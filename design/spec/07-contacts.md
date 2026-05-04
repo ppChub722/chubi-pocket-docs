@@ -16,7 +16,7 @@ Global conventions (base URL, error envelope, data types, HTTP verbs) are in [`o
 | Absorb `person_name` strings into a contact | ✅ | ✅ | ✅ |
 | Archive / restore contacts | ✅ | ✅ | ✅ |
 | Invite-based linking to app user | ✅ | ✅ | ✅ |
-| Unlink (keep contact, clear app_user_id) | ✅ | ✅ | ✅ |
+| Unlink (keep contact, clear linked_user_id) | ✅ | ✅ | ✅ |
 | Delete (hard; restore `person_name` on splits) | ✅ | ✅ | ✅ |
 | Fuzzy match for absorb / autocomplete | — | ✅ | ✅ |
 | Merge two contacts | — | ✅ | ✅ |
@@ -37,48 +37,58 @@ Codes are single-use. An invite is "live" when `accepted_at IS NULL AND expires_
 
 ## 2. `person_name` lifecycle — how contacts interact with splits
 
-`shared_expense_splits` has two columns that together identify who owes:
+`shared_expense_splits` has two columns that together identify the debtor:
 
-- `person_name` — free-text note ("mom", "MoM", "bf")
-- `contact_id` — FK to a contact row
+- `person_name` — `NOT NULL`, the durable display label ("mom", "Mom", "bf")
+- `contact_id` — optional FK to a contact row
 
-**Invariant:** exactly one is set at any moment. Never both, never neither.
+**Rule:** `person_name` is **always set**; `contact_id` is **optional**. Both can be set at the same time. `person_name` acts as the snapshot label; when `contact_id` is set the UI joins live to `contacts.display_name` for display, and falls back to `person_name` only when `contact_id` is NULL (unlinked / deleted).
 
-- `person_name` set, `contact_id = NULL` — unnamed note; a free-text placeholder
-- `person_name = NULL`, `contact_id` set — structured contact reference
+**Sync rule (service layer):** whenever `contact_id` is set or changed on a split — at split creation, edit, or via `POST /v1/contacts/:id/absorb` — the service writes `person_name = COALESCE(contact.nickname, contact.display_name)` so the snapshot reflects the link at that moment. Subsequent contact rename does **not** propagate to `person_name` (the live join handles display). On contact delete, the service snapshots the current contact name into `person_name` *before* nullifying `contact_id`, so the post-delete fallback shows the most recent name.
 
-Enforced at DB level via CHECK constraint on `shared_expense_splits` (spec in [`06-shared-expenses.md`](06-shared-expenses.md)).
+Full debtor-identity model (with `project_member_id` for project-context splits in 1b.2): see [`06-shared-expenses.md §2.5`](06-shared-expenses.md).
 
 ### 2.1 Lifecycle
 
 ```
-[Start] User types "mom" directly on a split
-  → split: person_name = "mom", contact_id = NULL
+[Start] User types "mommo" directly on a split
+  → split: person_name = "mommo", contact_id = NULL
+  → display: "mommo"
 
-[Consolidate — absorb] User creates contact "Mom", absorbs the "mom" strings
-  → split: person_name = NULL, contact_id = Mom.id
-  → display: "Mom" (or contact.nickname if set)
+[Consolidate — absorb] User creates contact "Mom" (display_name="Mom"),
+  absorbs the "mommo" strings
+  → split: person_name = "Mom", contact_id = Mom.id
+                                  ↑ service syncs person_name to contact's name
+  → display: "Mom" (live join from contact)
 
 [Link — invite accepted] Actual Mom joins the app and accepts the invite
-  → contact.app_user_id = mom_user.id
+  → contact.linked_user_id = mom_user.id
   → Mom's app now shows "I owe Alice ฿X" for those splits
-  → split row unchanged (still contact_id = Mom.id)
+  → split row unchanged
 
-[Unlink — soft] Alice unlinks the contact
-  → contact.app_user_id = NULL
+[Rename — Alice renames "Mom" → "Mommy"]
+  → contact.display_name = "Mommy"
+  → split row unchanged (person_name still "Mom")
+  → display: "Mommy" (live join, contact's current name)
+  ← Note: person_name is intentionally NOT updated. The live join handles
+    rename for display; person_name only matters as a fallback after
+    contact_id becomes NULL.
+
+[Unlink — soft] Alice unlinks the contact (clears linked_user_id only)
+  → contact.linked_user_id = NULL
   → Mom's view disappears
   → split row unchanged; contact still exists as an unlinked contact
-  → Alice can re-invite later to re-link
+  → display: "Mommy" (still live join — contact_id is still set)
 
 [Delete — hard] Alice deletes the contact
   → For each split where contact_id = this contact:
-      SET person_name = COALESCE(contact.nickname, contact.display_name)
+      SET person_name = COALESCE(contact.nickname, contact.display_name)  ← snapshot now
       SET contact_id = NULL
   → DELETE the contact row
-  → Display on splits: back to a free-text note using the last-known contact name
+  → display on those splits: "Mommy" (the snapshot from delete time)
 ```
 
-Restoring: if user wants the contact back, they create a new contact and re-absorb. Original typos ("MoM", "mOMMO") aren't restored — splits display the contact-name snapshot from delete time.
+Restoring: if user wants the contact back, they create a new contact and re-absorb. Original typos ("mommo") aren't restored — splits display the contact-name snapshot from delete time.
 
 ---
 
@@ -121,11 +131,13 @@ Create a contact. Optionally absorb existing `person_name` strings in the same r
 3. If `absorb_names` present:
    ```sql
    UPDATE shared_expense_splits
-     SET contact_id = :new_contact_id, person_name = NULL
+     SET contact_id  = :new_contact_id,
+         person_name = COALESCE(:nickname, :display_name)  -- snapshot the linked name
      WHERE user_id = :user_id
        AND contact_id IS NULL
        AND LOWER(person_name) IN (:absorbed_names_lowercased);
    ```
+   `person_name` is rewritten — not nulled — so the row's display label is now the structured contact name. The live join reads from the contact while `contact_id` is set; the rewritten `person_name` is the post-delete fallback.
 4. Return the contact with a count of absorbed splits
 
 **Success — `201 Created`:**
@@ -158,7 +170,7 @@ List contacts owned by the user.
 | Name | Description |
 |---|---|
 | `status` | `active` (default) \| `archived` \| `all` |
-| `linked` | `true` \| `false` — filter by whether `app_user_id` is set |
+| `linked` | `true` \| `false` — filter by whether `linked_user_id` is set |
 | `search` | Case-insensitive substring match on `display_name` / `nickname` |
 
 **Response — `200 OK`:**
@@ -174,7 +186,7 @@ List contacts owned by the user.
       "phone": "+66-...",
       "notes": "...",
       "icon": "person-heart",
-      "app_user_id": "0190e5-user...",
+      "linked_user_id": "0190e5-user...",
       "linked_user": {
         "display_name": "Somying Smith",
         "avatar_url": "https://..."
@@ -199,7 +211,7 @@ Get a single contact with computed fields (`split_count`, `outstanding_amount`, 
 Update contact fields. Partial.
 
 Editable: `display_name`, `nickname`, `email`, `phone`, `notes`, `icon`.
-Not editable: `app_user_id` (use link / unlink endpoints), `status` (use archive / restore), `user_id`.
+Not editable: `linked_user_id` (use link / unlink endpoints), `status` (use archive / restore), `user_id`.
 
 **Errors:** `400 VALIDATION_ERROR`, `401`, `403`, `404`.
 
@@ -263,7 +275,7 @@ Code is 8 chars, alphanumeric (unambiguous set — no `0`, `O`, `1`, `I`).
 
 | HTTP | Code | Cause |
 |---|---|---|
-| 400 | `ALREADY_LINKED` | Contact already has `app_user_id` set |
+| 400 | `ALREADY_LINKED` | Contact already has `linked_user_id` set |
 | 401 / 403 / 404 | | |
 
 ### 3.8 `POST /v1/contacts/accept-invite`
@@ -283,7 +295,7 @@ Called by the **potential linked user** (not the contact owner). Accepts an invi
 3. Check that contact.user_id != caller.user_id (can't accept your own invite)
 4. Check uniqueness: does caller already have a contact linked to the owner, or does the owner already have a contact linked to this user?
    - Failure → `409 ALREADY_LINKED` with details
-5. Set `contact.app_user_id = caller.user_id`
+5. Set `contact.linked_user_id = caller.user_id`
 6. Set `invite.accepted_at = NOW()`, `invite.accepted_by_user_id = caller.user_id`
 7. Return the contact (owner's view) and a confirmation
 
@@ -309,11 +321,13 @@ Cancel a pending invite (contact owner only).
 
 ### 3.10 `POST /v1/contacts/:id/unlink`
 
-Clear `app_user_id`. Contact stays in the book with all history. The linked user's view of splits referencing this contact disappears.
+Clear `linked_user_id`. Contact stays in the book with all history. The linked user's view of splits referencing this contact disappears.
+
+`shared_expense_splits` rows are unaffected — `contact_id` stays set, so the splits keep their structured reference and the UI keeps reading the contact's display name via live join. The split's own `person_name` snapshot doesn't need to be touched here; it's only the post-delete fallback.
 
 **Request body:** none.
 
-**Response — `200 OK`:** the contact with `app_user_id = null`.
+**Response — `200 OK`:** the contact with `linked_user_id = null`.
 
 **Errors:** `400 NOT_LINKED` (contact wasn't linked), `401`, `403`, `404`.
 
@@ -337,7 +351,7 @@ Hard-delete the contact. Restores `person_name` on all referencing splits.
 
 **Backend flow:**
 
-1. If `app_user_id` set, effectively unlinks (the linked user's view disappears)
+1. If `linked_user_id` set, effectively unlinks (the linked user's view disappears)
 2. `UPDATE shared_expense_splits SET person_name = COALESCE(contact.nickname, contact.display_name), contact_id = NULL WHERE contact_id = :id`
 3. Delete `contact_invites` rows for this contact (cascade)
 4. Delete the contact row
@@ -364,21 +378,26 @@ Contacts exist to let users split bills with people who may never join the app. 
 Three states along this journey:
 
 1. **Ad-hoc note** (`person_name` set, no contact) — user hasn't bothered to create a contact; the split just has a typed name
-2. **Contact, not linked** (contact exists, `app_user_id = NULL`) — structured but private to the owner
+2. **Contact, not linked** (contact exists, `linked_user_id = NULL`) — structured but private to the owner
 3. **Contact, linked** (both set) — cross-user visibility; both sides see the shared debt
 
 Users move freely between states. Downgrading (unlink, then delete) is always available.
 
-### 4.2 `person_name` is the free-text note; `contact_id` is the structured reference
+### 4.2 `person_name` always set; `contact_id` is an optional structured decoration
 
-On every `shared_expense_splits` row, exactly one of the two is set:
+On every `shared_expense_splits` row:
 
-- `person_name = "mom"`, `contact_id = NULL` — free-text note
-- `person_name = NULL`, `contact_id = <uuid>` — structured
+- `person_name` is `NOT NULL` — durable display label, snapshot kept in step with the linked contact's name at link time and at contact delete.
+- `contact_id` is optional — when set, the UI joins live to the contact for display; when null, falls back to `person_name`.
 
-CHECK constraint enforces this at the DB level (defined in [`06-shared-expenses.md`](06-shared-expenses.md)).
+Both can be set simultaneously. The column rule reduces to a single `NOT NULL` on `person_name` (plus the parent-FK XOR for source — see [`06-shared-expenses.md §1`](06-shared-expenses.md)).
 
-**Pattern B:** absorb clears `person_name` and sets `contact_id`. Delete reverses: restores `person_name` from the contact's `nickname || display_name`, clears `contact_id`. Trade-off: original typo variants lost on absorb; user sees a clean single label afterward. Industry-standard choice (Splitwise does effectively this when a guest is promoted).
+**Why "always-set name + optional FK" beats strict XOR:**
+
+- **Promotion is non-destructive.** Going free-text → contact-linked rewrites the snapshot to the contact's name and sets `contact_id`. The original typo variant is lost (intentional — the user sees a clean label), but no row ever transits through a NULL state.
+- **Deletion has a free fallback.** When a contact is hard-deleted, `person_name` already holds a snapshot. Service updates the snapshot to the *current* contact display name immediately before nullifying the FK so the post-delete display is the most recent name.
+- **Display is automatic.** `contact_id` set → live join. Null → snapshot. No conditional union over three columns.
+- **Industry-standard choice** (Splitwise does effectively this when a guest is promoted).
 
 ### 4.3 Privacy boundary on linked users
 
@@ -394,20 +413,20 @@ Mom does **not** see:
 - Other contacts in Alice's book
 - Other users Alice is linked to
 
-Enforced at the API response-projection layer. Mom can only see splits where `contact.app_user_id = her.id`.
+Enforced at the API response-projection layer. Mom can only see splits where `contact.linked_user_id = her.id`.
 
 ### 4.4 Icon + avatar fallback
 
 Display precedence for rendering a contact:
 
-1. Linked user's `avatar_url` (if `app_user_id` set and user has one)
+1. Linked user's `avatar_url` (if `linked_user_id` set and user has one)
 2. Linked user's `user_icon` *(Phase 2; preset icon on user profile — new `users` column)*
 3. Contact's `icon`
 4. Generic default icon (client-side)
 
 Allows users to: set a real photo on their profile for friends who link, or fall back to a playful preset icon picker. Contact owners who don't know the linked person's style pick an icon they like.
 
-### 4.5 Uniqueness: one contact per (user, app_user_id)
+### 4.5 Uniqueness: one contact per (user, linked_user_id)
 
 A given user cannot have two contacts both linked to the same app user. Prevents duplicate debt streams flowing to the linked user (Mom seeing "I owe Alice ฿100" twice from two different contacts).
 
@@ -431,7 +450,7 @@ Codes are 8 chars, alphanumeric with unambiguous set (no `0/O/1/I`), 7-day TTL. 
 
 Three levels of "removing" a contact:
 
-| Action | Effect on contact | Effect on `app_user_id` | Effect on splits |
+| Action | Effect on contact | Effect on `linked_user_id` | Effect on splits |
 |---|---|---|---|
 | **Unlink** | stays; remains in book | cleared → NULL | unchanged (still reference the contact); linked user loses view |
 | **Archive** | stays; `status = archived` | unchanged | unchanged; contact hidden from pickers; linked user loses view while archived |
@@ -441,7 +460,7 @@ Rationale: different user intents deserve different actions. "Stop sharing" shou
 
 ### 4.8 Block self-link
 
-`user_id != app_user_id` enforced at DB level. Alice cannot create a contact that links to herself. Would cause pathological queries (you'd see splits you owe yourself).
+`user_id != linked_user_id` enforced at DB level. Alice cannot create a contact that links to herself. Would cause pathological queries (you'd see splits you owe yourself).
 
 If Alice really wants to split with "me" (rare — e.g., tracking reimbursements between personal and business accounts for tax purposes), use a plain person_name or create a separate contact without linking.
 
@@ -474,6 +493,9 @@ When the user taps "New contact," client calls this endpoint first to populate t
 
 ## 6. Status
 
-- **Phase** — spec; Phase 1b implementation pending
-- **Last updated** — 2026-04-25
-- **Version** — 0.1 (initial draft; Pattern B for person_name, separate unlink/archive/delete, invite-only linking, block duplicate links)
+- **Phase** — spec; Phase 1b.1 implementation pending
+- **Last updated** — 2026-04-30
+- **Version** — 0.2
+- **Changelog**
+  - **0.2 (2026-04-30)** — Aligned with `06-shared-expenses.md` v0.3: `person_name` is always set on splits; `contact_id` is an optional decoration that coexists with the snapshot rather than replacing it. Updated §2 lifecycle, §3.1 absorb SQL, §3.10 unlink, §4.2 design rationale.
+  - **0.1** — Initial draft (Pattern B for `person_name`, separate unlink/archive/delete, invite-only linking, block duplicate links).

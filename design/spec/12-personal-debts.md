@@ -1,370 +1,302 @@
-# 12 — Personal Debts
+# 12 — Personal Debts (bidirectional)
 
-The debtor-side ledger. **"What I owe to others."** A standalone tracker for obligations the user has chosen to log — whether linked to a split or freestanding.
+The unified obligations ledger. Tracks "I owe X" and "Y owes me" in one
+table — every commitment between the user and another party, regardless
+of how it originated. Replaces the old two-table design (`shared_expense_splits`
++ debtor-only `personal_debts`) that shipped in 1b.1; merged in migration 24.
 
-This module owns the `personal_debts` table and the I-owe / owed-to-me dashboard. It's a separate user-facing screen with its own CRUD; settlement state is computed from the user's personal `transactions` and the splits they're involved in (defined in [`06-shared-expenses.md`](06-shared-expenses.md)).
+References: `transactions` (origin + settlement), `contacts`, `projects`
+(1b.2), `project_transactions` (1b.2).
 
-References: `transactions` (user's personal entries that auto-close debts via `source_split_id`), `shared_expense_splits` (optional source via `source_split_id`), `contacts`, `projects`.
-
-Global conventions (base URL, error envelope, data types, HTTP verbs) are in [`overview.md`](overview.md).
+Global conventions in [`overview.md`](overview.md).
 
 ---
 
-## Phase summary
+## 1. The model
 
-| Concern | Phase 1b | Phase 2 | Phase 3 |
+### 1.1 Three layers
+
+The app keeps **three separate truths**:
+
+| Layer | What it tracks | Mutability |
+|---|---|---|
+| **Account** (`accounts.balance`) | Real cash. ฿4000 went out, balance dropped ฿4000. Never adjusted to reflect "my share". | Recomputed atomically on every transaction |
+| **Transactions** (`transactions`) | The cash event itself. Full amount, account, category, date. | Mutable per spec §04 |
+| **Personal debts** (`personal_debts`) | Relationship state — "X owes Y". Bidirectional, person-grouped. Net positions. | Mutable: cancel, settle, direct-edit |
+
+The `personal_debts` row never moves money — it's metadata on top of
+transactions, capturing the obligation that a transaction created.
+Settlement of a debt creates *another* transaction that moves money,
+with `source_personal_debt_id` pointing back at the debt.
+
+### 1.2 Schema overview
+
+Full column definitions in [`../database/schema.md#12--personal-debts-bidirectional`](../database/schema.md).
+
+Key columns:
+
+- `direction` — `'i_owe'` (counterparty is creditor) | `'owed_to_me'` (counterparty is debtor)
+- `counterparty_contact_id` (nullable) + `counterparty_person_name` (always set) — direction-agnostic identification
+- `source_transaction_id` (nullable) — origin transaction in this row's owner's book; NULL for manual debts and partner-side mirror rows
+- `amount`, `settled_amount`, `status` (`open`/`settled`/`cancelled`)
+
+### 1.3 Per-user ownership
+
+Every row is owned by one user (`user_id`). When a split is created with
+a linked contact, **two rows are created**, one in each user's book —
+each user can edit theirs independently. If Alice creates expense + split
+with linked Bob, the rows are:
+
+| `user_id` | `direction` | `counterparty_*` | `source_transaction_id` |
 |---|---|---|---|
-| Personal_debts CRUD (debtor-side) | ✅ | ✅ | ✅ |
-| Add-as-debt from a split (`/shared-expenses/splits/:id/add-as-debt`) | ✅ | ✅ | ✅ |
-| Manual debt creation (no split, no project) | ✅ | ✅ | ✅ |
-| Auto-close on personal payment with matching `source_split_id` | ✅ | ✅ | ✅ |
-| Unified dashboard ("I owe / owed to me") | ✅ | ✅ | ✅ |
-| Cancel / forgive a debt | ✅ | ✅ | ✅ |
-| Bulk pay (settle many debts at once) | — | ✅ | ✅ |
-| Currency conversion across debts | — | — | Phase 3+ |
+| Alice | `owed_to_me` | Bob | Alice's transaction |
+| Bob | `i_owe` | Alice | NULL (Bob has no transaction in his book) |
+
+Bob can delete his row without affecting Alice's. Alice can edit her row
+without affecting Bob's. This respects each user's sovereignty over their
+own book.
+
+### 1.4 Origin paths
+
+A `personal_debts` row can be created via:
+
+| Trigger | `source_transaction_id` | Direction |
+|---|---|---|
+| `POST /v1/transactions` with `splits[]` (splitter side) | parent transaction | `owed_to_me` |
+| Same call's mirror on linked partner's side | NULL (no tx in partner's book) | `i_owe` |
+| Manual `POST /v1/personal-debts` (cash loan, IOU, broken item) | NULL | caller picks |
+| 1b.2: `POST /v1/projects/:id/project-transactions` with `splits[]` | NULL (project context uses `source_project_transaction_id`) | actor side / member side |
 
 ---
 
-## 1. Schema
+## 2. Settlement
 
-Tables owned by this module: `personal_debts`.
+Two ways `settled_amount` advances:
 
-Full column definitions, constraints, and indexes: see [`../database/schema.md#12--personal-debts`](../database/schema.md#12--personal-debts).
+### 2.1 Through a transaction (default — money actually moves)
 
-Notable behavior:
-
-- `creditor_contact_id` (optional) + `creditor_person_name` (always set) — creditor identification. The display name is durable: stays even if the contact is later renamed or deleted.
-- `source_split_id` — optional link to the originating split (when row created via `add-as-debt`). `ON DELETE SET NULL` so the debt survives if the split is deleted.
-- `paid_amount` is auto-bumped when the user's personal `transactions` with matching `source_split_id` land — see §2.3.
-- **No `creditor_member_id`** — dropped under the unified model. Creditor is always identified by contact_id + person_name.
-
----
-
-## 2. Core concepts
-
-### 2.1 Three ways a row gets created
-
-| Trigger | source_split_id | project_id | creditor_contact_id |
-|---|---|---|---|
-| **Manual** — Bob owes Somchai for lunch (no split, no project) | NULL | NULL | optional (set if Somchai is a contact) |
-| **Add-as-debt from personal-context split** — Alice splits dinner with Bob (linked contact) | set | NULL | optional (set if creditor is in Bob's contacts) |
-| **Add-as-debt from project-context split** — Grandma fronted; Carol owes Grandma | set | set | optional (set if Carol has Grandma in her contacts) |
-
-In all three cases, `creditor_person_name` is always set — it's the durable display label, even if the contact is later renamed or deleted.
-
-### 2.2 Creditor identification — three forms
-
-**With contact link:**
+User creates a real income/expense via the settle endpoint:
 
 ```
-| creditor_contact_id | creditor_person_name |
-| C-alice             | "Alice"              |
+POST /v1/personal-debts/:id/settle
+{
+  "account_id": "...",
+  "amount": 2000,
+  "date": "2026-05-04"
+}
 ```
 
-The contact may itself be linked (`contact.app_user_id` set, creditor is an app user) or unlinked (just a name in the debtor's address book). Either way, the dashboard can render it consistently.
+BE creates:
+- One `transactions` row in the caller's book
+  - `type=expense` for `i_owe` debts (paying back)
+  - `type=income` for `owed_to_me` debts (receiving back)
+  - `source_personal_debt_id = debtId`
+  - Account balance updates accordingly
+- Auto-bump: `personal_debts.settled_amount += amount`, status flips to `settled` if covered
 
-**Person-name only:**
+### 2.2 Direct edit (no money — adjustments)
 
-```
-| creditor_contact_id | creditor_person_name |
-| NULL                | "Grandma"            |
-```
-
-Used when the creditor isn't in the debtor's contact book. Common for ad-hoc project members who the debtor hasn't promoted to a contact, or true free-text entries ("the cab driver who fronted my fare").
-
-The debtor can later edit a row to add a `creditor_contact_id` — promoting from name-only to contact-linked.
-
-### 2.3 Auto-close mechanic
-
-When the user creates a personal expense with `source_split_id` set (typically via `/shared-expenses/splits/:id/pay`), the backend looks up any `personal_debts` row with the same `(user_id, source_split_id)` and bumps its `paid_amount` by the expense's `amount`. If `paid_amount >= amount`, status flips to `paid`.
-
-This means add-as-debt followed by pay-now is automatic on the debtor's side — no second action required.
+User edits the row directly via `PUT /v1/personal-debts/:id`:
 
 ```
-SQL sketch:
-UPDATE personal_debts
-SET paid_amount = paid_amount + :amount,
-    status = CASE WHEN paid_amount + :amount >= amount THEN 'paid' ELSE status END,
-    updated_at = NOW()
-WHERE user_id = :caller AND source_split_id = :split_id;
+{ "settled_amount": 2000 }     // marked partially/fully settled
+{ "amount": 1500 }              // changed total (e.g., agreed lower)
+{ "status": "cancelled" }       // forgiven / written off
 ```
 
-### 2.4 Manual edits and cancellation
+Use cases:
+- Forgiveness in exchange for a favor ("I'll do the dishes for a week instead of paying you back")
+- Math correction (entered ฿2000, actual ฿1800)
+- Negotiated amount ("just give me ฿1500, we're square")
+- User doesn't track a cash account and partner paid cash
 
-The user can edit any field on their own debt rows (creditor_person_name, amount, paid_amount, note). They can also cancel a debt (debt forgiven / written off):
+### 2.3 Settle endpoint flag
 
-- `POST /v1/personal-debts/:id/cancel` → `status = 'cancelled'`, no money moves
-- Editing `paid_amount` directly is allowed (e.g., user paid Alice in cash without going through `/pay`)
-
-Drift between the auto-close machinery and manual edits is fine — last write wins. The dashboard always reflects the current row state.
-
-### 2.5 The unified dashboard — "I owe" vs "owed to me"
-
-The dashboard joins two sources from the caller's perspective:
-
-**I owe** — open `personal_debts` rows where `user_id = caller` and `status = 'open'`. Sum: `amount - paid_amount`.
-
-**Owed to me** — open splits where the caller is the creditor:
-- Splits on the caller's personal `transactions` rows (caller created the parent)
-- Splits on `project_transactions` where the caller is the actor (`transaction_member.user_id = caller`)
-- Splits on personal transactions claimed by the caller (parent's `user_id = caller` and parent has `source_project_transaction_id` set — the post-claim case)
-
-For each split, outstanding from caller's view = `owed_amount - sum(caller's income personal entries with source_split_id = split.id)`.
-
-Two queries; one unified response.
+`POST /v1/personal-debts/:id/settle?direct=true` — explicit direct-edit mode.
+Skips the transaction entirely and bumps `settled_amount` only. Useful when
+the FE wants a single endpoint with toggle.
 
 ---
 
 ## 3. API
 
-All endpoints require authentication. Paths rooted at `/api`.
+All endpoints require auth. Paths under `/api/v1`.
 
-### 3.1 `GET /v1/personal-debts`
+### 3.1 `GET /v1/personal-debts/people`
 
-List the caller's own debt rows.
+People view — aggregated by counterparty with net position.
 
-**Query parameters:**
+**Response:**
+
+```json
+{
+  "currency": "THB",
+  "total_owed_to_me": 2000,
+  "total_i_owe": 1000,
+  "net_position": 1000,
+  "data": [
+    {
+      "contact_id": "0190e5-bob",
+      "display_name": "Bob",
+      "owed_to_me_open": 500,
+      "i_owe_open": 0,
+      "net_position": 500,
+      "open_count": 2
+    },
+    {
+      "contact_id": null,
+      "display_name": "Mom",
+      "owed_to_me_open": 0,
+      "i_owe_open": 1000,
+      "net_position": -1000,
+      "open_count": 1
+    }
+  ]
+}
+```
+
+Grouping key: `contact_id` when set, else case-insensitive `counterparty_person_name`.
+Settled and cancelled rows excluded.
+
+### 3.2 `GET /v1/personal-debts`
+
+Flat list. Filters:
 
 | Name | Description |
 |---|---|
-| `status` | `open` (default) / `paid` / `cancelled` / `all` |
-| `creditor_contact_id` | Filter to a specific contact |
-| `project_id` | Filter to a specific project |
-| `from`, `to` | Date range (created_at) |
-| `page`, `per_page` | Standard pagination |
+| `direction` | `i_owe` / `owed_to_me` |
+| `status` | `open` (default) / `settled` / `cancelled` / `all` |
+| `counterparty_contact_id` | filter to a specific contact |
+| `from`, `to` | date range (`created_at`) |
+| `page`, `per_page` | pagination |
 
-**Response:**
+### 3.3 `POST /v1/personal-debts`
 
-```json
-{
-  "data": [
-    {
-      "id": "0190e5-debt1",
-      "creditor_contact_id": "0190e5-alice",
-      "creditor_person_name": "Alice",
-      "source_split_id": "0190e5-split1",
-      "project_id": "0190e5-japan",
-      "amount": 1000.00,
-      "paid_amount": 0,
-      "outstanding": 1000.00,
-      "currency": "THB",
-      "status": "open",
-      "note": "Hotel split",
-      "created_at": "..."
-    }
-  ],
-  "total_outstanding_by_currency": { "THB": 1000.00 },
-  "pagination": { "page": 1, "per_page": 20, "total": 1, "total_pages": 1 }
-}
-```
+Manual debt entry. Both directions supported.
 
-### 3.2 `POST /v1/personal-debts`
-
-Manually add a debt. No source split, no project context.
-
-**Request body:**
+**Request:**
 
 ```json
 {
-  "creditor_contact_id": "0190e5-somchai",
-  "creditor_person_name": "Somchai",
-  "amount": 500.00,
+  "direction": "i_owe",
+  "counterparty_contact_id": "0190e5-mom",
+  "counterparty_person_name": "Mom",
+  "amount": 500,
   "currency": "THB",
-  "note": "Lunch last Thursday"
+  "note": "Cash loan for parking"
 }
 ```
 
-| Field | Required | Rules |
-|---|---|---|
-| `creditor_person_name` | ✅ | Always required — the display label |
-| `creditor_contact_id` | — | Optional — link to contact book |
-| `amount` | ✅ | > 0 |
-| `currency` | ✅ | ISO 4217 |
-| `note` | — | |
+### 3.4 `GET /v1/personal-debts/:id`
 
-(Manual debts have no `source_split_id` or `project_id`. Use `add-as-debt` from a split context for those.)
+### 3.5 `PUT /v1/personal-debts/:id` — direct edit
 
-**Errors:** `400 VALIDATION_ERROR`, `401`.
+Editable: `amount`, `settled_amount`, `note`, `status`, `counterparty_*`.
 
-### 3.3 `PUT /v1/personal-debts/:id`
+### 3.6 `POST /v1/personal-debts/:id/cancel`
 
-Edit debt fields. Caller must be `user_id` (debt owner).
+Marks `status='cancelled'`. No money moves.
 
-**Editable:** `creditor_contact_id`, `creditor_person_name`, `amount`, `paid_amount`, `currency`, `note`, `status`.
+### 3.7 `POST /v1/personal-debts/:id/settle?direct=<true|false>`
 
-Editing `paid_amount` directly is allowed (manual reconciliation). If `status` is changed to `paid`, backend validates `paid_amount >= amount`.
+Records a settlement. Default mode (`direct=false`) creates a transaction.
+`direct=true` skips the transaction and just bumps `settled_amount`.
 
-**Errors:** `400 VALIDATION_ERROR`, `401`, `403 NOT_OWNER`, `404`.
+**Errors:** `ALREADY_SETTLED`, `ALREADY_CANCELLED`, `OVERPAYMENT`.
 
-### 3.4 `DELETE /v1/personal-debts/:id`
-
-Hard delete. Doesn't touch any linked source split (that lives on the creditor's side).
-
-### 3.5 `POST /v1/personal-debts/:id/cancel`
-
-Convenience endpoint to mark `status = 'cancelled'` without manual edit. Used when a debt is forgiven / written off.
-
-### 3.6 `POST /v1/personal-debts/:id/pay`
-
-Settle a debt by recording a real payment. Creates a personal `transactions` row from the debt's context.
-
-**Request body:**
-
-```json
-{
-  "account_id": "0190e5-bob-kbank",
-  "amount": 500.00,
-  "date": "2026-04-26"
-}
-```
-
-| Field | Required | Rules |
-|---|---|---|
-| `account_id` | ✅ | Caller's account |
-| `amount` | — | Defaults to `outstanding` (`amount - paid_amount`); partial allowed |
-| `date` | — | Defaults to today |
-
-**Backend (atomic):**
-
-1. Validate caller is the debt owner
-2. Insert personal `transactions` row: `type=expense`, `account_id`, `amount`, `source_split_id` = debt's `source_split_id` if set (else NULL), `project_id` = debt's `project_id`
-3. `accounts.balance −= amount`
-4. Bump debt's `paid_amount += amount`; flip `status = 'paid'` if paid in full
-5. If a split is linked AND its creditor is a linked user, fire `split_paid` notification (delegating to the same notification trigger used by `/shared-expenses/splits/:id/pay`)
-
-**Success — `201 Created`:** the created personal transaction + updated debt.
-
-**Errors:** `400 ALREADY_PAID`, `400 ALREADY_CANCELLED`, `400 OVERPAYMENT`, `401`, `403 NOT_OWNER`, `404`.
-
-### 3.7 `GET /v1/personal-debts/dashboard`
-
-Unified dashboard — both directions.
-
-**Response:**
-
-```json
-{
-  "currency": "THB",
-
-  "owed_to_me": {
-    "total": 2000.00,
-    "by_person": [
-      {
-        "type": "project_member",
-        "member_id": "0190e5-m-bob",
-        "contact_id": null,
-        "display_name": "Bob",
-        "total": 1000.00,
-        "splits_count": 1
-      },
-      {
-        "type": "contact",
-        "contact_id": "0190e5-carol",
-        "display_name": "Carol",
-        "total": 1000.00,
-        "splits_count": 1
-      }
-    ]
-  },
-
-  "i_owe": {
-    "total": 1500.00,
-    "by_person": [
-      {
-        "type": "contact",
-        "contact_id": "0190e5-somchai",
-        "display_name": "Somchai",
-        "total": 500.00,
-        "source": "personal_debt"
-      },
-      {
-        "type": "person_name",
-        "display_name": "Grandma",
-        "total": 1000.00,
-        "source": "personal_debt"
-      }
-    ]
-  },
-
-  "net_position": 500.00
-}
-```
-
-`owed_to_me` is computed from splits where caller is creditor, summing `outstanding_from_my_view` per debtor identity. `i_owe` is computed from open `personal_debts` rows.
+### 3.8 `DELETE /v1/personal-debts/:id`
 
 ---
 
 ## 4. Design decisions
 
-### 4.1 Drop `creditor_member_id`
+### 4.1 Why bidirectional in one table
 
-The previous schema had `creditor_member_id` as a third creditor-identifier alongside `creditor_contact_id`. Dropped because:
+Splits + debtor-only personal_debts (the original 1b.1 design) caused
+semantic overlap and FE confusion: the same "obligation between two people"
+was tracked in two tables with different shapes, two screens, with the
+"owed to me" view computed from one and "I owe" from the other.
 
-- All creditors can be represented as either a contact (linked or unlinked) or a free-text name. Project members who aren't yet contacts use `creditor_person_name` (debtor-side label) and can be promoted to contacts later via `POST /v1/contacts` with `app_user_id` linking.
-- Unifies creditor identification across all three creation triggers (manual / personal-context / project-context).
-- The project context is still captured via `project_id` and `source_split_id`.
+Unified: every obligation is one row. Direction column says which side
+the row owner is on. People view nets directions trivially. The FE has
+one screen, one mental model.
 
-### 4.2 `creditor_person_name` always set
+### 4.2 Why two rows for linked-contact splits (not one)
 
-Always-set display label means the dashboard can always render the debt without joining contacts. Snapshot semantics: "Alice" stays "Alice" even if the user later renames their contact, ensuring debt history doesn't shift.
+Each user's book is independent. Bob can delete his row, edit his note,
+mark it settled via a barter agreement — none of which should mutate
+Alice's view. A shared row would force conflict resolution (who wins
+when both edit?). Two rows = no conflict, each user owns their truth.
 
-### 4.3 Separate from splits — own table, own screen
+Trade-off: the views can drift. Alice says "Bob owes me ฿2000"; Bob says
+"I deleted that, never agreed to it". This is realistic — and matches
+real life. Linked notifications at create-time alert the partner; both
+sides can add notes if they disagree.
 
-Splits are creditor-side ("Bob owes me"); personal_debts are debtor-side ("I owe Alice"). The two perspectives are complementary but not redundant:
+### 4.3 No more `shared_expense_splits` table
 
-- A split exists from the moment the creditor saves their transaction. The debtor doesn't have to do anything for it to exist.
-- A personal_debt exists only when the debtor explicitly tracks it (via add-as-debt, manual entry, or pay-now-which-auto-creates).
+Removed in migration 24. The factual record of "this transaction was
+split this way" lives in `personal_debts` rows with non-NULL
+`source_transaction_id`. Querying `WHERE source_transaction_id = T` gives
+the breakdown.
 
-Splits are managed in [`06-shared-expenses.md`](06-shared-expenses.md); personal_debts is its own module with its own UI.
+### 4.4 Direct edit vs transaction-settle
 
-### 4.4 Auto-close mechanic via `source_split_id`
+Both paths exist because real life has both. Money-moves cases create
+transactions (audit trail, account balance updates). No-money cases
+(forgiveness, barter, math fixes) skip transactions and just adjust
+`settled_amount`. Users can pick per-case.
 
-When the debtor pays a split (via `/shared-expenses/splits/:id/pay` or `/personal-debts/:id/pay`), the resulting personal expense has `source_split_id` set. The backend uses this to auto-bump any matching `personal_debts.paid_amount`.
+### 4.5 Account stays cash-basis; reports compute share-basis
 
-This means:
-- Add-as-debt followed by pay closes both the debt AND records the personal expense in one tap
-- The debtor never has to manually reconcile "I created a personal_debt; I paid; now I need to mark the debt closed"
+`accounts.balance` and the transactions table track real money flow.
+Spending reports (transactions summary) subtract the SUM of open
+`personal_debts` rows where `direction='owed_to_me'` and
+`source_transaction_id` matches — giving "my share". The user sees
+฿4000 actually went out (cash truth) AND ฿2000 was their real cost
+(share truth). Both are correct, neither is fudged.
 
-### 4.5 Manual `paid_amount` edits allowed
+### 4.6 Auto-bump on transaction with `source_personal_debt_id`
 
-The auto-close machinery is helpful but not mandatory. Users can directly edit `paid_amount` (e.g., "I paid Alice ฿300 in cash, didn't go through the app's pay flow"). Last write wins; no conflict detection.
+When a transaction with `source_personal_debt_id` lands, the BE looks
+up the matching debt row owned by the same user and bumps
+`settled_amount`. Single source of settlement state — no two-sided
+handshake, no global flag.
 
-### 4.6 `ON DELETE SET NULL` for source split
+If the transaction is rolled back (parent edit, account deletion),
+the auto-bump rolls back too (same DB tx).
 
-If the creditor deletes the parent transaction (and cascade kills the split), the debtor's personal_debt loses its `source_split_id` link but keeps the row. The debt becomes "unlinked" but still exists for the debtor's tracking.
+### 4.7 Manual debts and creditor-side bookkeeping
 
-This protects the debtor from data loss when the creditor mutates their book.
+Manual debts (`source_transaction_id IS NULL`) cover:
+- Cash I borrowed yesterday but didn't record the income
+- "Bob broke my phone, owes me ฿8000"
+- "I'll pay you ฿500 next time we meet" agreements
 
-### 4.7 Currency stored per row
-
-Manual debts have no parent to inherit from, so currency must be explicit. Auto-created (from add-as-debt) rows inherit from the source split's parent transaction's currency.
-
-Multi-currency dashboard rendering and conversion are deferred to Phase 3+.
-
-### 4.8 Manual debts have no auto-close path
-
-A manual `personal_debts` row (no `source_split_id`) can only be closed via `/personal-debts/:id/pay` or direct `paid_amount` edit. There's no split context to trigger auto-close.
+Both directions can be manual. The key constraint: `counterparty_person_name`
+is always set — even free-text entries get displayed by name in the
+people view.
 
 ---
 
-## 5. Open questions
+## 5. Open questions / Phase 2+
 
-- **Bulk pay** — "Settle all my debts to Alice in one go" — single account, multiple debts. Phase 2+.
-- **Recurring debts** — "I owe my landlord ฿8,000/mo" — better expressed as a recurring transaction, not a debt. Cross-link with [`11-scheduled-transactions.md`](11-scheduled-transactions.md) at the UI layer.
-- **Debt forgiveness notification** — When debtor cancels, notify creditor? Probably yes; Phase 2+.
-- **Currency conversion** — Multi-currency dashboard summing — Phase 3+.
-- **Promoting person_name to contact** — One-tap from the debt detail view: "Add Grandma to my contacts." Uses existing `POST /v1/contacts` endpoint; no new schema.
-- **Statute of limitations / archive** — Auto-archive paid debts older than X months to keep dashboard lean? Phase 2+ user setting.
+- **Notifications** — `debt_created`, `debt_settled` triggers (replacing
+  `split_*` types from the deprecated splits design)
+- **Bulk settle** — "settle all my open debts with Alice in one tap"
+- **Multi-currency dashboard** — nets across currencies (Phase 3+)
+- **Auto-archive** — settled debts older than X months hidden from
+  default views (user setting)
+- **Project-context** — 1b.2's `source_project_transaction_id` and
+  `project_id` columns ship dormant; project_transactions with splits
+  not yet wired post-refactor
 
 ---
 
 ## 6. Status
 
-- **Phase** — spec; Phase 1b implementation pending
-- **Last updated** — 2026-04-26
-- **Version** — 0.1 (extracted from `06-shared-expenses.md` v0.1; updated for unified model)
-  - Drops `creditor_member_id`
-  - Renames `creditor_display_name` → `creditor_person_name`
-  - Adds `POST /v1/personal-debts/:id/pay` convenience endpoint
-  - Adds `GET /v1/personal-debts/dashboard` unified view
-  - Auto-close mechanic via `source_split_id` formalized
+- **Phase** — 1b refactor complete (BE + FE + schema)
+- **Last updated** — 2026-05-04
+- **Version** — 1.0 (post-merge of splits + debts)
+- **Predecessor** — `06-shared-expenses.md` v0.3 (deprecated)
+- **Migration** — 24 (drop splits, rebuild personal_debts) + 25 (rename source_split_id)

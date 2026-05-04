@@ -27,7 +27,7 @@ This document is the **canonical API contract**. Postman / OpenAPI exports are d
 | [07 — Contacts](#07--contacts) | Contact book, invites, linking *(pending)* |
 | [08 — Budgets](#08--budgets) | Budget CRUD, overview *(pending)* |
 | [09 — Saving Goals](#09--saving-goals) | Goal CRUD, progress *(pending)* |
-| [10 — Projects](#10--projects) | Projects, members, invites, project transactions, claims *(pending)* |
+| [10 — Projects](#10--projects) | Projects, members, invites, project transactions (with splits), per-row marks |
 | [11 — Scheduled Transactions](#11--scheduled-transactions) | Recurring + installments *(pending)* |
 | [12 — Personal Debts](#12--personal-debts) | Debt tracking *(pending)* |
 | [13 — Notifications](#13--notifications) | Inbox, settings *(pending)* |
@@ -649,7 +649,77 @@ Change username. **Rate-limited to once per 30 days per user** — username live
 
 ## 10 — Projects
 
-*Pending — see [`../spec/10-projects.md`](../spec/10-projects.md).*
+Post-migration 27 endpoint surface (project as a separate book — see [`../plans/project-as-separate-book.md`](../plans/project-as-separate-book.md)).
+
+### Projects CRUD
+
+- `POST   /v1/projects` — create
+- `GET    /v1/projects` — list (`?status=active|completed|cancelled|archived|all`, `?type=`, `?page=`, `?per_page=`)
+- `GET    /v1/projects/:id`
+- `PUT    /v1/projects/:id` (owner only — name/type/description/start_date/end_date/status)
+- `DELETE /v1/projects/:id` (owner only; rejected with `409 PROJECT_HAS_TRANSACTIONS` if any rows exist)
+- `POST   /v1/projects/:id/leave`
+- `POST   /v1/projects/:id/transfer-ownership` `{new_owner_user_id}`
+
+### Members
+
+Two variants on `POST /v1/projects/:id/members` (the from-contact variant was dropped in migration 27 — contacts are user-scoped; for "add my contact", look up `contacts.linked_user_id` client-side and use the by-email or ad-hoc variant):
+
+- by-email: `{email, display_name, role?}` — pending until accepted via project_invite notification
+- ad-hoc: `{display_name, ad_hoc: true, role?}` — active immediately, no user link
+
+Endpoints:
+
+- `GET    /v1/projects/:id/members`
+- `POST   /v1/projects/:id/members`
+- `PUT    /v1/projects/:id/members/:member_id` (owner only — `{role}`)
+- `DELETE /v1/projects/:id/members/:member_id` (owner only; cannot remove the owner)
+- `POST   /v1/projects/:id/members/:member_id/request-link` (re-issue invite — owner only)
+- `POST   /v1/projects/link-requests/:notification_id/accept`
+- `POST   /v1/projects/link-requests/:notification_id/reject`
+
+### Project transactions
+
+The project ledger is decoupled from personal books. Splits are represented as child rows of the parent (linked via `parent_project_transaction_id`).
+
+- `GET    /v1/projects/:id/transactions` — flat list of parents + their children. Pagination applies to **parent rows only**; children of returned parents are appended without counting against `per_page`. Client groups into a tree via `parent_project_transaction_id`.
+- `POST   /v1/projects/:id/project-transactions` — body:
+  ```json
+  {
+    "transaction_member_id": "uuid",
+    "type": "expense | income",
+    "amount": 1000.00,
+    "currency": "THB",
+    "date": "YYYY-MM-DD",
+    "note": "optional",
+    "splits": [
+      {"member_id": "uuid", "amount": 500.00}
+    ]
+  }
+  ```
+  Children inherit `type/currency/date/note` from the parent — do not send them per child. Server validates: each split's member belongs to the project, no self-split (split member ≠ parent actor), Σ split amounts ≤ parent amount.
+- `PUT    /v1/projects/:id/project-transactions/:pt_id` — body fields all optional: `amount`, `date`, `note`, `splits`. When `splits` is non-null, all existing children are deleted and the new list is inserted (full replacement). Children cannot be edited directly; rejected with `400 PT_IS_CHILD` if `:pt_id` is a child.
+- `DELETE /v1/projects/:id/project-transactions/:pt_id` — deleting a parent FK-cascades children. Deleting a child removes that one split.
+- `PUT    /v1/projects/:id/project-transactions/:pt_id/mark` — body `{"marked": bool}`. Toggles caller's `project_member_id` in the row's `marks` array. Idempotent. Independent of personal-book actions.
+
+There is **no `/claim` endpoint** — the resolve flow is client-side. The FE creates personal entries via the regular `POST /v1/transactions` (with `source_project_transaction_id` set for traceback) or `POST /v1/personal-debts`. The transactions module auto-derives `project_id` from `source_project_transaction_id` and validates caller is a project member.
+
+### Summary
+
+- `GET    /v1/projects/:id/summary` — totals (parents only, children excluded), member count.
+
+### Error codes specific to projects
+
+- `NOT_OWNER` — owner-only action attempted by non-owner
+- `NOT_MEMBER` — caller isn't an active project member
+- `PROJECT_LOCKED` — write attempted on cancelled/archived project
+- `PROJECT_NOT_ACTIVE` — `create_pt` attempted on non-active project
+- `PROJECT_HAS_TRANSACTIONS` — delete attempted with rows present (409)
+- `USER_ALREADY_MEMBER` — duplicate user→project membership (409)
+- `MEMBER_NOT_IN_PROJECT` — referenced member belongs to a different project
+- `PT_IS_CHILD` — direct edit attempted on a split-child row
+- `SELF_SPLIT` — split member equals parent actor
+- `SPLITS_EXCEED_PARENT` — Σ splits > parent amount
 
 ## 11 — Scheduled Transactions
 

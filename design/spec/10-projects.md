@@ -1,5 +1,18 @@
 # 10 — Projects
 
+> ⚠️ **REDESIGNED in Phase 2 (migration 27).** The behavior described below from "three ledgers, one shared view" through the Resolve / claim flow is the legacy design. The current model is **"project as a separate book"** — see [`../plans/project-as-separate-book.md`](../plans/project-as-separate-book.md) for the canonical description. Key changes:
+>
+> - Project ledger is **fully decoupled** from personal books — no auto-sync, no claim flow, no shared SQL view.
+> - **Splits live as child rows in `project_transactions`** (parent row + N children, linked by `parent_project_transaction_id`). The standalone `shared_expense_splits` table is no longer used by projects.
+> - Per-row **`marks`** array (set of `project_member.id`) replaces the project-side resolution flag — independent of personal-book actions.
+> - Resolve flow is **client-side**: the FE reads the project ledger, lets the caller pick lines, and calls the existing `POST /transactions` (with `source_project_transaction_id` set) or `POST /personal-debts`. The project module never sees personal book entries.
+> - **`project_members.contact_id`** and **`project_transactions.category_id`** are dropped — those are user-scoped resources and have no place on a shared row. Members are now linked or ad-hoc only; categories are picked fresh at resolve time.
+> - All members have **full edit rights** on any `project_transaction`.
+>
+> The sections below are kept for historical context and will be rewritten end-to-end in a follow-up.
+
+---
+
 Shared-visibility containers for time-bounded collaborative financial tracking. Trips, freelance gigs, group events — anywhere multiple people need to see the same set of transactions to coordinate who spent what, who owes whom, and how to settle.
 
 **Design principle — three ledgers, one shared view:**
@@ -364,8 +377,8 @@ Add a member. Owner only.
 
 Backend:
 1. Resolve contact from owner's contact book
-2. If contact has `app_user_id` set → create `project_members` row with `contact_id` + `user_id` (same as contact's app_user_id), auto-generate invite (user must accept to activate)
-3. If contact has no `app_user_id` → create `project_members` row with `contact_id` only; `user_id = NULL`; status = `active` immediately (contact member; no app access anyway)
+2. If contact has `linked_user_id` set → create `project_members` row with `contact_id` + `user_id` (same as contact's linked_user_id), auto-generate invite (user must accept to activate)
+3. If contact has no `linked_user_id` → create `project_members` row with `contact_id` only; `user_id = NULL`; status = `active` immediately (contact member; no app access anyway)
 
 **(b) Direct invite** (no contact):
 

@@ -376,7 +376,7 @@ Per global convention ([`overview.md §3`](overview.md)). All `PUT /v1/users/me`
 - `status` → `'archived'`
 
 **Why no hard delete:**
-- `users.id` is referenced by `created_by_user_id` / `updated_by_user_id` on every table, plus owned tables (`accounts`, `transactions`, `categories`, ...) and shared tables (`project_members`, `contacts.app_user_id`, splits, ...). Hard-deleting would either cascade-destroy other users' data (e.g., a project Alice was in) or force `SET NULL` on every audit reference, losing the historical record.
+- `users.id` is referenced by `created_by_user_id` / `updated_by_user_id` on every table, plus owned tables (`accounts`, `transactions`, `categories`, ...) and shared tables (`project_members`, `contacts.linked_user_id`, splits, ...). Hard-deleting would either cascade-destroy other users' data (e.g., a project Alice was in) or force `SET NULL` on every audit reference, losing the historical record.
 - Keeping the row preserves the audit trail and other users' linked data; anonymization satisfies PDPA/GDPR right-to-erasure for PII.
 
 **Owned-data handling at archive time:** owned rows (Alice's `accounts`, `transactions`, `categories`, `tags`, `budgets`, `saving_goals`) are deleted via existing `ON DELETE CASCADE` FKs at archive time by manually deleting them in the same job — Phase 3 design detail. Shared/referenced rows (project memberships, contacts pointing to her, splits where she's a debtor or creditor) remain so other users' data stays intact.

@@ -168,14 +168,14 @@ For transfers, the API accepts a `transfer_to_account_id` field. Backend creates
   "date": "2026-04-24",
   "note": "Dinner with friends",
   "splits": [
-    { "contact_id": "0190e5-bob",   "owed_amount": 1000.00 },
-    { "contact_id": "0190e5-carol", "owed_amount": 1000.00 }
+    { "person_name": "Bob",   "contact_id": "0190e5-bob",   "owed_amount": 1000.00 },
+    { "person_name": "Carol", "contact_id": "0190e5-carol", "owed_amount": 1000.00 }
   ],
   "my_share": 1000.00
 }
 ```
 
-Splits create rows in `shared_expense_splits` (schema in [`06-shared-expenses.md`](06-shared-expenses.md)). For personal-context splits (parent is a personal `transactions` row), each split row sets exactly one of `contact_id` or `person_name`. **`project_member_id` is not allowed on personal-context splits** — splitting with project members requires creating the parent in the project as a `project_transaction` (see [`10-projects.md`](10-projects.md)).
+Splits create rows in `shared_expense_splits` (schema in [`06-shared-expenses.md`](06-shared-expenses.md)). Each split row **must include `person_name`** (the durable display label) and may optionally include `contact_id` to promote the row to a structured contact reference. The two coexist; the service writes `person_name = COALESCE(contact.nickname, contact.display_name)` whenever `contact_id` is set so the snapshot is in step with the link. See [`06-shared-expenses.md §2.5`](06-shared-expenses.md). `project_member_id` ships with the projects module (1b.2) — splitting with project members on a personal transaction is allowed there, but for now (1b.1) it isn't a valid field on the request.
 
 | Field | Type | Required | Rules |
 |---|---|---|---|
@@ -186,7 +186,7 @@ Splits create rows in `shared_expense_splits` (schema in [`06-shared-expenses.md
 | `date` | date | ✅ | Calendar date in user's tz |
 | `note` | string | — | Free-text |
 | `transfer_to_account_id` | string | required if type=transfer | Must belong to caller; must differ from `account_id`; same currency (Phase 1) |
-| `splits` | array | — | For personal-context shared expenses; each split sets one of: `contact_id` / `person_name` |
+| `splits` | array | — | For personal-context shared expenses; each split row requires `person_name` (always) and may include `contact_id` (optional structured ref). See [`06-shared-expenses.md §2.5`](06-shared-expenses.md). |
 | `my_share` | number | required if `splits` present | Caller's own share amount (included in total) |
 
 **Note: no `project_id` parameter.** Personal transactions cannot be created with `project_id` set. The field is auto-managed: it's set on the row only when the row is a project mirror (a claim or a split-resolve, both created via dedicated endpoints in [`10-projects.md`](10-projects.md) §3.7 and [`06-shared-expenses.md`](06-shared-expenses.md) §3). To "associate" a personal transaction with a project, either (a) record it as a `project_transaction` instead, or (b) tag it with a `tag` (see [`05-categories-tags.md`](05-categories-tags.md)).
@@ -198,7 +198,7 @@ Splits create rows in `shared_expense_splits` (schema in [`06-shared-expenses.md
 - Each split row sets exactly one of `contact_id` / `person_name` (not `project_member_id`)
 - Transfer transactions cannot have splits
 
-**Notification side effects:** for each split with a debtor whose `contact.app_user_id` is set (linked contact), a `split_created` notification fires per the splitter's `auto_notify_linked_split_contacts` setting (see [`13-notifications.md`](13-notifications.md)).
+**Notification side effects:** for each split with a debtor whose `contact.linked_user_id` is set (linked contact), a `split_created` notification fires per the splitter's `auto_notify_linked_split_contacts` setting (see [`13-notifications.md`](13-notifications.md)).
 
 **Success — `201 Created`:**
 

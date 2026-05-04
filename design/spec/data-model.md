@@ -68,7 +68,7 @@ See [10-projects.md](10-projects.md) for the full claim/resolve flow.
 ## ERD — contacts, debts, notifications
 
 ```
-users ─┬─< contacts ──> users (app_user_id; nullable, set on link-accept)
+users ─┬─< contacts ──> users (linked_user_id; nullable, set on link-accept)
        │                └─< contact_invites
        ├─< personal_debts ─┬─> contacts (creditor_contact_id; nullable)
        │                   ├─> shared_expense_splits (source_split_id; nullable)

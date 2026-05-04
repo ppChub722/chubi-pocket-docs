@@ -64,7 +64,9 @@ Create a new account. If a non-zero opening balance is given, an "Opening Balanc
   "balance": 15000.00,
   "currency": "THB",
   "icon": "bank",
-  "color": "#2196F3"
+  "color": "#2196F3",
+  "description": "Daily-spend account",
+  "note": null
 }
 ```
 
@@ -76,6 +78,8 @@ Create a new account. If a non-zero opening balance is given, an "Opening Balanc
 | `currency` | string | — | ISO 4217; defaults to user's `currency` |
 | `icon` | string | — | |
 | `color` | string | — | Hex color |
+| `description` | string | — | Up to 280 chars; one-line guidance ("Daily-spend account"). `null` clears. |
+| `note` | string | — | Up to 280 chars; free-form scratch notes ("Old emergency fund — don't touch"). `null` clears. |
 | `credit_limit` | number | ✅ (if credit type) | ≥ 0 |
 | `statement_date` | integer | — | 1–31 |
 | `payment_due_date` | integer | — | 1–31 |
@@ -127,6 +131,8 @@ List accounts owned by the user.
       "currency": "THB",
       "icon": "bank",
       "color": "#2196F3",
+      "description": "Daily-spend account",
+      "note": null,
       "status": "active",
       "credit_limit": null,
       "statement_date": null,
@@ -164,6 +170,8 @@ Update an account's metadata. Partial — only provided fields change.
   "currency": "USD",
   "icon": "bank-alt",
   "color": "#1976D2",
+  "description": "Updated description",
+  "note": "Switched to USD on 2026-04-29",
   "status": "archived",
   "credit_limit": 50000.00,
   "statement_date": 28,
@@ -173,7 +181,7 @@ Update an account's metadata. Partial — only provided fields change.
 }
 ```
 
-All fields optional.
+All fields optional. `description` and `note` follow the same presence-tracking convention as `parent_id` on categories (§05/§3.4): the field absent means "leave alone"; explicit `null` clears the column.
 
 **Special rules:**
 
@@ -284,7 +292,15 @@ Balance summary and income/expense totals for an account over a date range.
 }
 ```
 
-`balance` is current balance as of now. `total_income`/`total_expense`/`net` are within the date range. Transfers **in** count as income; transfers **out** count as expense.
+`balance` is current balance as of now. `total_income` / `total_expense` / `net` and `transaction_count` are aggregated over the date range using the **report-inclusion rule**: a transaction contributes when its category has `include_in_report = TRUE`, or when the row has no category (uncategorized). Out of the seeded set this excludes:
+
+- Opening Balance (system) — bookkeeping at account creation, not real income / expense
+- Adjustment (system) — manual balance correction
+- Transfer In / Transfer Out (system) — money movement between user-owned wallets
+- Lending / Pay for Others, Reimbursements / Payback (starter user rows shipped with `include_in_report = false`)
+- Any user category the user has explicitly toggled off
+
+The flag is the single rule the FE relies on; transfers no longer have special-case handling here. See [`05-categories-tags.md §4.14c`](05-categories-tags.md) for the seed defaults and rationale.
 
 ---
 

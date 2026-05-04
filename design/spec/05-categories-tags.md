@@ -35,6 +35,27 @@ Full column definitions, constraints, and indexes: see [`../database/schema.md#0
 
 API-layer rule: 3-layer depth limit on `categories` is enforced on create and parent-change. Backend walks up from candidate `parent_id` counting hops; reject if > 3 with `400 MAX_DEPTH_EXCEEDED`.
 
+### 1.1 Phase 1a fields
+
+The following columns are added to support the Phase 1a Manage Categories and Manage Tags screens. They have safe defaults and are backfillable.
+
+**`categories`:**
+
+| Column | Type | Default | Purpose |
+|---|---|---|---|
+| `sort_order` | `INT` | `0` | Drag-reorder. Sibling order under the same `(user_id, type, parent_id)`. Lower = earlier. Server rewrites this in bulk via §3.13. |
+| `include_in_report` | `BOOLEAN` | `TRUE` | Per-row toggle for "show this in spending reports". `FALSE` for default-seeded *Adjustment* / *Lending* / *Reimbursement* categories so they don't pollute reports. |
+| `description` | `TEXT` | `NULL` | Optional one-line guidance ("Restaurants & dining out"). Seeded for default categories; user-editable. |
+| `note` | `TEXT` | `NULL` | Free-form user scratch notes per category. Never seeded. |
+
+**`tags`:**
+
+| Column | Type | Default | Purpose |
+|---|---|---|---|
+| `icon` | `VARCHAR(50)` | `NULL` | Free-form icon identifier (matches `categories.icon` convention). Phase 1a app supports a fixed preset set; backend stores the string. |
+
+These fields land via migration `000008_add_p1a_fields_to_categories_and_tags.up.sql`. Existing rows backfill: `sort_order = row_number() over (partition by user_id, type, parent_id order by id)`, `include_in_report = TRUE`, `tags.icon = NULL`.
+
 ---
 
 ## 2. Registration seed
@@ -126,7 +147,10 @@ Create a category.
   "type": "expense",
   "parent_id": "0190e4...",
   "icon": "subscriptions",
-  "color": "#FF5722"
+  "color": "#FF5722",
+  "include_in_report": true,
+  "description": "Recurring subscription services",
+  "note": null
 }
 ```
 
@@ -137,6 +161,11 @@ Create a category.
 | `parent_id` | string | — | NULL = root; must reference existing non-system category of same `type` |
 | `icon` | string | — | Free-form identifier |
 | `color` | string | — | Hex color |
+| `include_in_report` | boolean | — | Default `true` |
+| `description` | string | — | Up to 280 chars; `null` clears |
+| `note` | string | — | Up to 280 chars; `null` clears |
+
+`sort_order` is **not** set by `POST` — new categories append to the end of their sibling group (server assigns `MAX(sort_order)+1` for that `(user, type, parent_id)`).
 
 **Validation:**
 
@@ -182,6 +211,10 @@ List categories owned by the user. Returns a flat list by default; client builds
       "icon": "restaurant",
       "color": "#FF5722",
       "status": "active",
+      "sort_order": 0,
+      "include_in_report": true,
+      "description": "Restaurants and groceries",
+      "note": null,
       "created_at": "...",
       "updated_at": "..."
     }
@@ -189,7 +222,7 @@ List categories owned by the user. Returns a flat list by default; client builds
 }
 ```
 
-Clients reconstruct the tree by grouping on `parent_id`.
+Clients reconstruct the tree by grouping on `parent_id` and sorting siblings by `sort_order` ASC, then `created_at` ASC for stable ordering when ties occur.
 
 ### 3.3 `GET /v1/categories/:id`
 
@@ -225,7 +258,10 @@ Update a category. Partial.
   "name": "Dining Out",
   "parent_id": "0190e4-food",
   "icon": "dining",
-  "color": "#FF9800"
+  "color": "#FF9800",
+  "include_in_report": false,
+  "description": "Restaurants only",
+  "note": "Move groceries out before tax season"
 }
 ```
 
@@ -235,8 +271,12 @@ Update a category. Partial.
 | `parent_id` | string | always for non-system | null or active category of same type; depth check; no cycle |
 | `icon` | string | always | |
 | `color` | string | always | |
+| `include_in_report` | boolean | always | |
+| `description` | string | always | up to 280 chars; `null` clears |
+| `note` | string | always | up to 280 chars; `null` clears |
 | `type` | — | **immutable** | Delete + recreate if wrong |
 | `is_system` | — | **immutable** | |
+| `sort_order` | — | via §3.13 only | |
 | `status` | — | via dedicated endpoints (§3.5, §3.6) | |
 
 **Parent change rules:**
@@ -319,13 +359,14 @@ Create a tag.
 **Request body:**
 
 ```json
-{ "name": "reimbursable", "color": "#4CAF50" }
+{ "name": "reimbursable", "color": "#4CAF50", "icon": "receipt" }
 ```
 
 | Field | Type | Required | Rules |
 |---|---|---|---|
 | `name` | string | ✅ | 1–50 chars; unique per user case-insensitive |
 | `color` | string | — | Hex color |
+| `icon` | string | — | Free-form identifier (matches category convention) |
 
 **Errors:** `400 VALIDATION_ERROR`, `409 TAG_EXISTS`, `401`.
 
@@ -342,6 +383,7 @@ List user's tags. No pagination — tag counts are small.
       "id": "0190e4...",
       "name": "reimbursable",
       "color": "#4CAF50",
+      "icon": "receipt",
       "usage_count": 12,
       "created_at": "..."
     }
@@ -349,7 +391,7 @@ List user's tags. No pagination — tag counts are small.
 }
 ```
 
-`usage_count` is computed (count of rows in `transaction_tags`).
+`usage_count` is computed (count of rows in `transaction_tags`). The list is server-sorted by `usage_count DESC, LOWER(name) ASC` so the most-used tags surface first.
 
 ### 3.10 `GET /v1/tags/:id` / `PUT /v1/tags/:id` / `DELETE /v1/tags/:id`
 
@@ -376,6 +418,61 @@ Attach tags to a transaction. Idempotent — attaching an already-attached tag i
 Detach a single tag from a transaction.
 
 **Success — `200 OK`:** `{ "message": "Tag removed from transaction" }`.
+
+### 3.13 `PATCH /v1/categories/reorder`
+
+Bulk-rewrite `(parent_id, sort_order)` for the user's category tree atomically. Used by the Manage Categories drag-and-drop reorder mode.
+
+**Why one atomic call instead of per-row PUTs.** A reorder touches many rows simultaneously (e.g. promoting a sub-category to root, then sliding everything else down). Per-row PUTs leak partial states on network failure and would briefly violate the sibling-sort invariant. One PATCH = one transaction.
+
+**Request body:**
+
+```json
+{
+  "categories": [
+    { "id": "0190e4-food", "parent_id": null, "sort_order": 0 },
+    { "id": "0190e4-restaurants", "parent_id": "0190e4-food", "sort_order": 0 },
+    { "id": "0190e4-groceries", "parent_id": "0190e4-food", "sort_order": 1 },
+    { "id": "0190e4-transport", "parent_id": null, "sort_order": 1 }
+  ]
+}
+```
+
+| Field | Type | Required | Rules |
+|---|---|---|---|
+| `categories` | array | ✅ | Every entry references a category owned by the user; entries can't be omitted (must be a complete restatement of the affected tree — see below) |
+| `categories[].id` | string | ✅ | Must exist, belong to user |
+| `categories[].parent_id` | string \| null | ✅ | Same-type rule applies; depth ≤ 3; no cycles across the entire batch |
+| `categories[].sort_order` | int | ✅ | ≥ 0 |
+
+**Server contract:**
+
+- The payload **must include every `(user_id, type)` row that's being touched**. The server treats the batch as the authoritative new layout for any `(type)` that appears in the payload — rows of that type missing from the payload retain their existing `(parent_id, sort_order)` only if no row in the payload claims their slot. Simplest client behavior: send the whole tree for whichever `type` the user reordered.
+- System categories (`is_system = true`) **may** appear in the payload but their `parent_id` must remain `null`. `sort_order` is editable.
+- Archived categories may not be reordered (filter them out client-side).
+- Validation runs entirely before any writes. On failure, no row changes.
+- Cycle detection runs against the post-batch parent map (so dragging A under B and B under A in the same batch is rejected).
+
+**Success — `200 OK`:**
+
+```json
+{ "data": [ /* updated full list of the user's active categories */ ] }
+```
+
+Returning the full list lets the client replace its local cache without a follow-up `GET`.
+
+**Errors:**
+
+| HTTP | Code | Cause |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Malformed payload |
+| 400 | `MAX_DEPTH_EXCEEDED` | Some path exceeds 3 levels post-batch |
+| 400 | `CYCLE_DETECTED` | Batch defines a cycle |
+| 400 | `INVALID_PARENT` | A `parent_id` references a system, archived, or wrong-type category |
+| 400 | `DUPLICATE_NAME` | Reparenting collides with an existing sibling name |
+| 401 | `UNAUTHORIZED` | |
+| 403 | `FORBIDDEN` | A referenced id doesn't belong to the user |
+| 404 | `NOT_FOUND` | A referenced id doesn't exist |
 
 ---
 
@@ -465,6 +562,35 @@ Localization (Thai names) comes in Phase 2 when i18n ships.
 
 Phase 4+ adds a template picker at onboarding — choose "Default," "Student," "Family," "Business," etc. Each template is a named set of starter categories.
 
+### 4.14a Drag-to-reorder, single atomic save
+
+The Manage Categories screen has a long-press-to-reorder mode (§6). Reordering can move a row up/down among siblings **and** change its depth (e.g. promote a sub-category to a root). To keep the sibling-sort invariant intact during what's effectively a multi-row mutation, the client stages all changes locally then sends them as one `PATCH /v1/categories/reorder` (§3.13).
+
+Why not per-row PUTs:
+- A single drag-drop can shift `parent_id` *and* `sort_order` on multiple rows. Per-row PUTs would briefly produce a state where two siblings share a `sort_order`, or where a row's `parent_id` points at the previous-batch tree.
+- Network failure mid-batch is recoverable (transaction rolls back) only with the atomic endpoint.
+
+`sort_order` is intentionally not exposed on `POST` / `PUT` — those endpoints are for create / metadata edits. All sibling reordering goes through §3.13.
+
+### 4.14b Color inheritance from L1 (client convention)
+
+The data model stores `color` per row, but the UI **displays** every row in a subtree using its L1 ancestor's color. Why: the user picks a single color for "Food" and expects "Food → Restaurants" and "Food → Restaurants → Tipping" to inherit it. Storing the L1 color on every descendant would scatter the source of truth and break when L1's color changes.
+
+Backend stores whatever the client sends. The client either:
+- Sends the L1 color when creating L2/L3 rows (current Phase 1a app behavior), so the data is self-consistent if displayed standalone, **or**
+- Sends `null` and resolves the L1 color at render time.
+
+Both are valid; backend doesn't enforce.
+
+### 4.14c `include_in_report` defaults for seed categories
+
+Most seeded categories ship with `include_in_report = TRUE`. Exceptions (seeded `FALSE`) are conceptually "money movement, not spending":
+- *Adjustment* (system, both directions)
+- *Transfer In/Out* (system)
+- *Lending* / *Repayment* / *Reimbursement* (when present in the starter seed)
+
+Rationale: a transfer between user-owned wallets isn't an expense; lumping it into "monthly spending" misleads the user. The flag is per-row so users can override.
+
 ### 4.14 System category names can be renamed
 
 System categories have `is_system = true` but `name` is editable. Users might want to localize ("Transfer Out" → "เงินโอนออก") or personalize. The system identity is the row (referenced by FK and `is_system` flag), not the string.
@@ -483,6 +609,9 @@ System categories have `is_system = true` but `name` is editable. Users might wa
 
 ## 6. Status
 
-- **Phase** — spec; Phase 1a implementation pending
-- **Last updated** — 2026-04-24
-- **Version** — 0.1 (initial draft; 3-layer tree, system categories + seed, soft-delete with display-skip)
+- **Phase** — spec; Phase 1a backend partially landed (CRUD + system seed + starter seed). Reorder endpoint + new fields land with migration `000008`.
+- **Last updated** — 2026-04-29
+- **Version** — 0.2
+- **Changelog**
+  - **0.2 (2026-04-29)** — Added `sort_order`, `include_in_report`, `description`, `note` to `categories`; added `icon` to `tags`. Added `PATCH /v1/categories/reorder` (§3.13). Added §4.14a–c notes covering single-atomic-save, color inheritance, and `include_in_report` defaults.
+  - **0.1 (2026-04-24)** — Initial draft (3-layer tree, system categories + seed, soft-delete with display-skip).

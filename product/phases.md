@@ -110,7 +110,7 @@ Any feature beyond auth + users (→ Phase 1). Visual polish (→ Phase 2). Prod
 *Contacts*
 - User can create / update / soft-delete contacts
 - User can absorb `person_name` strings into a contact
-- User can invite a contact to link via 8-char invite code; recipient accepts → `app_user_id` populated
+- User can invite a contact to link via 8-char invite code; recipient accepts → `linked_user_id` populated
 - Linked contact's user sees splits where they're the debtor on their side
 
 *Shared expenses (splits)*

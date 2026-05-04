@@ -1,14 +1,19 @@
-# 06 — Shared Expenses (Splits)
+# 06 — (Deprecated) Shared Expenses (Splits)
 
-Split-bill mechanics. When a transaction is shared across multiple people, this module tracks who owes what — both for **personal-context splits** (Alice's personal expense, splits with friends) and **project-context splits** (a project_transaction with member splits).
+> **⚠️ DEPRECATED.** The `shared_expense_splits` table was removed in
+> migration 24 (Phase 1b refactor). Splits and personal_debts are now
+> unified into a single bidirectional `personal_debts` table. See
+> [`12-personal-debts.md`](12-personal-debts.md) for the current model.
+>
+> This document is kept as historical record of the original two-table
+> design. The endpoints described here (`/v1/shared-expenses/splits/*`)
+> no longer exist.
 
-This module owns the `shared_expense_splits` table and the resolve actions that turn a split into personal-book entries.
-
-Personal_debts (the I-owe / owed-to-me dashboard) lives in [`12-personal-debts.md`](12-personal-debts.md). Notification triggers and delivery are in [`13-notifications.md`](13-notifications.md).
-
-References: `transactions` and `project_transactions` (parent rows for splits via polymorphic FKs), `contacts`, `project_members`.
-
-Global conventions (base URL, error envelope, data types, HTTP verbs) are in [`overview.md`](overview.md).
+Original purpose (now superseded): split-bill mechanics. When a transaction
+is shared across multiple people, this module tracked who owes what —
+both for **personal-context splits** (Alice's personal expense, splits
+with friends) and **project-context splits** (a project_transaction with
+member splits). Resolve actions turned a split into personal-book entries.
 
 ---
 
@@ -36,11 +41,8 @@ Full column definitions, constraints, and indexes: see [`../database/schema.md#0
 
 Notable behavior:
 
-- **Polymorphic parent** — `source_transaction_id` (personal) OR `source_project_transaction_id` (project), exactly one set.
-- **Debtor identifier gated by parent context** (API-enforced):
-  - Project-context split → `project_member_id` only
-  - Personal-context split (parent has `project_id IS NULL`) → `contact_id` or `person_name` only
-  - Post-claim mirror split (parent has `project_id IS NOT NULL`) → `project_member_id` only
+- **Polymorphic parent** — `source_transaction_id` (personal) OR `source_project_transaction_id` (project), exactly one set. CHECK constraint at the DB level.
+- **Debtor identity** — `person_name TEXT NOT NULL` is always set (the durable display label). `contact_id` and `project_member_id` are **optional structured FKs** that can coexist with each other and with the name; they decorate the row, they don't replace `person_name`. See §2.5 for the full rule.
 - **No `paid_amount` / `is_settled` columns** — settlement is per-caller computed from personal `transactions.source_split_id` (see §2.3).
 
 ---
@@ -51,13 +53,11 @@ Notable behavior:
 
 Splits attach to two kinds of parent. The mechanics are the same; only the parent table and debtor identifier differ.
 
-**Personal-context split** — parent is a personal `transactions` row created by the user with no project involvement (`project_id IS NULL`). Debtor identified by `contact_id` or `person_name` (never `project_member_id`). The parent's account drops at save time; splits track who owes the parent's owner.
+**Personal-context split** — parent is a personal `transactions` row created by the user with no project involvement. The debtor is identified by `person_name` (always set) and optionally a `contact_id` (when the user has linked the name to a contact). The parent's account drops at save time; splits track who owes the parent's owner.
 
-**Project-context split** — parent is a `project_transactions` row. Debtor is a `project_member_id`. No account is touched at parent save time; the project ledger is the canonical record. After the actor claims, splits migrate to the actor's personal mirror — but the debtor identifier stays `project_member_id` (the migration only rewrites the parent FK, not the split's identity).
+**Project-context split** — parent is a `project_transactions` row. The debtor's `person_name` is sourced from the project member's display name; in addition, `project_member_id` references the membership row. `contact_id` may also be set independently if the debtor is a project member who is *also* in the actor's contacts. No account is touched at parent save time; the project ledger is the canonical record.
 
-Both kinds use the same `shared_expense_splits` table. The polymorphic source FK is the only structural difference.
-
-**The two contexts don't mix:** a personal transaction with `project_id IS NULL` cannot have splits targeting `project_member_id`. Splitting with project members requires creating a `project_transaction` instead. This keeps the rule "splits' debtor identifier is determined by parent context" — no ambiguity.
+Both kinds use the same `shared_expense_splits` table. The polymorphic *source* FK is what distinguishes context (which parent ledger this row belongs to). The *debtor identity* columns (`contact_id`, `project_member_id`) are independent decorations that may be present or absent regardless of context — see §2.5.
 
 ### 2.2 Splits migrate to personal mirror on claim
 
@@ -95,7 +95,28 @@ Three actions can be triggered on a split. Each is independent; multiple invocat
 
 No global state is mutated by any action — each call writes to the caller's own book. The caller decides what their book reflects.
 
-### 2.5 Notifications fire at split lifecycle events
+### 2.5 Debtor identity — name + optional structured FKs
+
+The debtor of a split is always identified by `person_name` (a `NOT NULL` text column). Optional structured FKs decorate the row when more is known:
+
+| Column | Required? | What it adds |
+|---|---|---|
+| `person_name` | ✅ always set | The durable display label. Survives contact rename / delete. |
+| `contact_id` | optional | Promotes the row from "just a name" to a structured contact reference. Set when the user absorbs / picks a contact at split create / edit time. |
+| `project_member_id` | optional | Set when the split's debtor is a member of the parent's project. Coexists with `contact_id` (a project member who is also in the user's contacts gets both). |
+
+**Display priority:** `contact_id` (live join to `contacts.display_name`) → `project_member_id` (live join to the member's display) → `person_name`. A live join means contact / member rename reflects automatically without rewriting the split row.
+
+**Sync rule (service layer):** whenever the application sets or changes `contact_id` on a split (insert, edit, or `POST /v1/contacts/:id/absorb`), it also writes `person_name = COALESCE(contact.nickname, contact.display_name)` so the snapshot stays in step with the link at the moment of linking. Subsequent contact renames don't propagate to the snapshot — the live join handles display while the contact is linked, and `person_name` only matters as a fallback after `contact_id` becomes NULL (unlink / delete). On contact delete, the contacts module snapshots the contact name into `person_name` before nullifying `contact_id` — see [`07-contacts.md §2.1`](07-contacts.md).
+
+**No XOR.** Earlier drafts of this spec required exactly one of (`contact_id` / `person_name` / `project_member_id`) per row, with parent context dictating which. That rule is dropped in favor of the always-set name + optional decorations described above. Reasons:
+
+- Promotion (free name → contact-linked) becomes non-destructive — set `contact_id`, don't touch `person_name`.
+- Deletion fallback is automatic — `person_name` was always there.
+- A project member who is also a contact can carry both FKs; no information loss.
+- The constraint reduces to a single `NOT NULL` instead of a 3-way CHECK.
+
+### 2.6 Notifications fire at split lifecycle events
 
 Notification triggers (full schema and delivery in [`13-notifications.md`](13-notifications.md)):
 
@@ -196,7 +217,7 @@ Caller (the debtor on the split) creates a personal expense.
 
 **Backend (atomic):**
 
-1. Validate caller is the debtor (split's `contact.app_user_id = caller`, OR `project_member.user_id = caller`)
+1. Validate caller is the debtor (split's `contact.linked_user_id = caller`, OR `project_member.user_id = caller`)
 2. Insert personal `transactions` row: `type=expense`, `account_id`, `amount`, `source_split_id = split.id`, `project_id` = parent's `project_id` if any
 3. `accounts.balance −= amount`
 4. Auto-bump any of caller's `personal_debts.paid_amount` rows where `source_split_id = split.id`
@@ -314,16 +335,20 @@ UX rationale: when Bob looks at his ฿3,000 personal expense in his own book, h
 
 Cost: queries for "is this split settled from my view" require a sum-over-personal-tx subquery. Phase 2+ may add a materialized view if this becomes hot.
 
-### 4.5 Three-way debtor identification — gated by parent context
+### 4.5 Debtor identity — name always set, FKs optional
 
-`person_name` / `contact_id` / `project_member_id` — exactly one set per row. But the choice isn't free; it's determined by the parent ledger:
+`person_name` is always set (`NOT NULL`); `contact_id` and `project_member_id` are optional decorations that can coexist. Service layer keeps `person_name` synced to the contact's display name at link time and after contact deletion. See §2.5 for the full rule + display-priority order.
 
-- **Personal-context splits** (parent is `transactions`, `project_id IS NULL`) use `contact_id` or `person_name` only. `project_member_id` is rejected because the parent isn't in any project.
-- **Project-context splits** (parent is `project_transactions`, OR a personal mirror with `source_project_transaction_id` set) use `project_member_id` only. Project membership is the identity space.
+Earlier drafts required strict XOR ("exactly one of contact_id / person_name / project_member_id, parent context dictates which"). Dropped because:
 
-Why gate it: allowing personal-context splits to target project members would imply a personal transaction is "in" a project — which contradicts the unified rule that project-context spending lives in `project_transactions`. The user's path to "split a personal transaction with project members" is to create a project_transaction instead.
+1. **Promotion is non-destructive.** Going from "user typed a name" → "user linked it to a contact" is just `SET contact_id = ...`. The original name stays as a fallback automatically.
+2. **Deletion has a free fallback.** When a contact is hard-deleted, `person_name` already holds a snapshot — no need to first read the contact to capture its name then null the FK.
+3. **A project member who is also a contact can carry both FKs.** No information loss; the spec reflects reality (Bob is both `contacts.bob` and `project_members.bob_for_trip_2026`).
+4. **Constraint simplifies.** `NOT NULL` on `person_name` replaces a 3-way CHECK that's easy to write wrong.
 
-The CHECK in §1.1 enforces single identity; the API layer enforces parent-vs-debtor compatibility.
+The only remaining XOR-style constraint on the table is the *parent FK* one — `source_transaction_id` XOR `source_project_transaction_id` — which is unavoidable structural polymorphism (a split has exactly one parent ledger). That stays.
+
+The trade is: a `person_name` value can technically drift from the linked contact's current name if the application forgets to call the sync. Mitigated by centralizing the sync in the contacts service (one chokepoint) and treating `person_name` as a snapshot rather than a live mirror.
 
 ### 4.6 No edit-after-resolve protection on splits
 
@@ -354,14 +379,13 @@ The project router still exposes `POST /v1/projects/:id/resolve-all` as a batch 
 
 ## 6. Status
 
-- **Phase** — spec; Phase 1b implementation pending
-- **Last updated** — 2026-04-26
-- **Version** — 0.2 (unified model)
-  - Drops `paid_amount`, `is_settled`, `split_settlements` table, `mark-paid` endpoint
-  - Polymorphic source FKs (`source_transaction_id` / `source_project_transaction_id`)
-  - Per-caller computed settlement state
-  - Splits migrate to personal mirror on claim (linked actor)
-  - **Debtor identifier gated by parent context** — personal-context splits only use `contact_id` / `person_name`; project-context splits only use `project_member_id`. A personal transaction with no project cannot split with project members directly (must use a `project_transaction` instead).
+- **Phase** — spec; Phase 1b.1 implementation pending (personal-context splits only; project-context deferred to 1b.2 with the projects module)
+- **Last updated** — 2026-04-30
+- **Version** — 0.3
+- **Changelog**
+  - **0.3 (2026-04-30)** — Replaced strict 3-way debtor-identity XOR with "`person_name` always set + optional `contact_id` / `project_member_id` decorations". Added §2.5 with the sync rule. Rewrote §4.5 to capture the new model. Phase 1b.1 ships only `person_name` + `contact_id` (project columns deferred).
+  - **0.2 (2026-04-26)** — Unified model. Drops `paid_amount`, `is_settled`, `split_settlements` table, `mark-paid` endpoint. Polymorphic source FKs. Per-caller computed settlement. Splits migrate to personal mirror on claim.
+  - **0.1** — Initial draft.
   - `personal_debts` extracted to [`12-personal-debts.md`](12-personal-debts.md)
   - Notifications extracted to [`13-notifications.md`](13-notifications.md)
 - **Version 0.1** — initial 3-table design (`shared_expense_splits` + `split_settlements` + `personal_debts` colocated); two-sided settlement handshake; `mark-paid` endpoint.

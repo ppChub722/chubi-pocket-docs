@@ -67,9 +67,9 @@ Endpoints per [`07-contacts.md §3`](../../design/spec/07-contacts.md), with the
 - [ ] `PUT    /v1/contacts/:id` (partial; `display_name`, `nickname`, `email`, `phone`, `notes`, `icon`)
 - [ ] `POST   /v1/contacts/:id/absorb` (1b.1: stub returning `501` until 1b.5 wires it; or no-op early — pick one and document)
 - [ ] **`POST   /v1/contacts/:id/request-link`** — looks up `users.email` / `users.username` against `contact.email`; fires `contact_link_request` notification iff match. Same 200 response either way (privacy preservation).
-- [ ] **`POST   /v1/contacts/link-requests/:notification_id/accept`** — recipient (the matched user) accepts. Sets `contacts.app_user_id = caller`, marks notification `actioned_at`. Idempotent (re-accept is no-op).
+- [ ] **`POST   /v1/contacts/link-requests/:notification_id/accept`** — recipient (the matched user) accepts. Sets `contacts.linked_user_id = caller`, marks notification `actioned_at`. Idempotent (re-accept is no-op).
 - [ ] **`POST   /v1/contacts/link-requests/:notification_id/reject`** — recipient rejects. Marks notification `dismissed_at`. No link change.
-- [ ] `POST   /v1/contacts/:id/unlink` (`app_user_id = NULL`; spec §3.10)
+- [ ] `POST   /v1/contacts/:id/unlink` (`linked_user_id = NULL`; spec §3.10)
 - [ ] `POST   /v1/contacts/:id/archive`
 - [ ] `POST   /v1/contacts/:id/restore`
 - [ ] `DELETE /v1/contacts/:id` (hard delete; restores `person_name` on referencing splits)
@@ -79,7 +79,7 @@ Public exports for other modules:
 - [ ] `contacts.Service.GetByID(ctx, userID, contactID)` — used by `projects.AddMember` variant (a)
 - [ ] `contacts.SplitsRestorer` func type — injected from `splits` package via `WithSplitsRestorer(...)`. On `DELETE /v1/contacts/:id`, called inside the contact-delete tx to run `UPDATE shared_expense_splits SET person_name = COALESCE(c.nickname, c.display_name), contact_id = NULL WHERE contact_id = $1`. In 1b.1 this is `nil` (table doesn't exist) → contact delete does no restoration; 1b.5 wires the real impl.
 
-Errors mapped: `VALIDATION_ERROR`, `NOT_FOUND`, `ALREADY_LINKED` (409 — contact already has `app_user_id` when accept fires), `NOT_LINKED`, `NOT_ARCHIVED`, `ALREADY_ARCHIVED`, `LINK_REQUEST_NOT_FOR_YOU` (notification not addressed to caller — defensive 403).
+Errors mapped: `VALIDATION_ERROR`, `NOT_FOUND`, `ALREADY_LINKED` (409 — contact already has `linked_user_id` when accept fires), `NOT_LINKED`, `NOT_ARCHIVED`, `ALREADY_ARCHIVED`, `LINK_REQUEST_NOT_FOR_YOU` (notification not addressed to caller — defensive 403).
 
 ### 1b.2 — Notifications
 
@@ -152,7 +152,7 @@ Endpoints per [`10-projects.md §3.1, §3.2, §3.4, §3.5`](../../design/spec/10
 - [ ] `DELETE /v1/projects/:id` (owner only; blocked if any transactions reference)
 - [ ] `GET    /v1/projects/:id/members`
 - [ ] `POST   /v1/projects/:id/members` (3 variants):
-  - **(a) From contact** — `{ contact_id, role }`. If contact is linked (`app_user_id` set), creates member row with `user_id` populated, `status = 'active'` immediately, AND fires informational `project_invite` notification to the user. If contact is unlinked but its email matches a user, falls through to variant (b) flow.
+  - **(a) From contact** — `{ contact_id, role }`. If contact is linked (`linked_user_id` set), creates member row with `user_id` populated, `status = 'active'` immediately, AND fires informational `project_invite` notification to the user. If contact is unlinked but its email matches a user, falls through to variant (b) flow.
   - **(b) Direct invite by email** — `{ display_name, email, role }`. Creates `project_members` row with `user_id = NULL`, `contact_id = NULL`, `display_name`, `status = 'pending'`. Fires `project_invite` notification iff email matches a registered user; voids silently otherwise. Same 200 response either way.
   - **(c) Ad-hoc** — `{ display_name, role, ad_hoc: true }`. Creates row with both `user_id` and `contact_id` NULL, `status = 'active'`. No notification.
 - [ ] `PUT    /v1/projects/:id/members/:member_id` (role change)
@@ -300,7 +300,7 @@ No new tables / modules; this is pure cross-module wiring. Each producer calls `
 
 | Trigger | Producer | When fired | Recipient | Notes |
 |---|---|---|---|---|
-| `split_created` | `splits.CreateForTransactionTx` (called from `transactions.Create` and `project_transactions.Create`) | After splits insert | Each linked debtor (resolved via `contact.app_user_id` or `project_member.user_id`) | Suppress if creator's `auto_notify_linked_split_contacts = false` and no manual override |
+| `split_created` | `splits.CreateForTransactionTx` (called from `transactions.Create` and `project_transactions.Create`) | After splits insert | Each linked debtor (resolved via `contact.linked_user_id` or `project_member.user_id`) | Suppress if creator's `auto_notify_linked_split_contacts = false` and no manual override |
 | `split_paid` | `splits.Pay` (also `personal_debts.Pay` when `source_split_id` set) | After personal expense lands + auto-bump | Creditor (if linked) | |
 | `split_received` | `splits.Receive` | After personal income lands | Debtor (if linked) | Closure signal |
 | `project_tx_recorded_for_you` | `projects.CreateProjectTransaction` | After insert | The actor (if `transaction_member.user_id` is linked AND `≠ record_user_id`) | |
@@ -498,7 +498,7 @@ Match Phase 1a's depth — happy path + key edge cases + the critical correctnes
    - Average response time delta < 10ms (timing-attack mitigation: lookup runs in both branches)
    - DB inspection: 100 notification rows from hit branch, 0 from miss branch
 - [ ] **Integration: link-request privacy (projects).** Same as above for `POST /v1/projects/:id/members` variant (b).
-- [ ] **Integration: link-request accept flow.** Two users; A sends request to B's email; B's `GET /v1/notifications` shows the row; B's `POST /contacts/link-requests/:id/accept` populates `app_user_id`; A's contact list refresh shows linked.
+- [ ] **Integration: link-request accept flow.** Two users; A sends request to B's email; B's `GET /v1/notifications` shows the row; B's `POST /contacts/link-requests/:id/accept` populates `linked_user_id`; A's contact list refresh shows linked.
 - [ ] **Integration: link-request reject flow.** B rejects; notification dismissed; A's contact stays unlinked; A can `request-link` again (new notification fires).
 - [ ] **Integration: solo project — no notifications fire.** Create project with one linked member only; perform every action; verify zero notifications.
 - [ ] **Smoke**: register → create accounts (1a) → A request-link to B's contact (B accepts) → B sees Alice's splits → A creates project → adds B (linked) and Grandma (ad-hoc) → B accepts project_invite → recorder ≠ actor flow → claim → pay/receive → dashboard joins both directions.
@@ -513,7 +513,7 @@ Match Phase 1a's depth — happy path + key edge cases + the critical correctnes
   - A creates contact "B" with email matching B's user
   - A's UI shows "Link request sent" on `request-link`
   - B's `/v1/notifications` lists the `contact_link_request` row
-  - B accepts → A's contact "B" now shows `app_user_id` populated
+  - B accepts → A's contact "B" now shows `linked_user_id` populated
 - [ ] Two users with non-existent email: A's UI still shows "Link request sent" (privacy preservation); B doesn't exist so no notification
 - [ ] A creates a personal expense splitting with B; B sees the split in `/v1/shared-expenses/splits` with `direction=i_owe`
 - [ ] B taps pay; A receives `split_paid` notification; A's `/v1/notifications` shows the row

@@ -41,7 +41,7 @@ Alice taps "Send link request" on contact "Mom" (email = mom@example.com)
 
 **Privacy preservation:** Alice can never tell whether Mom is on the app — same response in both branches. This achieves spec §4.6's goal ("no enumeration of app users") via a different mechanism than invite codes. The spec's privacy intent is preserved; only the implementation changes.
 
-**Recipient flow:** Mom opens app → sees `contact_link_request` in her notification inbox → taps Accept (sets `contacts.app_user_id`) or Reject (notification dismissed; no link).
+**Recipient flow:** Mom opens app → sees `contact_link_request` in her notification inbox → taps Accept (sets `contacts.linked_user_id`) or Reject (notification dismissed; no link).
 
 **Same model for project member invites.** `project_invite` notification carries member_id + project_id; accept populates `project_members.user_id`; reject leaves the pending member row alone (owner can resend or remove).
 
@@ -80,18 +80,31 @@ All Phase 0 + 1a stack and convention locks carry forward unchanged:
 
 ## Sub-milestones (BE/DB only)
 
-Six independently-mergeable slices. Each ships its own migration(s) + module(s) plus the wiring needed to make them work end-to-end.
+Two big slices. Each is **independently shippable + dogfoodable** without the other; together they cover Phase 1b.
 
-| Sub | Focus | New tables | New module(s) |
+### 1b.1 — Bilateral (you + one other person)
+
+The user can split bills, track who owes whom, and resolve those debts — bilaterally, no shared book. Linking with another app user is **deferred** to 1b.2 (depends on the notifications module to fire link requests). Contacts in 1b.1 are personal-only: a name, optional email/phone, never linked to an `linked_user_id`.
+
+| Step | Focus | New tables | New module(s) |
 |---|---|---|---|
-| **1b.1** | Contacts (CRUD + archive + delete; `request-link` stubbed — wired in 1b.6 once notifications fire) | `contacts` | `contacts/` |
-| **1b.2** | Notification inbox + per-user settings (no triggers fired yet) | `notifications`, `user_notification_settings` | `notifications/` |
-| **1b.3** | Projects + members + ownership / leave (no invite-via-notification yet — wired in 1b.6) | `projects`, `project_members` | `projects/` |
-| **1b.4** | Project transactions + claim flow + shared-book read + project summary | `project_transactions` + `transactions.project_id`, `transactions.source_project_transaction_id` columns | extends `projects/` and `transactions/` |
-| **1b.5** | Splits + personal_debts + per-caller settlement + resolve actions; wires `contacts.absorb` retroactively | `shared_expense_splits`, `personal_debts` + `transactions.source_split_id` column | new `splits/` + `personal_debts/`; extends `contacts/` |
-| **1b.6** | Wire all 7 notification triggers across the modules above (incl. `contact_link_request` + `project_invite` link-request flows) | (no new tables) | extends every producer module |
+| **1b.1.a** | Contacts CRUD + archive + delete; absorb retroactively rewrites split debtor identity (wired once splits exist in 1b.1.b). **No `request-link` endpoints in 1b.1.** | `contacts` (no `contact_invites`) | `contacts/` |
+| **1b.1.b** | Splits (personal-context only) + personal_debts + per-caller settlement + resolve actions. Plugs into `transactions.Service.Create` (replaces the 1a `ErrSplitsNotSupportedYet` reject). | `shared_expense_splits` (no `project_member_id` column yet), `personal_debts` (`project_id` column nullable, no FK), `transactions.source_split_id` column | `shared_expenses/` + `personal_debts/`; extends `contacts/` + `transactions/` |
 
-Build each sub-milestone in order — 1b.5 depends on tables from 1b.1, 1b.3, 1b.4; 1b.6 wires triggers across all of them.
+**1b.1 ships dormant in the schema:** `contacts.linked_user_id` (nullable, never set in 1b.1), `personal_debts.project_id` (nullable, never set in 1b.1). Forward-compatible — 1b.2 just starts populating them.
+
+### 1b.2 — Group (projects + notifications)
+
+The user can run shared books for a multi-person event/trip. Members can be linked app users, contacts, or ad-hoc names. Notifications fire across the system for shared-state events. The notification-based link-request flow (replacing the spec's invite codes) ships here for both contacts and projects.
+
+| Step | Focus | New tables | New module(s) |
+|---|---|---|---|
+| **1b.2.a** | Notifications inbox + per-user settings (table + endpoints; no triggers fire yet — producers wire in subsequent steps) | `notifications`, `user_notification_settings` | `notifications/` |
+| **1b.2.b** | Projects + project_members + ownership / leave / lifecycle. Adds `project_member_id` column to `shared_expense_splits`. Adds `project_id` FK to `personal_debts`. | `projects`, `project_members` + ALTER on existing splits / debts | `projects/` |
+| **1b.2.c** | `project_transactions` + claim flow + shared-book read + project summary. Adds `transactions.project_id` and `transactions.source_project_transaction_id` columns. Splits-migrate-on-claim. | `project_transactions` + ALTER on `transactions` | extends `projects/` + `transactions/` |
+| **1b.2.d** | Wire all 7 notification triggers across the modules: `split_created`, `split_paid`, `split_received`, `project_tx_recorded_for_you`, `project_tx_changed`, `project_invite`, `contact_link_request`. Includes `contacts.request-link` + `projects.invite-by-email` endpoints (notification-based). | (no new tables) | extends every producer module |
+
+Build 1b.1 → 1b.2 in order. Within each, the inner steps are sequenced.
 
 ---
 
@@ -105,9 +118,9 @@ Mirrors [`../phases.md §Phase 1b — Exit criteria`](../phases.md), updated for
 - [ ] `POST /v1/contacts/:id/absorb` rewrites `shared_expense_splits.contact_id` for matching `person_name` rows (wired in 1b.5)
 - [ ] **Notification-based link request:**
   - `POST /v1/contacts/:id/request-link` fires `contact_link_request` notification iff `contacts.email` matches a registered user; voids silently otherwise (same 200 response)
-  - `POST /v1/contacts/link-requests/:notification_id/accept` populates `contacts.app_user_id` and marks notification `actioned`
+  - `POST /v1/contacts/link-requests/:notification_id/accept` populates `contacts.linked_user_id` and marks notification `actioned`
   - `POST /v1/contacts/link-requests/:notification_id/reject` marks notification `dismissed`; no link change
-  - Uniqueness still enforced (one contact per `(user, app_user_id)`)
+  - Uniqueness still enforced (one contact per `(user, linked_user_id)`)
 - [ ] Linked debtor's app sees splits where they're the debtor (per-caller computed)
 - [ ] Hard-delete restores `person_name` from `nickname || display_name` on referencing splits
 
@@ -190,10 +203,11 @@ These are the parts most likely to drift if implemented carelessly. Each gets a 
 1. **Splits-migrate-on-claim atomicity.** Single DB tx: lock the project_transaction row → lock the actor's account → insert personal mirror → `UPDATE shared_expense_splits SET source_transaction_id = mirror, source_project_transaction_id = NULL WHERE source_project_transaction_id = pt_id` → balance delta → commit. Test: 50 concurrent claims on the same PT → only one succeeds; rest hit `ALREADY_CLAIMED`.
 2. **Personal-debt auto-bump atomicity.** When `pay` (or `personal-debts/:id/pay`) inserts a personal expense with `source_split_id`, the same DB tx must `UPDATE personal_debts SET paid_amount = LEAST(amount, paid_amount + delta), status = ... WHERE user_id = caller AND source_split_id = $`. Test: split-pay with 0/1/2 personal_debts referencing — all paths behave.
 3. **Per-caller settlement state.** Pure read computation. Each split's `outstanding_from_my_view = owed_amount - SUM(my personal entries with source_split_id = this.id, matching role/type)`. Test: two callers with opposite views — both see their own truth.
-4. **Polymorphic split FK gating.** API rejects:
-   - personal-context (parent has `project_id IS NULL`) split with `project_member_id` debtor → `400 INVALID_DEBTOR_FOR_CONTEXT`
-   - project-context split with `contact_id` / `person_name` debtor → same error
-   - post-claim split (parent has `project_id IS NOT NULL`) with non-`project_member_id` debtor → same
+4. **Split debtor identity invariant.** Per [`spec/06-shared-expenses.md §2.5`](../../design/spec/06-shared-expenses.md), `person_name` is `NOT NULL` and `contact_id` / `project_member_id` are optional decorations that may coexist. The DB enforces the `NOT NULL` only; service layer keeps `person_name` synced to the linked contact's name at link / delete time. Tests:
+   - Insert a split with empty / NULL `person_name` → DB rejects.
+   - Personal-context split (parent has `project_id IS NULL` once 1b.2 ships): `project_member_id` rejected by service layer (no project membership to reference).
+   - Project-context split (1b.2): `project_member_id` should be set; `contact_id` may *also* be set if the actor knows the member as a contact (no rejection — coexistence is valid).
+   - Contact deleted with referencing splits → `person_name` snapshotted from the contact's `COALESCE(nickname, display_name)` before `contact_id` is nullified.
 5. **Notification dispatch is in-tx.** Each trigger insert happens inside the same tx as the action that fires it. If the action fails, the notification doesn't appear.
 6. **Link-request privacy preservation.** `POST /v1/contacts/:id/request-link` returns identical 200 response whether the email matches a user or not. Test: 100 calls with unknown emails + 100 calls with known emails → response shape, status code, and average response time should not differ in a way that leaks existence (timing-attack consideration — see [Risks](#risks-specific-to-1b)).
 7. **transactions.project_id is auto-managed.** API rejects `project_id` in `POST /v1/transactions` request bodies (1a already does this — 1b extends to set it automatically only on `pay`/`receive`/`claim` flows when the source has a project).
@@ -264,12 +278,19 @@ The spec is canonical for design intent. After 1b ships, update these to match t
 
 These spec edits are NOT blocking 1b. Track separately.
 
+**Already updated** (2026-04-30):
+- [`06-shared-expenses.md`](../../design/spec/06-shared-expenses.md) v0.3 — replaced strict 3-way debtor XOR with "name always set + optional FKs". §2.5 added; §4.5 rewritten.
+- [`07-contacts.md`](../../design/spec/07-contacts.md) v0.2 — lifecycle / absorb / unlink updated to match the new model.
+- [`schema.md` §06](../../design/database/schema.md) — `shared_expense_splits` constraints updated (`person_name NOT NULL`; XOR dropped from debtor identity, retained for source FKs).
+
 ---
 
 ## Status
 
 - **Created** — 2026-04-27
+- **Last updated** — 2026-04-30
 - **BE/DB plan** — drafted; see [`be.md`](be.md), [`db.md`](db.md)
+- **Sub-milestone restructure** — collapsed from 6 fine-grained slices into 2 super-milestones (1b.1 bilateral, 1b.2 group + notifications). `request-link` flows moved entirely to 1b.2; 1b.1 contacts are personal-only.
 - **Spec deviation** — invites via notifications (this doc §"Spec deviation"); spec text edits queued for post-1b
 - **FE plan** — deferred until BE endpoints settle
 - **CI/CD** — still deferred per Phase 0

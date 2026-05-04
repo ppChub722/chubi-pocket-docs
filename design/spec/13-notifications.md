@@ -44,7 +44,7 @@ The full set of notification types in Phase 1b. Each entry: when it fires, recip
 ### 2.1 `split_created`
 
 **Fires when:** a `shared_expense_splits` row is inserted with a debtor identifier that resolves to a linked user — either:
-- `contact_id` whose `contact.app_user_id` is set, OR
+- `contact_id` whose `contact.linked_user_id` is set, OR
 - `project_member_id` whose `project_member.user_id` is set
 
 **Recipient:** the resolved debtor user.

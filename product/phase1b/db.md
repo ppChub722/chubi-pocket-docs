@@ -14,7 +14,7 @@ FK chain dictates the order — `contacts` and `notifications` are leaf-ish (onl
 
 | # | File | Tables / changes | New FKs to existing |
 |---|---|---|---|
-| 8  | `000008_init_contacts.up.sql` | `contacts` | `users.id` (owner + audit + `app_user_id`) |
+| 8  | `000008_init_contacts.up.sql` | `contacts` | `users.id` (owner + audit + `linked_user_id`) |
 | 9  | `000009_init_notifications.up.sql` | `notifications` | `users.id` (recipient + actor + audit) |
 | 10 | `000010_init_user_notification_settings.up.sql` | `user_notification_settings` (+ backfill row for every existing user) | `users.id` (PK + audit), `accounts.id` (default_account_id) |
 | 11 | `000011_init_projects.up.sql` | `projects` | `users.id` (owner + audit) |
@@ -37,15 +37,15 @@ Each migration: idempotent up (`IF NOT EXISTS`), mandatory down, `set_timestamp`
 Per [`schema.md#07--contacts`](../../design/database/schema.md#07--contacts).
 
 - [ ] Columns per schema (§ `contacts`); `status CHECK IN ('active','archived')`
-- [ ] CHECK `user_id <> app_user_id` (block self-link)
+- [ ] CHECK `user_id <> linked_user_id` (block self-link)
 - [ ] FK `user_id → users(id) ON DELETE CASCADE`
-- [ ] FK `app_user_id → users(id)` — no CASCADE; `app_user_id` clears via unlink endpoint, contacts module never receives a CASCADE event
+- [ ] FK `linked_user_id → users(id)` — no CASCADE; `linked_user_id` clears via unlink endpoint, contacts module never receives a CASCADE event
 - [ ] **Indexes:**
   - `idx_contacts_user (user_id, status)`
   - `idx_contacts_name (user_id, LOWER(display_name))`
   - `idx_contacts_email (user_id, LOWER(email)) WHERE email IS NOT NULL` — supports lookup-by-email when sending link request (constant-cost regardless of match)
-  - `idx_contacts_app_user UNIQUE (user_id, app_user_id) WHERE app_user_id IS NOT NULL` — one contact per (user, linked app user)
-  - `idx_contacts_linked_user (app_user_id) WHERE app_user_id IS NOT NULL` — reverse query
+  - `idx_contacts_app_user UNIQUE (user_id, linked_user_id) WHERE linked_user_id IS NOT NULL` — one contact per (user, linked app user)
+  - `idx_contacts_linked_user (linked_user_id) WHERE linked_user_id IS NOT NULL` — reverse query
 - [ ] `set_timestamp` trigger
 - [ ] **API-layer rules** (not in DB):
   - `nickname` may be NULL
