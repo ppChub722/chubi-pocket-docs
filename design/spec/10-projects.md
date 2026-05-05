@@ -51,6 +51,8 @@ Global conventions (base URL, error envelope, data types, HTTP verbs) are in [`o
 | Leave project | ✅ | ✅ | ✅ |
 | Status: active / completed / cancelled / archived (with lifecycle rules) | ✅ | ✅ | ✅ |
 | Solo project (single-member; no notifications fire) | ✅ | ✅ | ✅ |
+| **Report tab** — per-member paid/owes/net + by-category totals (UI placeholder in 1c) | — | ✅ | ✅ |
+| **Resolve tab** — settle-up flow: resolve-to-personal / debt matrix (UI placeholder in 1c) | — | ✅ | ✅ |
 | Export project report (PDF / CSV) | — | ✅ | ✅ |
 | Project-level budget goal + alerts | — | ✅ | ✅ |
 | Consent hardening on invite accept | — | — | ✅ |

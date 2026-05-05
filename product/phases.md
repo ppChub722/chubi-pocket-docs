@@ -208,6 +208,8 @@ Any feature beyond auth + users (→ Phase 1). Visual polish (→ Phase 2). Prod
 
 ### Scope
 
+- **Project Report tab** — per-member paid / owes / net breakdown; by-category spend totals. UI shows "Coming soon" in Phase 1c; logic to be built in Phase 2 once report calculation rules (how splits affect member net) are validated with real data.
+- **Project Resolve tab** — resolve project transactions to personal book (create personal expense/income or debt entry). UI shows "Coming soon" in Phase 1c; full settlement flow (resolve-to-personal, mark, debt matrix) deferred to Phase 2 to redesign after Phase 1c UX feedback.
 - **Dashboard & reports** — landing screen with monthly income vs expense, spending breakdown by category (pie/donut), trends over time, budget utilization, savings rate, top categories/accounts, owed-to-me/I-owe summary card; drill-down everywhere
 - **Multi-currency** — per-transaction currency, per-account currency honored end-to-end, exchange-rate provider, daily-cached rates with last-known fallback, historical rate per transaction date
 - **Auth hardening** — short access token (15 min) + refresh token (7 days), `dio` interceptor handles refresh on 401, logout revokes refresh token; existing long-lived tokens invalidated on deploy
@@ -343,8 +345,8 @@ Any feature beyond auth + users (→ Phase 1). Visual polish (→ Phase 2). Prod
 
 ## Status
 
-- **Phase** — Planning (pre–Phase 0)
-- **Last updated** — 2026-04-26
-- **Version** — 0.5 (combined from 03-phase0/04-phase1/05-phase2/06-phase3 into single canonical file; removed migration list and endpoint references; reframed exit criteria in user-checkable language; phase docs no longer duplicate spec content)
+- **Phase** — Phase 1c in progress (project module complete through migrations 000032; budgets/saving-goals/scheduled-transactions next)
+- **Last updated** — 2026-05-05
+- **Version** — 0.6 (added Phase 2 deferrals: project Report tab + project Resolve tab deferred from Phase 1c)
 - **Version 0.4** — unified shared-expenses model in 1b; in-app notifications moved from Phase 2 to Phase 1b
 - **Version 0.3** — initial per-phase docs with two-sided settlement handshake
