@@ -624,8 +624,7 @@ Thin container for a project.
 | `start_date`         | `DATE`         | NULLABLE                            |                                                                                     |
 | `end_date`           | `DATE`         | NULLABLE                            |                                                                                     |
 | `status`             | `VARCHAR(20)`  | NOT NULL, DEFAULT `'active'`, CHECK | `'active'` \| `'completed'` \| `'cancelled'` \| `'archived'`                        |
-| `icon_id`            | `TEXT`         | NULLABLE                            | Icon art ID from the IconMaker registry                                             |
-| `color_id`           | `TEXT`         | NULLABLE                            | Color palette ID from the IconMaker registry                                        |
+| `icon_code`          | `JSONB`        | NULLABLE                            | Icon Maker code                                                                     |
 | `created_at`         | `TIMESTAMPTZ`  | NOT NULL, DEFAULT `NOW()`           |                                                                                     |
 | `created_by_user_id` | `UUID`         | FK → `users.id`, NULLABLE           | NULL = system                                                                       |
 | `updated_at`         | `TIMESTAMPTZ`  | NOT NULL, DEFAULT `NOW()`           | Trigger-updated                                                                     |
@@ -696,8 +695,7 @@ The canonical project ledger. Every transaction recorded in a project context go
 | `marks`                         | `UUID[]`        | NOT NULL, DEFAULT `'{}'`                                    | Set of `project_member.id` values that have marked this row "resolved on the board". Independent of personal-book actions — toggling does NOT create personal entries. |
 | `description`                   | `TEXT`          | NULLABLE                                                    | Optional user-supplied label for the transaction; editable                                                                                                             |
 | `category_name`                 | `TEXT`          | NULLABLE                                                    | Denormalized snapshot of the category name at record time; read-only                                                                                                   |
-| `category_icon_id`              | `TEXT`          | NULLABLE                                                    | Denormalized snapshot of the category icon ID at record time; read-only                                                                                                |
-| `category_color_id`             | `TEXT`          | NULLABLE                                                    | Denormalized snapshot of the category color ID at record time; read-only                                                                                               |
+| `category_icon_code`            | `JSONB`         | NULLABLE                                                    | Denormalized snapshot of `categories.icon_code` at record time; read-only                                                                                              |
 | `created_at`                    | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                                   |                                                                                                                                                                        |
 | `created_by_user_id`            | `UUID`          | FK → `users.id`, NULLABLE                                   | NULL = system                                                                                                                                                          |
 | `updated_at`                    | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                                   | Trigger-updated                                                                                                                                                        |
@@ -714,7 +712,7 @@ The canonical project ledger. Every transaction recorded in a project context go
 
 **No `account_id`** — project_transactions never hit a personal account. Personal entries are created client-side via the regular `POST /transactions` (with `source_project_transaction_id` set for traceback) or `POST /personal-debts`.
 
-**No `category_id` FK** — categories are user-scoped resources and ambiguous on a shared row. Categories are picked fresh by each user at resolve time, on the personal-book entry. Dropped in migration 27. `category_name`, `category_icon_id`, and `category_color_id` are denormalized read-only TEXT snapshots set at record time for display on the shared board (added migration 31).
+**No `category_id` FK** — categories are user-scoped resources and ambiguous on a shared row. Categories are picked fresh by each user at resolve time, on the personal-book entry. Dropped in migration 27. `category_name` and `category_icon_code` are denormalized read-only snapshots set at record time for display on the shared board (migration 31 added TEXT columns; migration 033 converts to JSONB).
 
 **Indexes:**
 
@@ -912,6 +910,7 @@ A row is auto-created on user registration with all defaults.
 ## Status
 
 - **Last updated** — 2026-05-05
+- **Version** — 0.7 (Applied migration 033 plan: `projects.icon_id` + `projects.color_id` → `projects.icon_code JSONB`; `project_transactions.category_icon_id` + `project_transactions.category_color_id` → `project_transactions.category_icon_code JSONB`.)
 - **Version** — 0.6 (Synced against all 32 migrations: removed `contacts.nickname` (dropped migration 29); added `contacts.last_used_at` + `idx_contacts_last_used` (migration 28); removed `contact_invites` table (never migrated — invite flow replaced by notifications); removed `project_invites` table (never migrated — invite flow replaced by notifications); added `project_transactions.description` (migration 30); corrected category snapshot columns on `project_transactions` from `category_icon_code JSONB` to `category_icon_id TEXT` + `category_color_id TEXT` (migration 31); corrected `projects` icon columns from `icon_code JSONB` to `icon_id TEXT` + `color_id TEXT` (migration 32).)
 - **Version** — 0.4 (locked in FK naming rule: every FK ends in `<target_table>_id`, role-prefixed when not the row's primary owner. Renamed `created_by` → `created_by_user_id` and `updated_by` → `updated_by_user_id` everywhere. Added compound-table-name carve-out so descriptive names like `shared_expense_splits` survive — FKs may use unambiguous abbreviations like `source_split_id`.)
 - **Version** — 0.3 (added `archived` user status + anonymize-on-delete flow; users are never hard-deleted so audit-column references survive forever)
