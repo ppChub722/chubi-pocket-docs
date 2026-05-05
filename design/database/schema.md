@@ -34,7 +34,11 @@ For module behavior, API endpoints, design rationale, and cross-table invariants
     "borderColors": ["#RRGGBB"]
   }
   ```
-  Art IDs are resolved by the frontend IconMaker registry and are never stored as file paths. `null` on any layer means that layer is not applied. Color arrays contain 0–3 hex strings depending on how many color slots the selected art exposes.
+  - All entities use a circle container. Shape is fixed — not stored.
+  - `background` — texture/art ID rendered inside the circle. Think of it as a function: `background(bgColors) → visual`. `null` = no background (transparent). Base pack includes `"solid"` (1 color), `"gradient_linear"` (2 colors), etc.
+  - `bgColors` — ordered color inputs the selected background art requires. Empty array when `background` is null. The art definition declares exactly how many colors it needs (0–3).
+  - `border` — optional border art ID (circle border style/thickness). `null` = no border. `borderColors` are its color inputs, same pattern as background.
+  - Art IDs are resolved by the frontend IconMaker registry and are never stored as file paths.
 
 ---
 
@@ -910,6 +914,7 @@ A row is auto-created on user registration with all defaults.
 ## Status
 
 - **Last updated** — 2026-05-05
+- **Version** — 0.8 (Removed `bgShape` from `icon_code` JSONB — all entities use circle container; shape is fixed and not stored.)
 - **Version** — 0.7 (Applied migration 033 plan: `projects.icon_id` + `projects.color_id` → `projects.icon_code JSONB`; `project_transactions.category_icon_id` + `project_transactions.category_color_id` → `project_transactions.category_icon_code JSONB`.)
 - **Version** — 0.6 (Synced against all 32 migrations: removed `contacts.nickname` (dropped migration 29); added `contacts.last_used_at` + `idx_contacts_last_used` (migration 28); removed `contact_invites` table (never migrated — invite flow replaced by notifications); removed `project_invites` table (never migrated — invite flow replaced by notifications); added `project_transactions.description` (migration 30); corrected category snapshot columns on `project_transactions` from `category_icon_code JSONB` to `category_icon_id TEXT` + `category_color_id TEXT` (migration 31); corrected `projects` icon columns from `icon_code JSONB` to `icon_id TEXT` + `color_id TEXT` (migration 32).)
 - **Version** — 0.4 (locked in FK naming rule: every FK ends in `<target_table>_id`, role-prefixed when not the row's primary owner. Renamed `created_by` → `created_by_user_id` and `updated_by` → `updated_by_user_id` everywhere. Added compound-table-name carve-out so descriptive names like `shared_expense_splits` survive — FKs may use unambiguous abbreviations like `source_split_id`.)
