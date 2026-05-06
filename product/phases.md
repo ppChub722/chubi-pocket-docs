@@ -345,8 +345,9 @@ Any feature beyond auth + users (→ Phase 1). Visual polish (→ Phase 2). Prod
 
 ## Status
 
-- **Phase** — Phase 1c in progress (project module complete through migrations 000032; budgets/saving-goals/scheduled-transactions next)
-- **Last updated** — 2026-05-05
-- **Version** — 0.6 (added Phase 2 deferrals: project Report tab + project Resolve tab deferred from Phase 1c)
+- **Phase** — Phase 1c queued (1b project module + cross-cutting IconMaker complete through migration **000033**; budgets / saving-goals / scheduled-transactions are next, starting at migration 000034). See [`phase1c/overview.md`](phase1c/overview.md).
+- **Last updated** — 2026-05-06
+- **Version** — 0.7 (Phase 1c kickoff: bumped current BE state to 000033, added pointer to phase1c plan)
+- **Version 0.6** — added Phase 2 deferrals: project Report tab + project Resolve tab deferred from Phase 1c
 - **Version 0.4** — unified shared-expenses model in 1b; in-app notifications moved from Phase 2 to Phase 1b
 - **Version 0.3** — initial per-phase docs with two-sided settlement handshake

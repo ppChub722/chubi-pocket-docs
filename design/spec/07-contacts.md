@@ -419,12 +419,13 @@ Enforced at the API response-projection layer. Mom can only see splits where `co
 
 Display precedence for rendering a contact:
 
-1. Linked user's `avatar_url` (if `linked_user_id` set and user has one)
-2. Linked user's `user_icon` *(Phase 2; preset icon on user profile — new `users` column)*
-3. Contact's `icon`
-4. Generic default icon (client-side)
+1. Linked user's `icon_code` (if `linked_user_id` set and user has one) — exposed on the contact response as `linked_user_icon_code`, projected from `users.icon_code`
+2. Contact's own `icon_code`
+3. Generic default icon (client-side)
 
-Allows users to: set a real photo on their profile for friends who link, or fall back to a playful preset icon picker. Contact owners who don't know the linked person's style pick an icon they like.
+Allows users to: pick a personal IconMaker code on their own profile for friends who link, and fall back to letting the contact owner choose an icon for un-linked or icon-less contacts.
+
+> **History:** Earlier drafts of this spec listed `users.avatar_url` (real photo) and a Phase-2 `users.user_icon` (preset) as separate slots above `icon_code`. Migration 33 (IconMaker) collapsed both into the single `users.icon_code` JSONB column and dropped `avatar_url`. The precedence above reflects the post-mig33 schema.
 
 ### 4.5 Uniqueness: one contact per (user, linked_user_id)
 
