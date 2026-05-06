@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IconMaker — finna-bbear</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F4F1EA;
+    --surface: #FFFFFF;
+    --surface-2: #FAF7F1;
+    --border: #E8E2D5;
+    --border-strong: #D4CCB8;
+    --text: #1F1B16;
+    --text-2: #6B6358;
+    --text-3: #9A9183;
+    --accent: #B45309;
+    --accent-soft: #FEF3C7;
+    --success: #047857;
+    --shadow-sm: 0 1px 2px rgba(31, 27, 22, 0.04);
+    --shadow-md: 0 4px 12px rgba(31, 27, 22, 0.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Manrope', -apple-system, sans-serif;
+    font-size: 14px; line-height: 1.5; min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  code, pre { font-family: 'JetBrains Mono', monospace; }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+
+  .app { max-width: 720px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+
+  /* ─── header ─────────────────────────── */
+  .app-head { display: flex; justify-content: space-between; align-items: center; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-dot {
+    width: 30px; height: 30px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--accent), #DC2626);
+    display: grid; place-items: center; color: white; font-weight: 800; font-size: 15px;
+  }
+  .brand h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+  .brand .sub { font-size: 12px; color: var(--text-3); }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .pill {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 100px;
+    padding: 7px 14px; font-size: 12px; color: var(--text-2);
+    display: flex; align-items: center; gap: 8px; box-shadow: var(--shadow-sm);
+  }
+  .pill.type { background: var(--text); color: white; border-color: var(--text); font-weight: 600; }
+  .pill.type::before { content: 'type'; font-size: 9px; opacity: 0.5; letter-spacing: 0.1em; text-transform: uppercase; margin-right: 2px; }
+  .pill.packs::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--success);
+  }
+
+  /* ─── panel ──────────────────────────── */
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; box-shadow: var(--shadow-sm);
+  }
+  .panel-head {
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .panel-head h2 {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--text-3);
+  }
+  .panel-body { padding: 20px; }
+
+  /* ─── PREVIEW SECTION ─────────────────── */
+  .composed-frame {
+    background: linear-gradient(180deg, #FBF8F2, #F4F1EA);
+    border-radius: 12px; padding: 24px 20px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px dashed var(--border-strong); position: relative;
+  }
+  .composed-frame::before {
+    content: 'as it appears in Account list';
+    position: absolute; top: 10px; left: 14px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .pv-card {
+    background: white; border-radius: 14px; box-shadow: var(--shadow-md);
+    padding: 14px; display: flex; align-items: center; gap: 14px;
+    width: 100%; max-width: 360px;
+  }
+  .pv-card-info { flex: 1; min-width: 0; }
+  .pv-card-title { font-weight: 700; font-size: 14px; }
+  .pv-card-sub { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+  .pv-card-amt { font-weight: 800; font-size: 16px; color: var(--success); }
+
+  /* the rendered icon — generic */
+  .ic { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1; user-select: none; border-radius: 50%; }
+
+  /* ─── editor rows ─────────────────────── */
+  .editors {
+    margin-top: 16px;
+    border-top: 1px dashed var(--border);
+    padding-top: 8px;
+  }
+  .editor-row {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 14px;
+    padding: 12px 8px;
+    border-radius: 10px;
+    align-items: center;
+    cursor: pointer;
+    border: 2px solid transparent;
+    position: relative;
+    transition: background .15s;
+  }
+  .editor-row:hover { background: var(--surface-2); }
+  .editor-row.active {
+    background: linear-gradient(90deg, var(--accent-soft), transparent 80%);
+    border-color: rgba(180, 83, 9, 0.25);
+  }
+  .editor-row.active::before {
+    content: ''; position: absolute; left: -1px; top: 8px; bottom: 8px; width: 3px;
+    background: var(--accent); border-radius: 2px;
+  }
+
+  .ed-preview {
+    width: 56px; height: 56px;
+    border-radius: 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    display: grid; place-items: center;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .ed-preview-inner {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 22px; line-height: 1;
+  }
+  .ed-preview-inner.empty {
+    border: 2px dashed var(--border-strong);
+    color: var(--text-3); font-size: 18px; font-weight: 600;
+  }
+  .ed-preview-inner.empty::after { content: '∅'; }
+
+  .ed-meta { display: flex; flex-direction: column; gap: 8px; }
+  .ed-label { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .ed-label .role { font-size: 13px; font-weight: 700; }
+  .ed-label .asset-id {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-3);
+  }
+  .ed-label .null-tag {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--text-3); background: var(--surface-2); padding: 2px 7px; border-radius: 100px;
+  }
+  .ed-slots { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+  /* slot swatches — tap-to-focus */
+  .slot {
+    width: 32px; height: 32px; border-radius: 9px;
+    border: 2px solid var(--border);
+    cursor: pointer; flex-shrink: 0; position: relative;
+    transition: transform .08s ease;
+  }
+  .slot:hover { transform: scale(1.05); }
+  .slot.focused {
+    border-color: var(--text);
+    box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text);
+  }
+  .slot.focused::after {
+    content: ''; position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 5px solid transparent; border-right: 5px solid transparent;
+    border-top: 5px solid var(--text);
+  }
+  .slot-tap-hint {
+    font-size: 10px; color: var(--text-3); margin-left: 4px;
+    font-style: italic;
+  }
+
+  /* ─── PICKER SECTION ──────────────────── */
+  .picker-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+    background: linear-gradient(90deg, var(--accent-soft), transparent 70%);
+    transition: background .2s;
+  }
+  .picker-head.empty {
+    background: var(--surface);
+  }
+  .picker-context .crumb {
+    font-size: 12px; font-weight: 600; color: var(--text-2);
+  }
+  .picker-context .crumb b { color: var(--text); }
+  .picker-context .crumb .sep {
+    margin: 0 6px; color: var(--text-3); font-weight: 400;
+  }
+  .picker-mode {
+    font-size: 10px; font-weight: 700; padding: 4px 10px;
+    background: var(--text); color: white; border-radius: 100px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .picker-mode.empty { background: var(--text-3); }
+
+  .picker-body { padding: 20px; }
+  .picker-section { margin-bottom: 18px; }
+  .picker-section:last-child { margin-bottom: 0; }
+  .picker-section h3 {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-3); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .picker-section h3 .count {
+    background: var(--surface-2); border: 1px solid var(--border);
+    padding: 1px 7px; border-radius: 100px; font-size: 9px; color: var(--text-2);
+    font-weight: 600; letter-spacing: 0.04em;
+  }
+
+  /* theme — compact pool */
+  .theme-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 44px);
+    gap: 8px;
+  }
+  .theme-grid .swatch {
+    aspect-ratio: 1; border-radius: 10px; border: 1px solid var(--border);
+    cursor: pointer; position: relative;
+    transition: transform .08s ease;
+  }
+  .theme-grid .swatch:hover { transform: scale(1.1); z-index: 2; }
+  .theme-grid .swatch.is-current {
+    box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--text);
+    border-color: var(--text);
+  }
+  .theme-grid .swatch.is-current::after {
+    content: '✓'; position: absolute; inset: 0;
+    display: grid; place-items: center; font-size: 13px; font-weight: 800;
+    color: var(--text); mix-blend-mode: difference; filter: invert(1);
+  }
+
+  /* recent */
+  .recent-row {
+    display: flex; gap: 8px; align-items: center;
+    flex-wrap: nowrap; overflow: hidden;
+  }
+  .recent-swatch {
+    width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--border);
+    cursor: pointer; flex-shrink: 0;
+    transition: transform .08s ease;
+  }
+  .recent-swatch:hover { transform: scale(1.05); }
+  .recent-empty {
+    font-size: 12px; color: var(--text-3); font-style: italic;
+  }
+  .custom-trigger {
+    margin-left: auto;
+    background: var(--text); color: white;
+    padding: 7px 14px; border-radius: 9px;
+    font-size: 12px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+    position: relative;
+  }
+  .custom-trigger::before {
+    content: ''; width: 14px; height: 14px; border-radius: 4px;
+    background: conic-gradient(from 0deg, #ef4444, #f59e0b, #84cc16, #06b6d4, #6366f1, #d946ef, #ef4444);
+  }
+  .custom-trigger input[type="color"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+
+  /* picker placeholder (default state) */
+  .picker-empty {
+    padding: 40px 20px; text-align: center;
+    border: 2px dashed var(--border-strong); border-radius: 12px;
+    background: var(--surface-2);
+  }
+  .picker-empty .arrow { font-size: 22px; margin-bottom: 8px; }
+  .picker-empty .msg { font-size: 13px; color: var(--text-2); font-weight: 500; }
+  .picker-empty .hint { font-size: 11px; color: var(--text-3); margin-top: 4px; }
+
+  /* asset pickers (icon/bg/border) */
+  .pack { padding-bottom: 16px; }
+  .pack + .pack { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .pack-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .pack-head .l { display: flex; align-items: center; gap: 8px; }
+  .pack-head h4 { font-size: 13px; font-weight: 700; }
+  .pack-tag {
+    font-size: 9px; padding: 3px 8px; border-radius: 100px;
+    font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .pack-tag.base { background: #DBEAFE; color: #1E40AF; }
+  .pack-tag.seasonal { background: #DCFCE7; color: #166534; }
+  .pack-tag.locked { background: var(--surface-2); color: var(--text-3); }
+  .pack-cta {
+    font-size: 11px; color: var(--accent); font-weight: 700;
+  }
+  .pack-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px;
+  }
+  .pack.locked .pack-grid {
+    opacity: 0.5; pointer-events: none; filter: grayscale(0.7);
+  }
+
+  .opt {
+    aspect-ratio: 1; border-radius: 12px; background: var(--surface-2);
+    border: 2px solid transparent;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: pointer; position: relative; padding: 6px 4px 12px;
+  }
+  .opt:hover { background: white; }
+  .opt.active { border-color: var(--text); background: white; box-shadow: var(--shadow-md); }
+  .opt-glyph { font-size: 22px; line-height: 1; }
+  .opt-shape { width: 26px; height: 26px; border-radius: 50%; }
+  .opt-dots {
+    position: absolute; bottom: 4px; left: 0; right: 0;
+    display: flex; justify-content: center; gap: 3px;
+    height: 6px; align-items: center;
+  }
+  .opt-dots span {
+    width: 6px; height: 6px; border-radius: 50%;
+    border: 1px solid rgba(31,27,22,0.15);
+  }
+  .opt-dots.zero::after {
+    content: 'preset'; font-size: 7.5px; font-weight: 700; color: var(--text-3);
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .opt-null {
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 1.5px dashed var(--border-strong);
+    display: grid; place-items: center;
+    background: repeating-linear-gradient(45deg, transparent 0 3px, rgba(180,83,9,0.06) 3px 5px);
+  }
+  .opt-null::after { content: '∅'; color: var(--text-3); font-size: 14px; font-weight: 600; }
+  .opt-border {
+    width: 28px; height: 28px; border-radius: 50%; background: white;
+  }
+
+  /* ─── actions ──────────────────────────── */
+  .actions {
+    display: flex; justify-content: flex-end; gap: 10px;
+  }
+  .btn {
+    padding: 11px 20px; border-radius: 10px; font-weight: 600; font-size: 13px;
+  }
+  .btn-primary { background: var(--text); color: white; }
+  .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+
+  /* ─── icon_code peek ───────────────────── */
+  .codebox {
+    background: var(--text); color: #FCD34D; padding: 14px 16px;
+    border-radius: 12px; font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; line-height: 1.6; overflow-x: auto;
+    white-space: pre;
+  }
+  .codebox .key { color: #94A3B8; }
+  .codebox .str { color: #86EFAC; }
+  .codebox .col { color: #FBBF24; }
+  .codebox .nul { color: #F87171; font-style: italic; }
+  .codebox .punc { color: #64748B; }
+
+  /* save toast */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: white; padding: 12px 20px;
+    border-radius: 10px; font-size: 13px; font-weight: 600;
+    box-shadow: var(--shadow-md);
+    opacity: 0; pointer-events: none;
+    transition: opacity .2s, transform .2s;
+    transform: translateX(-50%) translateY(8px);
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="app-head">
+    <div class="brand">
+      <div class="brand-dot">f</div>
+      <div>
+        <h1>IconMaker</h1>
+        <div class="sub">finna-bbear · shared Flutter component</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="pill type">account</div>
+      <div class="pill packs">2 packs</div>
+    </div>
+  </header>
+
+  <!-- PREVIEW SECTION -->
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Preview</h2>
+      <span style="font-size:11px;color:var(--text-3)">tap a row or a slot to edit</span>
+    </div>
+    <div class="panel-body">
+      <div class="composed-frame">
+        <div class="pv-card">
+          <div id="composedIcon"></div>
+          <div class="pv-card-info">
+            <div class="pv-card-title">Food &amp; Dining</div>
+            <div class="pv-card-sub">132 transactions this month</div>
+          </div>
+          <div class="pv-card-amt">฿8,420</div>
+        </div>
+      </div>
+      <div class="editors" id="editorRows"></div>
+    </div>
+  </div>
+
+  <!-- PICKER SECTION -->
+  <div class="panel">
+    <div class="picker-head" id="pickerHead"></div>
+    <div class="picker-body" id="pickerBody"></div>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="actions">
+    <button class="btn btn-secondary" data-action="reset">Reset</button>
+    <button class="btn btn-primary" data-action="save">Save icon_code</button>
+  </div>
+
+  <!-- icon_code peek -->
+  <div class="panel">
+    <div class="panel-head"><h2>Resulting icon_code</h2></div>
+    <div class="panel-body">
+      <div class="codebox" id="codebox"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+/* ──────────── PACK DATA ──────────── */
+const PACKS = {
+  base: {
+    name: 'Base', tag: 'base',
+    icon: [
+      { id: 'restaurant', glyph: '🍴', color: ['#FFFFFF'] },
+      { id: 'cart',       glyph: '🛒', color: ['#0F766E'] },
+      { id: 'car',        glyph: '🚗', color: ['#0EA5E9'] },
+      { id: 'home',       glyph: '🏠', color: ['#7C3AED'] },
+      { id: 'card',       glyph: '💳', color: ['#6366F1'] },
+      { id: 'duoUser',    glyph: '👤', color: ['#B45309', '#F4F1EA'] },
+      { id: 'star',       glyph: '⭐', color: ['#F59E0B'] },
+      { id: 'gift',       glyph: '🎁', color: ['#E11D48', '#F59E0B'] },
+    ],
+    background: [
+      { id: 'solid',          color: ['#E53935'] },
+      { id: 'superGradientA', color: ['#B45309', '#DC2626'] },
+      { id: 'radialGlow',     color: ['#F59E0B', '#78350F'] },
+    ],
+    border: [
+      { id: 'thin',   color: ['#78350F'] },
+      { id: 'thick',  color: ['#78350F'] },
+      { id: 'dashed', color: ['#78350F'] },
+    ]
+  },
+  christmas2026: {
+    name: 'Christmas 2026', tag: 'seasonal',
+    icon: [
+      { id: 'tree',    glyph: '🎄', color: ['#15803D'] },
+      { id: 'santa',   glyph: '🎅', color: [] },
+      { id: 'snowman', glyph: '⛄', color: [] },
+      { id: 'bell',    glyph: '🔔', color: ['#FBBF24'] },
+    ],
+    background: [
+      { id: 'snowflake', color: [] },
+      { id: 'wreath',    color: [] },
+      { id: 'starburst', color: [] },
+    ],
+    border: [
+      { id: 'candycane', color: [] },
+      { id: 'lights',    color: ['#FBBF24'] },
+    ]
+  },
+  songkran2026: {
+    name: 'Songkran 2026', tag: 'locked', locked: true,
+    icon: [
+      { id: 'water',  glyph: '💧', color: ['#0EA5E9'] },
+      { id: 'flower', glyph: '🌺', color: ['#E11D48'] },
+      { id: 'sun',    glyph: '☀️', color: [] },
+    ],
+    background: [],
+    border: []
+  }
+};
+
+const THEME_PALETTE = [
+  // row 1 — mid tones + black
+  '#1F1B16', '#DC2626', '#EA580C', '#CA8A04', '#16A34A', '#2563EB',
+  // row 2 — light tints + white
+  '#FFFFFF', '#FCA5A5', '#FED7AA', '#FDE68A', '#86EFAC', '#93C5FD'
+];
+
+/* ──────────── STATE ──────────── */
+const state = {
+  type: 'account',
+  ownedPacks: ['base', 'christmas2026'],
+
+  // current selection (= icon_code being built)
+  icon: 'restaurant',
+  iconColors: ['#FFFFFF'],
+  background: 'superGradientA',
+  bgColors: ['#B45309', '#DC2626'],
+  border: null,
+  borderColors: [],
+
+  // UI state
+  pickerMode: 'empty',    // 'empty' | 'color' | 'icon' | 'background' | 'border'
+  focusedSlot: null,      // null | { role, index }
+
+  // memory
+  recentColors: ['#0F766E', '#7C3AED', '#1E40AF', '#E11D48']
+};
+
+const ROLE_KEYS = {
+  icon:       { id: 'icon',       colors: 'iconColors' },
+  background: { id: 'background', colors: 'bgColors' },
+  border:     { id: 'border',     colors: 'borderColors' }
+};
+
+/* ──────────── HELPERS ──────────── */
+function findAsset(role, id) {
+  if (id == null) return null;
+  for (const packId of Object.keys(PACKS)) {
+    const list = PACKS[packId][role];
+    if (!list) continue;
+    const found = list.find(a => a.id === id);
+    if (found) return { ...found, packId };
+  }
+  return null;
+}
+
+function bgCss(id, colors) {
+  if (id == null) return 'background:transparent';
+  if (id === 'solid')          return `background:${colors[0]}`;
+  if (id === 'superGradientA') return `background:linear-gradient(180deg, ${colors[0]} 0%, ${colors[1]} 100%)`;
+  if (id === 'radialGlow')     return `background:radial-gradient(circle at 30% 30%, ${colors[0]}, ${colors[1]})`;
+  if (id === 'snowflake') return `background:conic-gradient(from 0deg, transparent 0 30deg, #93C5FD 30deg 60deg, transparent 60deg 90deg, #93C5FD 90deg 120deg, transparent 120deg 150deg, #93C5FD 150deg 180deg, transparent 180deg 210deg, #93C5FD 210deg 240deg, transparent 240deg 270deg, #93C5FD 270deg 300deg, transparent 300deg 330deg, #93C5FD 330deg 360deg), #DBEAFE`;
+  if (id === 'wreath')    return `background:radial-gradient(circle, transparent 35%, #15803D 36% 70%, transparent 71%)`;
+  if (id === 'starburst') return `background:repeating-conic-gradient(#15803D 0deg 30deg, #B91C1C 30deg 60deg)`;
+  return 'background:transparent';
+}
+
+function borderCss(id, colors) {
+  if (id == null) return '';
+  if (id === 'thin')      return `border:2px solid ${colors[0]};`;
+  if (id === 'thick')     return `border:4px solid ${colors[0]};`;
+  if (id === 'dashed')    return `border:2px dashed ${colors[0]};`;
+  if (id === 'lights')    return `border:3px dotted ${colors[0]};`;
+  if (id === 'candycane') return `border:3px solid transparent; background-image:linear-gradient(white,white), repeating-linear-gradient(45deg, #B91C1C 0 4px, #fff 4px 8px); background-clip:padding-box,border-box; background-origin:padding-box,border-box;`;
+  return '';
+}
+
+function iconHTML(size) {
+  const a = findAsset('icon', state.icon);
+  const glyph = a ? a.glyph : '?';
+  const bgStyle = bgCss(state.background, state.bgColors);
+  const bdStyle = borderCss(state.border, state.borderColors);
+  const glyphColor = state.iconColors[0] || '#000';
+  const fontSize = size * 0.46;
+  return `<div class="ic" style="
+    width:${size}px;height:${size}px;
+    font-size:${fontSize}px;
+    color:${glyphColor};
+    ${bgStyle}; ${bdStyle}
+  ">${glyph}</div>`;
+}
+
+function tagLabel(packId, pack) {
+  if (pack.locked || !state.ownedPacks.includes(packId)) return 'locked';
+  if (pack.tag === 'seasonal') return 'seasonal · owned';
+  return 'included';
+}
+
+function isLocked(packId, pack) {
+  return pack.locked || !state.ownedPacks.includes(packId);
+}
+
+function rolesColors(role) { return state[ROLE_KEYS[role].colors]; }
+function rolesId(role)     { return state[ROLE_KEYS[role].id]; }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+/* ──────────── RENDERERS ──────────── */
+function render() {
+  renderComposed();
+  renderEditors();
+  renderPicker();
+  renderCodebox();
+}
+
+function renderComposed() {
+  document.getElementById('composedIcon').innerHTML = iconHTML(56);
+}
+
+function renderEditors() {
+  const root = document.getElementById('editorRows');
+  const rows = [];
+
+  const focusedRole = state.focusedSlot ? state.focusedSlot.role : null;
+  const isActiveRow = (role) =>
+    state.pickerMode === role || (state.pickerMode === 'color' && focusedRole === role);
+
+  // ICON
+  {
+    const a = findAsset('icon', state.icon);
+    const previewBg = bgCss(state.background, state.bgColors);
+    const previewBd = borderCss(state.border, state.borderColors);
+    const slots = state.iconColors.map((c, i) => slotHTML('icon', i, c)).join('');
+    const previewInner = a
+      ? `<div class="ed-preview-inner" style="${previewBg};${previewBd};color:${state.iconColors[0]||'#000'}">${a.glyph}</div>`
+      : `<div class="ed-preview-inner empty"></div>`;
+    rows.push(`
+      <div class="editor-row ${isActiveRow('icon') ? 'active' : ''}" data-action="open-picker" data-role="icon">
+        <div class="ed-preview" data-action="open-picker" data-role="icon">${previewInner}</div>
+        <div class="ed-meta">
+          <div class="ed-label">
+            <span class="role">Icon</span>
+            <span class="asset-id">${state.icon}</span>
+          </div>
+          <div class="ed-slots">
+            ${slots || `<span class="slot-tap-hint">preset · no colors</span>`}
+          </div>
+        </div>
+      </div>
+    `);
+  }
+
+  // BACKGROUND
+  {
+    const isNull = state.background == null;
+    const previewInner = isNull
+      ? `<div class="ed-preview-inner empty"></div>`
+      : `<div class="ed-preview-inner" style="${bgCss(state.background, state.bgColors)}"></div>`;
+    const slots = state.bgColors.map((c, i) => slotHTML('background', i, c)).join('');
+    rows.push(`
+      <div class="editor-row ${isActiveRow('background') ? 'active' : ''}" data-action="open-picker" data-role="background">
+        <div class="ed-preview" data-action="open-picker" data-role="background">${previewInner}</div>
+        <div class="ed-meta">
+          <div class="ed-label">
+            <span class="role">Background</span>
+            ${isNull ? '<span class="null-tag">null</span>' : `<span class="asset-id">${state.background}</span>`}
+          </div>
+          <div class="ed-slots">
+            ${slots || `<span class="slot-tap-hint">${isNull ? 'tap row to choose a background' : 'preset · no colors'}</span>`}
+          </div>
+        </div>
+      </div>
+    `);
+  }
+
+  // BORDER
+  {
+    const isNull = state.border == null;
+    const previewInner = isNull
+      ? `<div class="ed-preview-inner empty"></div>`
+      : `<div class="ed-preview-inner" style="background:white;${borderCss(state.border, state.borderColors)}"></div>`;
+    const slots = state.borderColors.map((c, i) => slotHTML('border', i, c)).join('');
+    rows.push(`
+      <div class="editor-row ${isActiveRow('border') ? 'active' : ''}" data-action="open-picker" data-role="border">
+        <div class="ed-preview" data-action="open-picker" data-role="border">${previewInner}</div>
+        <div class="ed-meta">
+          <div class="ed-label">
+            <span class="role">Border</span>
+            ${isNull ? '<span class="null-tag">null</span>' : `<span class="asset-id">${state.border}</span>`}
+          </div>
+          <div class="ed-slots">
+            ${slots || `<span class="slot-tap-hint">${isNull ? 'tap row to choose a border' : 'preset · no colors'}</span>`}
+          </div>
+        </div>
+      </div>
+    `);
+  }
+
+  root.innerHTML = rows.join('');
+}
+
+function slotHTML(role, index, color) {
+  const f = state.focusedSlot;
+  const focused = f && f.role === role && f.index === index;
+  return `<div class="slot ${focused ? 'focused' : ''}"
+    style="background:${color}; ${color === '#FFFFFF' ? 'border-color:var(--border-strong);' : ''}"
+    data-action="focus-slot" data-role="${role}" data-index="${index}"
+    title="${role}Colors[${index}] = ${color}"></div>`;
+}
+
+function renderPicker() {
+  renderPickerHead();
+  renderPickerBody();
+}
+
+function renderPickerHead() {
+  const head = document.getElementById('pickerHead');
+  if (state.pickerMode === 'empty') {
+    head.classList.add('empty');
+    head.innerHTML = `
+      <div class="picker-context"><span class="crumb">No element selected</span></div>
+      <span class="picker-mode empty">idle</span>`;
+    return;
+  }
+  head.classList.remove('empty');
+  if (state.pickerMode === 'color') {
+    const f = state.focusedSlot;
+    const roleLabel = f.role === 'icon' ? 'Icon' : f.role === 'background' ? 'Background' : 'Border';
+    const total = rolesColors(f.role).length;
+    head.innerHTML = `
+      <div class="picker-context">
+        <span class="crumb">Editing <span class="sep">›</span> <b>${roleLabel}</b> <span class="sep">›</span> <b>color ${f.index+1} of ${total}</b></span>
+      </div>
+      <span class="picker-mode">color</span>`;
+    return;
+  }
+  // role pickers
+  const roleLabel = state.pickerMode === 'icon' ? 'Icon' : state.pickerMode === 'background' ? 'Background' : 'Border';
+  head.innerHTML = `
+    <div class="picker-context">
+      <span class="crumb">Editing <span class="sep">›</span> <b>${roleLabel}</b> <span class="sep">›</span> choose asset</span>
+    </div>
+    <span class="picker-mode">${state.pickerMode}</span>`;
+}
+
+function renderPickerBody() {
+  const body = document.getElementById('pickerBody');
+  if (state.pickerMode === 'empty') {
+    body.innerHTML = `
+      <div class="picker-empty">
+        <div class="arrow">↑</div>
+        <div class="msg">Tap an element above to edit</div>
+        <div class="hint">Icon, Background, Border, or any color slot</div>
+      </div>`;
+    return;
+  }
+  if (state.pickerMode === 'color') {
+    body.innerHTML = renderColorPicker();
+    return;
+  }
+  body.innerHTML = renderAssetPicker(state.pickerMode);
+}
+
+function renderColorPicker() {
+  const f = state.focusedSlot;
+  const colors = rolesColors(f.role);
+  const current = colors[f.index];
+  const isCurrent = c => c.toLowerCase() === (current || '').toLowerCase();
+
+  const themeHTML = THEME_PALETTE.map(c =>
+    `<div class="swatch ${isCurrent(c) ? 'is-current' : ''}"
+      style="background:${c}"
+      data-action="apply-color" data-color="${c}"
+      title="${c}"></div>`
+  ).join('');
+
+  const recentHTML = state.recentColors.length === 0
+    ? `<span class="recent-empty">No custom picks yet — they'll appear here</span>`
+    : state.recentColors.map(c =>
+        `<div class="recent-swatch" style="background:${c}" data-action="apply-color" data-color="${c}" title="${c}"></div>`
+      ).join('');
+
+  return `
+    <div class="picker-section">
+      <h3>Theme palette <span class="count">${THEME_PALETTE.length} colors · curated</span></h3>
+      <div class="theme-grid">${themeHTML}</div>
+    </div>
+    <div class="picker-section">
+      <h3>Recent <span class="count">your custom picks · max 6</span></h3>
+      <div class="recent-row">
+        ${recentHTML}
+        <label class="custom-trigger">
+          Custom hex
+          <input type="color" value="${current || '#000000'}" data-action="apply-custom">
+        </label>
+      </div>
+    </div>
+  `;
+}
+
+function renderAssetPicker(role) {
+  const currentId = rolesId(role);
+  let html = '';
+
+  for (const packId of Object.keys(PACKS)) {
+    const pack = PACKS[packId];
+    const assets = pack[role];
+    if (!assets || !assets.length) continue;
+    const locked = isLocked(packId, pack);
+
+    html += `<div class="pack ${locked ? 'locked' : ''}">
+      <div class="pack-head">
+        <div class="l">
+          <h4>${pack.name}</h4>
+          <span class="pack-tag ${locked ? 'locked' : pack.tag}">${tagLabel(packId, pack)}</span>
+        </div>
+        ${locked ? '<button class="pack-cta">Unlock pack →</button>' : ''}
+      </div>
+      <div class="pack-grid">`;
+
+    // null option (bg / border only, base pack only)
+    if ((role === 'background' || role === 'border') && packId === 'base') {
+      const active = currentId === null;
+      html += `<div class="opt ${active ? 'active' : ''}" data-action="pick-asset" data-role="${role}" data-id="">
+        <div class="opt-null"></div>
+        <div class="opt-dots zero"></div>
+      </div>`;
+    }
+
+    for (const a of assets) {
+      const active = currentId === a.id;
+      let visual = '';
+      if (role === 'icon') {
+        visual = `<span class="opt-glyph">${a.glyph}</span>`;
+      } else if (role === 'background') {
+        visual = `<div class="opt-shape" style="${bgCss(a.id, a.color)}"></div>`;
+      } else {
+        visual = `<div class="opt-border" style="${borderCss(a.id, a.color)}"></div>`;
+      }
+      const dots = a.color.length === 0
+        ? `<div class="opt-dots zero"></div>`
+        : `<div class="opt-dots">${a.color.map(c => `<span style="background:${c}"></span>`).join('')}</div>`;
+      html += `<div class="opt ${active ? 'active' : ''}" data-action="pick-asset" data-role="${role}" data-id="${a.id}">
+        ${visual}${dots}
+      </div>`;
+    }
+
+    html += `</div></div>`;
+  }
+  return html;
+}
+
+function renderCodebox() {
+  const j = {
+    icon: state.icon,
+    iconColors: state.iconColors,
+    background: state.background,
+    bgColors: state.bgColors,
+    border: state.border,
+    borderColors: state.borderColors
+  };
+  // colored JSON output
+  const html = `{
+  <span class="key">"icon"</span><span class="punc">:</span> <span class="str">"${j.icon}"</span><span class="punc">,</span> <span class="key">"iconColors"</span><span class="punc">:</span> [${j.iconColors.map(c=>`<span class="col">"${c}"</span>`).join('<span class="punc">, </span>')}]<span class="punc">,</span>
+  <span class="key">"background"</span><span class="punc">:</span> ${j.background==null?'<span class="nul">null</span>':`<span class="str">"${j.background}"</span>`}<span class="punc">,</span> <span class="key">"bgColors"</span><span class="punc">:</span> [${j.bgColors.map(c=>`<span class="col">"${c}"</span>`).join('<span class="punc">, </span>')}]<span class="punc">,</span>
+  <span class="key">"border"</span><span class="punc">:</span> ${j.border==null?'<span class="nul">null</span>':`<span class="str">"${j.border}"</span>`}<span class="punc">,</span> <span class="key">"borderColors"</span><span class="punc">:</span> [${j.borderColors.map(c=>`<span class="col">"${c}"</span>`).join('<span class="punc">, </span>')}]
+}`;
+  document.getElementById('codebox').innerHTML = html;
+}
+
+/* ──────────── EVENTS ──────────── */
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-action]');
+  if (!t) return;
+  const action = t.dataset.action;
+
+  if (action === 'open-picker') {
+    e.stopPropagation();
+    const role = t.dataset.role;
+    state.pickerMode = role;
+    // don't auto-focus a slot when opening role picker — user is browsing assets
+    state.focusedSlot = null;
+    render();
+  }
+  else if (action === 'focus-slot') {
+    e.stopPropagation();
+    const role = t.dataset.role;
+    const index = parseInt(t.dataset.index, 10);
+    state.pickerMode = 'color';
+    state.focusedSlot = { role, index };
+    render();
+  }
+  else if (action === 'apply-color') {
+    if (!state.focusedSlot) return;
+    const color = t.dataset.color;
+    applyColorToFocused(color, false);
+    render();
+  }
+  // 'apply-custom' handled by 'input' event on color input below
+  else if (action === 'pick-asset') {
+    const role = t.dataset.role;
+    const newId = t.dataset.id === '' ? null : t.dataset.id;
+    pickAsset(role, newId);
+    render();
+  }
+  else if (action === 'reset') {
+    if (confirm('Reset to default?')) {
+      Object.assign(state, {
+        icon: 'restaurant',
+        iconColors: ['#FFFFFF'],
+        background: 'superGradientA',
+        bgColors: ['#B45309', '#DC2626'],
+        border: null,
+        borderColors: [],
+        pickerMode: 'empty',
+        focusedSlot: null
+      });
+      render();
+    }
+  }
+  else if (action === 'save') {
+    showToast('Saved · icon_code copied to clipboard');
+    const json = JSON.stringify({
+      icon: state.icon, iconColors: state.iconColors,
+      background: state.background, bgColors: state.bgColors,
+      border: state.border, borderColors: state.borderColors
+    });
+    if (navigator.clipboard) navigator.clipboard.writeText(json).catch(()=>{});
+  }
+});
+
+// custom hex input fires 'input' events
+document.addEventListener('input', (e) => {
+  if (e.target.dataset && e.target.dataset.action === 'apply-custom') {
+    if (!state.focusedSlot) return;
+    const color = e.target.value.toUpperCase();
+    applyColorToFocused(color, true);
+    render();
+  }
+});
+
+function applyColorToFocused(color, pushToRecent) {
+  const f = state.focusedSlot;
+  if (!f) return;
+  const colors = rolesColors(f.role).slice();
+  colors[f.index] = color;
+  state[ROLE_KEYS[f.role].colors] = colors;
+
+  if (pushToRecent) {
+    // dedupe + cap at 5
+    state.recentColors = [color, ...state.recentColors.filter(c => c.toLowerCase() !== color.toLowerCase())].slice(0, 6);
+  }
+}
+
+function pickAsset(role, newId) {
+  const oldColors = rolesColors(role);
+  const stateKey = ROLE_KEYS[role];
+
+  if (newId == null) {
+    state[stateKey.id] = null;
+    state[stateKey.colors] = [];
+    // clear focused slot if it was on this role
+    if (state.focusedSlot && state.focusedSlot.role === role) state.focusedSlot = null;
+    return;
+  }
+
+  const asset = findAsset(role, newId);
+  if (!asset) return;
+  state[stateKey.id] = newId;
+
+  // carry over user's existing colors where possible, fill rest from defaults
+  const newColors = asset.color.map((def, i) => oldColors[i] != null ? oldColors[i] : def);
+  state[stateKey.colors] = newColors;
+
+  // adjust focused slot if it pointed past the new length
+  if (state.focusedSlot && state.focusedSlot.role === role && state.focusedSlot.index >= newColors.length) {
+    state.focusedSlot = newColors.length > 0 ? { role, index: 0 } : null;
+  }
+}
+
+/* ──────────── INIT ──────────── */
+// Start in empty picker mode so user sees the "tap above" placeholder first.
+state.pickerMode = 'empty';
+state.focusedSlot = null;
+render();
+</script>
+</body>
+</html>

@@ -1,22 +1,62 @@
 # IconMaker
 
-Everything known about the IconMaker system — data model, current implementation, intended design, and open decisions. Designer fills in the UI spec when ready; this doc is the reference so nothing gets lost.
+Canonical reference for the IconMaker module — data model, pack structure,
+display rules, picker UI, and current implementation state.
+
+> **Source of truth note.** When this conflicts with
+> [icon_maker_spec.md](icon_maker_spec.md) the implementation follows
+> *this* file. spec.md is the original UX design; this doc is the spec
+> after the per-type-base divergence ([icon_maker_plan.md](icon_maker_plan.md)).
 
 ---
 
 ## What it is
 
-A unified icon + color system for all customizable entities in the app. Replaces the old per-domain typed enums (`CategoryIconPreset`, `AccountColor`, `TagColor`, `AvatarPreset`, etc.) with a single `IconCode` JSONB blob stored on every entity.
+A unified icon + color system for every customizable entity in the app.
+Every entity that shows an icon stores an `IconCode` value object.
+`IconDisplay` is the single entry point for rendering icons across all
+screens. `IconMakerSheet` is the single entry point for picking icons.
 
 **Entities that carry `icon_code`:**
-users, accounts, categories, tags, contacts, projects, project_members
-*(schema.md also plans: saving_goals, budgets, scheduled_transactions — not yet migrated)*
+users, accounts, categories, tags, contacts, projects, project_members,
+project_transactions
+*(schema.md also plans: saving_goals, budgets, scheduled_transactions —
+not yet migrated.)*
+
+---
+
+## Types
+
+Every icon interaction is scoped to an `IconType`. Type controls:
+
+- **which base pack is loaded** (per-type icons),
+- **which fallback icon** appears when no `IconCode` is set,
+- **whether a picker is available** (`hasPicker`),
+- **per-type display rules** (`applyDisplayRules`),
+- **per-type default hide-toggles** in the picker preview
+  (`defaultPreviewHides`).
+
+| Type | Entity | Icon field | Picker | imageUrl | Display strips |
+|---|---|---|---|---|---|
+| `account` | Account | `iconCode` | ✅ | ✅ (`logoUrl`) | — |
+| `userProfile` | User | `iconCode` | ✅ | ✅ (`avatarUrl`) | — |
+| `category` | Category | `iconCode` | ✅ | — | — |
+| `tag` | Tag | `iconCode` | ✅ | — | **bg + border** |
+| `project` | Project | `iconCode` | ✅ | — | — |
+| `contact` | Contact | `iconCode` | ✅ | — | — |
+| `projectMember` | ProjectMember | `iconCode` | ✅ | — | — |
+| `projectTransaction` | ProjectTransaction | `categoryIconCode` | ✅ | — | — |
+| `transaction` | Transaction | — | ❌ display only | — | — |
+
+`transaction` uses the category's `iconCode` passed at the call site. No
+picker, no stored field.
 
 ---
 
 ## IconCode shape
 
-The canonical value object — identical in DB (JSONB) and Dart (`lib/shared/icon_maker/icon_code.dart`):
+The canonical value object — identical in DB (JSONB) and Dart
+(`lib/shared/icon_maker/icon_code.dart`):
 
 ```json
 {
@@ -31,20 +71,23 @@ The canonical value object — identical in DB (JSONB) and Dart (`lib/shared/ico
 
 | Field | Type | Meaning |
 |---|---|---|
-| `icon` | `string` | Icon ID — resolved to `IconData` via `IconRegistry`. Persisted as a stable string, never a file path. |
-| `iconColors` | `string[]` | 1–3 hex colors for the icon itself. 1 = solid tint. 2–3 = gradient (left→right or top→bottom). |
-| `background` | `string?` | `"solid"` / `"gradient"` / `null` (no background). |
-| `bgColors` | `string[]` | 1–3 hex colors for the background layer. |
-| `border` | `string?` | `"solid"` / `"gradient"` / `null` (no border). |
-| `borderColors` | `string[]` | 1–3 hex colors for the border layer. |
+| `icon` | `string?` | Icon ID — resolved to `IconData` via `IconRegistry`. Never a file path. |
+| `iconColors` | `string[]` | 1–3 hex colors for the icon glyph. 1 = solid. 2–3 = gradient (deferred). |
+| `background` | `string?` | Asset id of the bg variant, or `null` for no bg. |
+| `bgColors` | `string[]` | Hex colors for the bg layer; length depends on the variant. |
+| `border` | `string?` | Asset id of the border variant, or `null` for no border. |
+| `borderColors` | `string[]` | Hex colors for the border ring. |
 
-`NULL` column = entity uses its module default (initials for users, first base-pack icon for accounts, etc.).
+`NULL` column = entity uses its module default (theme-derived fallback,
+see below).
+
+**Asset id is the contract.** The renderer maps each id to its visual
+behaviour (texture, gradient direction, slot count). Adding a new variant
+= ship a new id + matching renderer case; the data shape doesn't change.
 
 ---
 
 ## 3 layers
-
-Every rendered icon has three independent layers, each configurable:
 
 ```
 ┌──────────────────────────────┐
@@ -52,38 +95,272 @@ Every rendered icon has three independent layers, each configurable:
 │  ┌────────────────────────┐  │
 │  │  background (bgColors) │  │  ← fill inside border
 │  │    ┌──────────────┐    │  │
-│  │    │  icon        │    │  │  ← the icon glyph, tinted by iconColors
+│  │    │  icon        │    │  │  ← glyph, tinted by iconColors
 │  │    │  (iconColors)│    │  │
 │  │    └──────────────┘    │  │
 │  └────────────────────────┘  │
 └──────────────────────────────┘
 ```
 
-Each layer supports 1–3 colors:
-- 1 color → solid
-- 2–3 colors → gradient (direction TBD by designer)
+---
+
+## Pack system
+
+### Two kinds of pack
+
+| Kind | Scope | Storage | Loaded by |
+|---|---|---|---|
+| **Base** | Per-type — each `IconType` has its own curated pack | `packs/base/pack_<type>.dart` | `PackRegistry._basePacks[type]` |
+| **Extra** (DLC, seasonal, paid) | Global — appears in every type's picker once owned | `packs/<pack_id>/pack.dart` | `PackRegistry._extraPacks[id]` |
+
+Per-type base packs let each picker show only icons that are semantically
+appropriate (account → wallet/bank/card; userProfile → person/man/woman).
+
+Extras are **type-agnostic** and global: a `christmas2026` pack ships its
+own icons + bg + borders, and once granted, all of it shows up in every
+picker.
+
+### Shared base bg + borders
+
+Every base pack uses the same `commonBaseBackgrounds` and
+`commonBaseBorders` from `packs/base/_shared.dart`. Per-type customisation
+applies only to **icons**.
+
+**`commonBaseBackgrounds`**
+
+| id | Slots | Default colors | Render |
+|---|---|---|---|
+| `solid` | 1 | `#64B5F6` | flat fill |
+| `superGradientA` | 2 | `#B45309` → `#DC2626` | linear top→bottom |
+| `radialGlow` | 2 | `#F59E0B` → `#78350F` | radial from upper-left |
+| `stripedPatternDi` | 3 | `#DC2626` `#F59E0B` `#2563EB` | 3 hard diagonal bands |
+| `rainbow` | 0 (preset) | — | SweepGradient ROYGBIV |
+
+**`commonBaseBorders`**
+
+| id | Slots | Default | Render |
+|---|---|---|---|
+| `thin` | 1 | `#78350F` | 2 px solid |
+| `thick` | 1 | `#78350F` | 4 px solid |
+| `dashed` | 1 | `#78350F` | 2 px (dashed approximated as solid for now) |
+
+### Per-type base icons
+
+| Type | Count | Source |
+|---|---|---|
+| `account` | 12 | `packs/base/pack_account.dart` |
+| `category` | 44 | `packs/base/pack_category.dart` |
+| `tag` | 16 | `packs/base/pack_tag.dart` |
+| `userProfile` | 8 | `packs/base/pack_user_profile.dart` |
+| `project` | 16 | `packs/base/pack_project.dart` |
+| `contact` | 10 | `packs/base/pack_contact.dart` |
+| `projectMember` | 9 | `packs/base/pack_project_member.dart` |
+| `projectTransaction` | 44 | `packs/base/pack_project_transaction.dart` (mirrors `category`) |
+
+### Pack data structure
+
+```dart
+IconPack(
+  id: 'base',
+  icons:       [IconPackItem(id, colors)],   // per-type
+  backgrounds: commonBaseBackgrounds,         // shared
+  borders:     commonBaseBorders,             // shared
+)
+```
+
+`colors` serves two purposes:
+- **Length** → how many color slots this item needs in the picker
+- **Values** → default/recommended hex colors pre-filled when the user
+  selects this item
+
+A 0-length `colors` array marks the item as a **preset** — no
+user-controlled colors (e.g. `rainbow`).
+
+### Pack folder structure
+
+```
+lib/shared/icon_maker/packs/
+├── icon_pack.dart            ← IconPack, IconPackItem types
+├── pack_registry.dart        ← PackRegistry: per-type base + global extras
+├── base/
+│   ├── _shared.dart              ← commonBaseBackgrounds + commonBaseBorders
+│   ├── pack_account.dart
+│   ├── pack_category.dart
+│   ├── pack_tag.dart
+│   ├── pack_user_profile.dart
+│   ├── pack_project.dart
+│   ├── pack_contact.dart
+│   ├── pack_project_member.dart
+│   └── pack_project_transaction.dart
+└── (extra packs added here as new folders, e.g. `christmas2026/pack.dart`)
+```
+
+### PackRegistry
+
+```dart
+PackRegistry.packs({
+  required IconType type,
+  List<String> grantedPackIds = const [],
+}) → List<IconPack>
+```
+
+Returns `[basePackForType(type), ...grantedExtras]`. Unknown extra ids
+are skipped silently. Base is always first.
+
+### Pack permissions
+
+`user_pack_permissions` table (migration 033) tracks which extra packs a
+user has access to. At picker open, granted pack IDs are read from
+`UserBloc` cache and forwarded to `PackRegistry.packs(...)`. Refreshed
+on login / app resume.
+
+Locked-icon treatment (icons from packs the user doesn't own): **TBD by
+designer** — not yet implemented.
 
 ---
 
-## Two render styles
+## IconDisplay
 
-Set at the call site per domain; controls how the picker behaves and what it stores:
+Universal display widget. Used on every screen that shows an icon.
 
-| Style | Background | Icon color | Used by |
-|---|---|---|---|
-| `background` | Solid colored circle | White (`#FFFFFF`) | Accounts, Categories, Projects, User avatar |
-| `iconColor` | Transparent / none | Tinted by `iconColors` | Tags |
+```dart
+IconDisplay(
+  type:     IconType,
+  size:     double,
+  imageUrl: String?,   // optional
+  iconCode: IconCode?, // optional
+)
+```
 
-In `background` style, `iconColors` is always `["#FFFFFF"]` — the user only picks the background color.
-In `iconColor` style, `bgColors` stays empty — the user only picks the icon tint color.
+**Resolution order:**
+1. `imageUrl` non-empty → `Image.network` with the icon path as error fallback.
+2. `iconCode` set → `IconCodeWidget(type.applyDisplayRules(iconCode), …)`.
+3. Neither → theme-derived default (primaryContainer fill +
+   `type.fallbackIcon` glyph).
 
-*(Future: full 3-layer mode lets the user pick all three independently.)*
+**`type.applyDisplayRules(code)`** strips layers a type ignores at render
+time. Currently: `tag` → returns `IconCode(icon, iconColors)` only;
+all other types return the code unchanged.
+
+### imageUrl
+
+Only `account` and `userProfile` ever have one. The caller resolves any
+server-relative path to a usable URL before passing.
+
+### Default IconCode
+
+Computed at build time, never stored:
+- `icon` → `type.fallbackIcon`
+- `bgColor` → `Theme.of(context).colorScheme.primaryContainer`
+
+| Type | Fallback icon |
+|---|---|
+| `account` | `account_balance_wallet_outlined` |
+| `userProfile` | `person_outline` |
+| `category` | `category_outlined` |
+| `tag` | `label_outline` |
+| `project` | `folder_outlined` |
+| `contact` | `contacts_outlined` |
+| `projectMember` | `person_outline` |
+| `projectTransaction` | `receipt_outlined` |
+| `transaction` | `receipt_outlined` |
+
+---
+
+## IconCodeWidget
+
+Self-inferring renderer. Type-unaware — renders whatever `IconCode` it's
+given. `IconDisplay` is responsible for applying type rules first.
+
+| IconCode state | Renders |
+|---|---|
+| `iconCode == null` | fallback circle + fallback icon |
+| `bgColors` non-empty | filled circle + tinted icon |
+| `bgColors` empty, `iconColors` non-empty | no background + tinted icon |
+| `borderColors` non-empty | outer border ring |
+| 2–3 colors in `iconColors` | gradient (deferred) |
+| all empty | fallback color + fallback icon |
+
+`IconDisplayMode.compact` suppresses the border layer (used in dense list
+rows / small avatars).
+
+---
+
+## IconMakerSheet
+
+Opened via `showIconMakerSheet(...)`. Returns `IconMakerResult` —
+`selected(IconCode)`, `removed`, or `null` (dismissed).
+
+```dart
+showIconMakerSheet(
+  context:         BuildContext,
+  type:            IconType,
+  initial:         IconCode?,
+  previewBuilder:  Widget Function(IconCode)?,   // optional contextual preview
+  previewSubtitle: Widget?,
+  removeLabel:     String?,                       // shown only on edit forms
+  useThisLabel:    String?,
+  grantedPackIds:  List<String> = const [],
+)
+```
+
+### Sections
+
+**1. Live preview**
+Renders `_previewCode` — the working `IconCode` with currently-hidden
+layers stripped. Caller-supplied `previewBuilder` (e.g. `AccountCard`,
+`CategoryPreviewCard`) shows the icon in its actual destination context.
+No builder = an 80 px `IconCodeWidget`.
+
+**2. Hide toggles** *(new in this revision)*
+A compact row directly under the preview:
+`[ ] Hide icon  [ ] Hide background  [ ] Hide border`
+
+- Defaults from `IconType.defaultPreviewHides`. `tag` → bg + border ticked.
+- Picker-only state — never saved to `IconCode`. Reset every open.
+- Lets the user toggle layer visibility in the live preview without
+  losing the underlying configuration. Editor rows + asset picker tiles
+  still show full fidelity.
+
+**3. Editor rows**
+Three rows, always visible — Icon, Background, Border. Each shows:
+- A 44 px mini-preview (tap → opens that role's asset picker).
+- Role label + current asset id (or `∅ none` if null).
+- One slot swatch per color in the current asset (tap → focuses that
+  slot, opens the color picker).
+
+The active row gets a subtle `primaryContainer @ 25%` fill + a 3 px left
+accent bar.
+
+**4. Picker section** (swappable, below the editor rows)
+
+| State | Trigger | Content |
+|---|---|---|
+| Empty | sheet just opened, nothing tapped | "Tap an element above to edit" placeholder |
+| Color | a slot swatch was tapped | Theme palette (12 swatches, 2×6) + Recent strip + Custom hex button |
+| Asset | a row's mini-preview was tapped | Pack-grouped asset grid; null tile for bg/border in the base pack |
+
+- **Theme palette** — 12 curated swatches (neutrals + 5 hue families ×
+  mid + light tints). Selected = thicker outline.
+- **Recent** — only **custom hex picks** land here. Theme/recent clicks
+  apply to the focused slot but don't pollute the recent list. Capped at 6.
+- **Custom hex** — TextField in an AlertDialog (native color wheel TBD).
+
+**5. Action row**
+- **Remove** (outlined, `removeLabel` only) — emits `IconMakerRemoved`.
+- **Use this** (filled, `useThisLabel`) — emits `IconMakerSelected(code)`.
+
+### Responsive
+- Mobile: bottom sheet with drag handle, scrollable.
+- Web ≥ 600 dp: centered `Dialog`, `maxWidth: 480`.
 
 ---
 
 ## BrandPalette
 
-12 swatches. Defined in `lib/shared/icon_maker/brand_palette.dart`. Replaces `AccountColor`, `CategoryColor`, `TagColor`.
+12 swatches in `lib/shared/icon_maker/brand_palette.dart`. (Reference
+palette — *separate* from the picker's theme palette which is curated for
+in-context contrast.)
 
 | # | Name | Hex |
 |---|---|---|
@@ -100,73 +377,52 @@ In `iconColor` style, `bgColors` stays empty — the user only picks the icon ti
 | 11 | Orange | `#FFB74D` |
 | 12 | Brown | `#A1887F` |
 
-Skipped: Teal (collides with brand `#00A389`), Green (collides with income-amount semantic), Yellow (too close to Amber).
+Skipped: Teal (collides with brand `#00A389`), Green (collides with
+income-amount semantic), Yellow (too close to Amber).
 
 ---
 
 ## IconRegistry
 
-`lib/shared/icon_maker/icon_registry.dart` — maps every stable icon ID → `IconData`.
+`lib/shared/icon_maker/icon_registry.dart` — maps every stable icon ID
+→ `IconData`.
 
-**Rule:** IDs are persisted server-side. Never rename them. When adding a new icon, add both the ID to the relevant domain list and the mapping to `_all`.
-
-### Per-domain icon lists (pickable by users)
-
-| List | Used by |
-|---|---|
-| `accountIconIds` (12) | Account form |
-| `categoryIconIds` (46) | Category form |
-| `tagIconIds` (16) | Tag form |
-| `userIconIds` (8) | Edit profile / avatar |
+**Rule:** IDs are persisted server-side. Never rename them. When adding a
+new icon, add both the ID to the relevant pack file and the mapping to
+`_all`.
 
 ### System icons (not pickable — used by seed categories)
 
-`system_transfer`, `system_adjustment`, `system_opening`, `system_debt_received`, `system_debt_paid`
+`system_transfer`, `system_adjustment`, `system_opening`,
+`system_debt_received`, `system_debt_paid`
 
 ---
 
-## Pack system
+## File structure
 
-`user_pack_permissions` table (migration 033). Tracks which icon packs a user has access to beyond the base pack.
-
-| Concept | Meaning |
-|---|---|
-| **Base pack** | Always available to every user. No DB row needed. Contains the current `accountIconIds` / `categoryIconIds` / `tagIconIds` / `userIconIds` lists. |
-| **Extra packs** | Each row in `user_pack_permissions` grants access to a named pack (`pack_id`). Can have an `expires_at` for seasonal packs. |
-| `pack[]` empty | User has base pack only. |
-
-**FE behavior (not yet implemented):**
-- At picker open, load the user's granted packs from cache.
-- Merge base pack icons + granted-pack icons for the relevant domain.
-- Icons from packs the user doesn't own are either hidden or shown as locked (designer to decide).
-
----
-
-## IconMaker UI — intended shape
-
-*(Designer to fill in exact layout, spacing, and visual treatment. The sections below are known requirements, not a finished spec.)*
-
-### Sections (4–5 total)
-
-1. **Preview** — live rendering of the current `IconCode` as it's being built. Updates on every change. Domain-specific: each form passes its own `previewBuilder` (e.g., `AccountCard`, `CategoryPreviewCard`).
-
-2. **Icon grid** — filtered by module (domain icon list) + granted packs. Selected icon highlighted. Cell size and column count TBD by designer (currently 4 columns, 4×4 dp border-radius cells).
-
-3. **Icon color picker** — pick `iconColors` (1–3 colors). In `background` style this may be locked to `#FFFFFF`. In `iconColor` style this is the primary user choice.
-
-4. **Background picker** — pick `background` type (none / solid / gradient) + `bgColors` (1–3 colors).
-
-5. **Border picker** — pick `border` type (none / solid / gradient) + `borderColors` (1–3 colors). *(Optional section — may be hidden for simpler domains.)*
-
-### Bottom of sheet
-
-- **Remove** button (outlined) — only shown on edit forms where removing the icon is allowed. Returns `IconMakerRemoved`.
-- **Use this** button (filled) — confirms and returns `IconMakerSelected(iconCode)`.
-
-### Responsive behavior
-
-- Mobile: bottom sheet with drag handle, scrollable.
-- Web (≥ 600 dp): centered dialog.
+```
+lib/shared/icon_maker/
+├── icon_code.dart              ← IconCode value object
+├── icon_type.dart              ← IconType enum + fallback + applyDisplayRules + defaultPreviewHides
+├── icon_display.dart           ← universal display widget
+├── icon_code_widget.dart       ← self-inferring renderer (type-unaware)
+├── icon_maker_sheet.dart       ← picker UI (tap-to-focus, hide toggles)
+├── icon_registry.dart          ← id → IconData map
+├── brand_palette.dart          ← 12 reference swatches
+└── packs/
+    ├── icon_pack.dart              ← IconPack, IconPackItem
+    ├── pack_registry.dart          ← per-type base + global extras
+    └── base/
+        ├── _shared.dart                ← commonBaseBackgrounds + commonBaseBorders
+        ├── pack_account.dart
+        ├── pack_category.dart
+        ├── pack_tag.dart
+        ├── pack_user_profile.dart
+        ├── pack_project.dart
+        ├── pack_contact.dart
+        ├── pack_project_member.dart
+        └── pack_project_transaction.dart
+```
 
 ---
 
@@ -175,56 +431,56 @@ Skipped: Teal (collides with brand `#00A389`), Green (collides with income-amoun
 ### Done ✅
 
 - `IconCode` value object (Dart + JSONB match)
-- `IconCodeWidget` — renders any `IconCode` as a circle (background or iconColor style)
-- `showIconMakerSheet` — bottom sheet / dialog; preview + icon grid + single swatch row + action buttons
-- `BrandPalette` — 12 swatches
-- `IconRegistry` — full map + per-domain lists
+- `IconType` enum with `fallbackIcon`, `hasPicker`, `applyDisplayRules`,
+  `defaultPreviewHides`
+- `IconDisplay` universal widget with `imageUrl` + theme fallback
+- `IconCodeWidget` self-inferring renderer with `IconDisplayMode.full/compact`
+  and full bg variant set (`solid`, `superGradientA`, `radialGlow`,
+  `stripedPatternDi`, `rainbow`)
+- `IconPack` / `IconPackItem` / `PackRegistry` with per-type base + global extras
+- 8 per-type base packs sharing `commonBaseBackgrounds` + `commonBaseBorders`
+- `IconMakerSheet` — tap-to-focus, swappable picker, hide toggles, all 3
+  editor rows always visible
 - All 6 domain models use `IconCode? iconCode`
-- All form pages wired to `showIconMakerSheet`
-- All list/detail renderers use `IconCodeWidget` or `IconRegistry.get()`
-- Migration 033 applied: old columns dropped, data migrated
+- All form pages wired to `showIconMakerSheet` with the right `IconType`
+- All list/detail renderers use `IconDisplay`
+- Migration 033 applied (`user_pack_permissions`)
 
 ### Not yet implemented ❌
 
-- **Border layer not rendered** — `IconCode` stores `border` / `borderColors` but `IconCodeWidget` ignores them. No visual border is shown.
-- **Multi-color (gradient) not rendered** — only `bgColors[0]` / `iconColors[0]` is used; extra colors are stored but ignored.
-- **Pack system not in FE** — the picker always shows the full base pack list regardless of `user_pack_permissions`. No locked-icon UI.
-- **`logo_url` fallback for accounts** — schema says "show `logo_url` instead of `icon_code` when set" but `AccountCard` / `IconCodeWidget` don't implement this.
-- **`gift_card` missing from `_all` map** — `accountIconIds` includes `'gift_card'` but the registry only has `'card_giftcard'`; the picker falls back to the default icon for that slot.
-- **`userIconIds` only 8 icons** — thin for an avatar picker.
-- **3-layer full picker not built** — current sheet only shows one swatch row (bg color OR icon color depending on style); no border section, no multi-color gradient pickers.
+- Real `grantedPackIds` flow — read from `UserBloc` cache, forward into
+  `showIconMakerSheet` calls (currently always `[]`)
+- Sample seasonal pack file (e.g. `packs/christmas2026/pack.dart`) so the
+  global-extras path can be exercised
+- Locked-pack visual treatment in the asset picker (greyed grid + "Unlock
+  pack →" CTA per the demo)
+- PNG-texture background variants (e.g. `christmasTree`, `snowman`,
+  `frozen`) and the matching `DecorationImage` renderer path
+- Native color-wheel picker (currently a hex TextField in an AlertDialog)
+- Multi-color icon gradient rendering (`iconColors.length > 1`)
+- True dashed border (currently approximated as solid)
+- Visual chrome from the demo: composed preview frame with entity card,
+  picker breadcrumb, mode pill, square-tile theme palette, conic-gradient
+  custom-hex button — see [icon_maker_demo.html](icon_maker_demo.html)
 
 ---
 
-## Key Dart files
-
-| File | Purpose |
-|---|---|
-| `lib/shared/icon_maker/icon_code.dart` | `IconCode` value object; `resolvedBgColor`, `resolvedIconColor`, `accentColor` getters |
-| `lib/shared/icon_maker/icon_code_widget.dart` | `IconCodeWidget` — stateless renderer |
-| `lib/shared/icon_maker/icon_maker_sheet.dart` | `showIconMakerSheet` + `_Sheet` widget |
-| `lib/shared/icon_maker/icon_registry.dart` | ID → `IconData` map; per-domain ID lists |
-| `lib/shared/icon_maker/brand_palette.dart` | `BrandPalette` — 12 swatches; `BrandSwatch` type |
-
----
-
-## Open design decisions (for designer)
+## Open design decisions
 
 | Item | Status |
 |---|---|
-| Gradient direction (left→right vs top→bottom vs radial) | ❌ not decided |
-| Whether `background` style locks icon color to white or lets user pick | ❌ not decided |
-| Border thickness / inset | ❌ not decided |
-| Locked-pack icon treatment (hidden vs shown greyed vs shown with lock badge) | ❌ not decided |
-| Number of columns in icon grid | ❌ not decided |
-| Whether all 5 sections show for every domain, or domain-specific subset | ❌ not decided |
-| Multi-color picker UX (e.g., color stop handles, swap button) | ❌ not decided |
-| Preview card size + whether entity name shows below it | ❌ not decided |
+| Locked-pack icon treatment (hidden vs greyed vs lock badge + CTA) | ❌ pending designer |
+| Number of columns in icon grid (currently 5 for icons, 4 for bg/border) | ⚠️ working default |
+| Gradient direction for `iconColors` multi-color (deferred entirely) | ❌ deferred |
+| Multi-color picker UX (slot stops, swap button) | ❌ pending designer |
+| Preview card size + whether entity name shows below | ❌ pending designer |
+| Demo-style two-panel chrome vs single-sheet (current) | ⚠️ accepted — Material 3 single sheet is fine; revisit if/when designer pushes back |
 
 ---
 
 ## Status
 
 - **Created** — 2026-05-05
-- **Migration** — 033 applied, BE + FE migration complete
-- **UI spec** — pending designer; this doc is the reference
+- **Last updated** — 2026-05-06 (per-type base + hide toggles + new bg variants implemented)
+- **Migration** — 033 applied
+- **Plan of record** — [icon_maker_plan.md](icon_maker_plan.md)
