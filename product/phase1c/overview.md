@@ -14,12 +14,15 @@ scheduled transactions. Per [phases.md §Phase 1c](../phases.md).
 
 ## Current state
 
-- BE migration head: **000033** (`icon_maker`).
+- BE migration head: **000036** (`init_scheduled_transactions`).
 - Phase 1a + 1b modules + cross-cutting IconMaker: **done**.
-- Phase 1c BE work: **none yet** — no `budgets`, `saving_goals`,
-  `scheduled_transactions` migrations exist.
-- Phase 1c FE work: **none yet** — no `/more/budgets`,
-  `/more/saving-goals`, `/more/scheduled` routes / pages.
+- Phase 1c BE work: **done** — `saving_goals` (000034), `budgets` (000035),
+  `scheduled_transactions` (000036) tables created; all handlers / services /
+  stores wired and routes registered in `cmd/api/main.go`.
+- Phase 1c FE work: **done** — `/saving-goals`, `/budgets`,
+  `/scheduled-transactions` routes (+ `/new`, `/:id`, `/:id/edit`) all
+  shipped; More-menu entries wired; cubits + repos provided in `app.dart`;
+  l10n keys added (en + th). `flutter analyze` clean.
 
 ## Modules at a glance
 
@@ -88,8 +91,9 @@ across `status='active'` rows ≤ 100. Enforced API-side with
 - `GET /v1/accounts/:id/saving-allocations` — pie helper for FE
 
 **FE pages:**
-- `/more/saving-goals` → `SavingGoalsListPage`
-- `SavingGoalFormModal` (create + edit)
+- `/saving-goals` → `SavingGoalsListPage` (entry point in More menu)
+- `/saving-goals/new` + `/saving-goals/:id/edit` → `SavingGoalFormPage` (full page; matches `account_form_page.dart` convention — no module uses modals for forms)
+- `/saving-goals/:id` → `SavingGoalDetailPage`
 - Per-account allocation pie helper widget (consumed by detail / form)
 
 **Exit checklist:**
@@ -127,11 +131,12 @@ WHERE `status='active'`.
 - Child breakdown: same query grouped by direct child category
 
 **FE pages:**
-- `/more/budgets` → `BudgetsListPage` with progress bar per row
-- `BudgetFormModal` (create + edit)
+- `/budgets` → `BudgetsListPage` with progress bar per row (entry point in More menu)
+- `/budgets/new` + `/budgets/:id/edit` → `BudgetFormPage` (full page)
+- `/budgets/:id` → `BudgetDetailPage`
 - Project-scope budgets list inside project detail page (Phase 1c
   scope; only project owner can create/edit/delete)
-- Optional `/more/budgets/overview` summary card or inline header
+- Optional `/budgets/overview` summary card or inline header
 
 **Exit checklist:**
 - [ ] User-scope monthly budget tracks spend correctly across the period
@@ -174,9 +179,9 @@ links a generated transaction back to its template.
 All in one DB transaction.
 
 **FE pages:**
-- `/more/scheduled` → `ScheduledListPage`
-- `/more/scheduled/new` → `ScheduledFormPage` (full page; segmented Recurring / Installment / Loan; per spec, too many fields for a modal)
-- `/more/scheduled/:id` → detail (with manual "Generate now" button + history list)
+- `/scheduled-transactions` → `ScheduledTransactionsListPage` (entry point in More menu)
+- `/scheduled-transactions/new` + `/scheduled-transactions/:id/edit` → `ScheduledTransactionFormPage` (full page; segmented Recurring / Installment / Loan)
+- `/scheduled-transactions/:id` → `ScheduledTransactionDetailPage` (with manual "Generate now" button + history list)
 
 **Exit checklist:**
 - [ ] All three entry-types create successfully with their own field rules
@@ -193,8 +198,8 @@ All in one DB transaction.
 
 | Item | Notes |
 |---|---|
-| **More menu** | 3 new entries: Budgets, Saving Goals, Scheduled. Already specced in [flows.md §Quick reference](../ui-design/app/flows.md). |
-| **Routes** | `/more/budgets`, `/more/saving-goals`, `/more/scheduled` (+ `/new`, `/:id`). |
+| **More menu** | 3 new entries: Budgets, Saving Goals, Scheduled Transactions. Already specced in [flows.md §Quick reference](../ui-design/app/flows.md). |
+| **Routes** | Top-level (matching shipped `/personal-debts`, `/projects`, `/contacts` convention; accessed *via* the More menu, not nested under it): `/budgets`, `/saving-goals`, `/scheduled-transactions` — each with `/new`, `/:id`, `/:id/edit`. |
 | **IconMaker integration** | All three tables ship with `icon_code` JSONB (per [schema.md §1](../../design/database/schema.md)). Reuse `IconType` — likely add `IconType.budget`, `IconType.savingGoal`, `IconType.scheduled` with their own per-type base packs (curated icons). Optional in 1c — could ship with `IconType.category` reused for budgets, etc., and split later. |
 | **l10n** | en + th from day 1; matches all other 1a/1b modules. Strings in `lib/l10n/app_*.arb`. |
 | **Empty states** | 3 new lists need empty-state copy + illustration. Pattern lives in `EmptyView` from Phase 0. |
@@ -235,5 +240,6 @@ Per spec & phases.md:
 ## Status
 
 - **Created** — 2026-05-06
-- **Status** — plan drafted; awaiting review before code work starts
+- **Completed** — 2026-05-07
+- **Status** — **shipped.** All three modules (saving-goals, budgets, scheduled-transactions) live end-to-end. BE migrations 000034–000036 applied; Flutter app wires every endpoint and `flutter analyze` is clean. Phase 1 overall is complete.
 - **Maintained** — this folder is the kickoff plan; canonical scope updates go in [`../phases.md`](../phases.md)

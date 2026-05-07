@@ -227,6 +227,7 @@ Any feature beyond auth + users (→ Phase 1). Visual polish (→ Phase 2). Prod
 - **Empty / error / loading polish** — skeletons, illustrated empty states, retry affordances
 - **Theming** — real dark mode toggle (Phase 0 stubbed it); accessibility (semantic labels, color contrast, text scaling, screen reader)
 - **Performance** — list virtualization, image lazy-load, query optimization, response caching (short TTL), Flutter build optimization
+- **l10n cleanup** — Phase 1 notifications module ships with hardcoded English strings ('Notifications', 'All', 'Unread', tile titles like "Alice split a bill with you", reject/dismiss labels, link-request banner + email-match bottom sheet copy from the 1c inbox tap-flow rework). Phase 2 sweeps these into `app_en.arb` + `app_th.arb` with placeholders for actor/project names. Other Phase 1 features that already use l10n stay unchanged.
 
 ### Exit criteria
 
@@ -345,9 +346,11 @@ Any feature beyond auth + users (→ Phase 1). Visual polish (→ Phase 2). Prod
 
 ## Status
 
-- **Phase** — Phase 1c queued (1b project module + cross-cutting IconMaker complete through migration **000033**; budgets / saving-goals / scheduled-transactions are next, starting at migration 000034). See [`phase1c/overview.md`](phase1c/overview.md).
-- **Last updated** — 2026-05-06
-- **Version** — 0.7 (Phase 1c kickoff: bumped current BE state to 000033, added pointer to phase1c plan)
+- **Phase** — **Phase 1 complete.** All sub-milestones shipped: 1a (single-user core), 1b (multi-user + collaboration + dashboard + notifications), 1c (budgets, saving goals, scheduled transactions). BE migrations through **000038** (post-1c polish: budgets dropped per-row icon + gained description/note; idempotency on `contact_link_request`; new `contact_link_request` tap-flow endpoints). Flutter app exposes UI for every Phase 1 module. Phase 2 (UX polish) is next; full l10n cleanup of the notifications module is queued there.
+- **Last updated** — 2026-05-07
+- **Version** — 0.9 (post-1c polish: budgets description/note + category-derived icon; contact_link_request idempotency + accept-with-contact tap flow; l10n cleanup deferred to Phase 2)
+- **Version 0.8** — Phase 1 complete: 1c BE shipped through migration 000036, FE for budgets / saving-goals / scheduled-transactions wired and analyze-clean
+- **Version 0.7** — Phase 1c kickoff: bumped current BE state to 000033, added pointer to phase1c plan
 - **Version 0.6** — added Phase 2 deferrals: project Report tab + project Resolve tab deferred from Phase 1c
 - **Version 0.4** — unified shared-expenses model in 1b; in-app notifications moved from Phase 2 to Phase 1b
 - **Version 0.3** — initial per-phase docs with two-sided settlement handshake

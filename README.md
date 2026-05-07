@@ -89,4 +89,4 @@ All repos live side-by-side in the same parent folder so cross-repo references w
 
 ## Status
 
-Phase 0 in progress. Solo dev, AI-assisted. See [`product/phases.md`](product/phases.md) for what's in scope and what's deferred.
+**Phase 1 complete** (1a + 1b + 1c shipped end-to-end as of 2026-05-07). Solo dev, AI-assisted. Phase 2 (UX polish) up next. See [`product/phases.md`](product/phases.md) for what's in scope and what's deferred.

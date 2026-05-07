@@ -491,6 +491,6 @@ Phase 1c: `down_payment` is metadata only; user records the initial payment manu
 
 ## 6. Status
 
-- **Phase** — spec; Phase 1c implementation pending
-- **Last updated** — 2026-04-25
+- **Phase** — Phase 1c shipped (BE migration 000036 + Flutter `/scheduled-transactions` routes). Phase 1c uses manual `generate-now`; real scheduler cron lands in Phase 3.
+- **Last updated** — 2026-05-07
 - **Version** — 0.1 (initial draft; one table for recurring/installment/loan; template-with-future-only edits; Phase 1c manual trigger; day-of-month clamping)
