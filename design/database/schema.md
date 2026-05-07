@@ -746,6 +746,7 @@ Owned by [`../spec/11-scheduled-transactions.md`](../spec/11-scheduled-transacti
 | `category_id`               | `UUID`          | FK → `categories.id`, NULLABLE      | Category applied to generated transactions                      |
 | `billing_cycle`             | `VARCHAR(20)`   | NOT NULL, CHECK                     | `'daily'` \| `'weekly'` \| `'monthly'` \| `'yearly'`            |
 | `next_billing_date`         | `DATE`          | NOT NULL                            | Next date the scheduler should fire                             |
+| `day_of_month`              | `SMALLINT`      | NOT NULL, DEFAULT 1, CHECK 1..31    | Original intended day-of-month captured at create time. Advance helper clamps to `min(day_of_month, days_in_target_month)` so monthly schedules with day=29/30/31 preserve last-day intent across short months (spec §4.4). |
 | `status`                    | `VARCHAR(20)`   | NOT NULL, DEFAULT `'active'`, CHECK | `'active'` \| `'paused'` \| `'cancelled'` \| `'completed'`      |
 | `note`                      | `TEXT`          | NULLABLE                            |                                                                 |
 | **Installment-only fields** |                 |                                     | NULL when `entry_type = 'recurring'`                            |

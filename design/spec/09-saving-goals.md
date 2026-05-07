@@ -85,19 +85,21 @@ Create a goal.
 | `name` | string | ✅ | 1–100 chars |
 | `target_amount` | number | ✅ | > 0 |
 | `linked_account_id` | string | ✅ | Must belong to caller |
-| `allocation_pct` | number | — | 0 < pct ≤ 100; defaults to `min(100, remaining_capacity, target × 100 / sum_of_other_active_targets_on_account)` |
+| `allocation_pct` | number | — | 0 < pct ≤ 100; defaults to remaining capacity on the linked account (`100 - sum(active goals' allocation_pct)`). Existing goals' allocations are never silently mutated. |
 | `deadline` | date | — | Future date |
 | `icon`, `color`, `note` | | — | |
 
 **Default allocation suggestion (server-side):**
 
-If user omits `allocation_pct`, backend computes a suggestion:
+If user omits `allocation_pct`, backend computes a default:
 
 1. Find the remaining allocation capacity on `linked_account_id`: `100 - sum(active goals' allocation_pct)`
-2. If other active goals exist, suggest proportional share based on `target_amount` ratios
-3. If remaining capacity would be exceeded, fill up to capacity only
+2. New goal's `allocation_pct` = that remaining capacity (clamped to (0, 100])
+3. Existing goals' `allocation_pct` values are NEVER silently changed — the new goal fills only what is unallocated
 
-Suggestion is just a default; user can override. If explicit value exceeds capacity → `400 ALLOCATION_EXCEEDED`.
+If remaining capacity is 0 (account fully allocated), creation is rejected with `400 ALLOCATION_EXCEEDED` and the user must explicitly lower another goal's allocation first.
+
+Default is just a starting point; user can override on create. If an explicit value exceeds capacity → `400 ALLOCATION_EXCEEDED`.
 
 **Success — `201 Created`:** the goal with computed fields.
 
@@ -225,7 +227,7 @@ Rejected alternatives:
 
 ### 4.2 Allocation percentage — multi-goal per account
 
-Multiple goals can share an account via percentage allocation. Default on create: proportional to targets; user can freely override.
+Multiple goals can share an account via percentage allocation. Default on create: **fill the remaining capacity** on the account into the new goal. Existing goals are never silently mutated — if the user wants equal shares, they explicitly lower the existing goals first or override `allocation_pct` on each goal individually. Rationale: silent mutation of existing rows on what looks like an unrelated POST is surprising and easy to miss in a list view.
 
 Progress per goal = `account.balance × allocation_pct / 100`. Deposits distribute proportionally; withdrawals deduct proportionally.
 
@@ -302,6 +304,6 @@ Phase 2+ could add virtual sub-accounts if demand.
 
 ## 6. Status
 
-- **Phase** — spec; Phase 1c implementation pending
-- **Last updated** — 2026-04-25
+- **Phase** — Phase 1c shipped (BE migration 000034 + Flutter `/saving-goals` routes). `required_monthly` is FE-computed per §2.6.
+- **Last updated** — 2026-05-07
 - **Version** — 0.1 (initial draft; account-linked, percentage allocation, computed progress, non-sticky completion)

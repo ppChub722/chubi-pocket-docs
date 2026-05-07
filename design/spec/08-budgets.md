@@ -343,6 +343,6 @@ Caveat: if the budget was edited mid-period (amount changed from ฿5,000 to ฿
 
 ## 6. Status
 
-- **Phase** — spec; Phase 1c implementation pending
-- **Last updated** — 2026-04-25
+- **Phase** — Phase 1c shipped (BE migration 000035 + Flutter `/budgets` routes). User-scope budgets live; project-scope still wired via project detail page (Phase 1c plan).
+- **Last updated** — 2026-05-07
 - **Version** — 0.1 (initial draft; user + project scopes, 3-level hierarchy rollup, advisory-only, fresh rollover)

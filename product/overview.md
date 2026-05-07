@@ -135,8 +135,8 @@ docs/
 
 ## Status
 
-- **Phase** — Planning (pre–Phase 0)
-- **Last updated** — 2026-04-26
+- **Phase** — **Phase 1 complete** (1a + 1b + 1c shipped end-to-end). Phase 2 (UX polish) up next. See [`phases.md`](phases.md).
+- **Last updated** — 2026-05-07
 - **Version** — 0.6 (restructure: combined per-phase docs into single `phases.md`; moved `ui-design/` from design/ to product/; renamed design folders dropping numeric prefixes; reorganized `frontend/` to anticipate per-client subfolders for Phase 3 admin + power-user web)
 - **Version 0.5** — link rot fix; documented `/v1/` versioning
 - **Version 0.4** — unified shared-expenses model; project_transactions ledger
