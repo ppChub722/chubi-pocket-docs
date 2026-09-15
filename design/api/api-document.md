@@ -705,6 +705,17 @@ The project ledger is decoupled from personal books. Splits are represented as c
 
 There is **no `/claim` endpoint** — the resolve flow is client-side. The FE creates personal entries via the regular `POST /v1/transactions` (with `source_project_transaction_id` set for traceback) or `POST /v1/personal-debts`. The transactions module auto-derives `project_id` from `source_project_transaction_id` and validates caller is a project member.
 
+### Quick create *(planned — spec §4.24)*
+
+- `POST   /v1/projects/quick` — atomic: create project + auto-add members
+  (split counterparties, shared-wallet members; linked users active +
+  notified, free-text as ad-hoc) + board rows for every included bill,
+  born auto-claimed (`project_id` + `source_project_transaction_id` set
+  on the existing personal transactions). Body: `{name?, new_transaction:
+  {…regular bill form…}, transaction_ids: [uuid…]}` — included bills must
+  belong to the caller and have `project_id IS NULL`. Settled debt state
+  is never modified.
+
 ### Summary
 
 - `GET    /v1/projects/:id/summary` — totals (parents only, children excluded), member count. *(planned)* when `projects.planned_amount` is set, also returns `planned_amount`, `spent_net` (Σ expense − Σ income parents), `remaining` (may be negative — FE renders "เกินงบ X" instead of a raw negative); all three omitted when planned_amount is NULL.

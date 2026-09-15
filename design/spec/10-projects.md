@@ -1070,6 +1070,48 @@ period, no category breakdown:
   transactions tagged to the project — each member tracks their own
   spending inside the trip.
 
+### 4.24 Quick create from existing bills _(planned — decided 2026-09-15)_
+
+Projects normally exist before their transactions. Real life runs the
+other way: bills pile up first ("ค่าข้าวมื้อแรกที่หารกัน"), and only later
+does the user realize they're a trip. Quick create closes that gap — the
+third instance of the app's "informal first, formalize later" pattern
+(free-text names → contact absorb; project member → contact promote;
+now loose bills → project).
+
+**Entry point:** a second FAB above the main `+` on the transactions
+tab — "สร้างอีเวนต์จากบิล". It opens the regular bill form **plus** a
+picker of past eligible transactions to pull in:
+
+- Eligible = the caller's own transactions with `project_id IS NULL`
+  (splits NOT required — any loose bill qualifies), recent first,
+  bounded window (~90 days) + search.
+- Ticking is optional: zero ticks = a project born from the one new
+  bill — a one-tap "create project + first bill" shortcut.
+
+**What creation does (one atomic tx, planned `POST /v1/projects/quick`):**
+
+1. Creates the project. Default name = members + date
+   ("แฟน, บี · 15 ก.ย. 2026"), editable before saving.
+2. **Auto-adds members — consent is implied** (they already agreed to
+   the underlying splits/wallet): split counterparties with a linked
+   user become active members **without an invite handshake** but with a
+   "you've been added" notification (leave is always available);
+   free-text names become ad-hoc members; if a bill lives on a shared
+   wallet, the wallet's active members join too.
+3. Every included bill (new + ticked) lands on the board as an
+   **auto-claimed** project_transaction: the existing personal
+   transaction gets `project_id` + `source_project_transaction_id`, so
+   the board row is born already resolved — the normal claim flow run
+   backwards. No money moves; no account is touched.
+4. **Settled means settled.** Debts and repayments that already happened
+   are left exactly as they are — they only gain `project_id` for
+   traceability. Report/Resolve views compute from reality as usual.
+
+**v1 scope-cut:** the FAB always creates a *new* project. Adding a later
+bill to an existing project uses the project page's own flow ("add to
+existing" from the picker is a v2 candidate if users ask).
+
 ---
 
 ## 5. Open questions
@@ -1092,7 +1134,8 @@ period, no category breakdown:
 ## 6. Status
 
 - **Phase** — spec; Phase 1b implementation pending
-- **Last updated** — 2026-09-11
+- **Last updated** — 2026-09-15
+- **Version** — 0.5 (added §4.24 quick create from existing bills — auto-claim semantics, implied-consent auto-members, settled-stays-settled)
 - **Version** — 0.4 (added §4.23 `planned_amount` — plan-vs-actual single nullable total, display-only; resolved the budget_goal open question; two-lens coexistence note with 08 project-scope budgets)
 - **Version** — 0.3 (unified shared-expenses model)
   - Drops `transactions.settles_split_id` references in favor of `transactions.source_split_id` (renamed for naming consistency — see [`04-transactions.md`](04-transactions.md))

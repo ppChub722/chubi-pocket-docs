@@ -78,6 +78,22 @@ breaking API v2 ever happens, bundle the code rename then. Shared wallets
 `account_members` and wallet rows live in the ordinary `transactions`
 table; the UI says "shared wallet / กระเป๋าร่วม".
 
+### Umbrella label "Projects & Events", one word per inner context
+
+The projects feature serves two vibes with one engine: work-shaped
+containers (sales, freelance → "โปรเจกต์") and life-shaped ones (trips,
+day outings, group bills → "อีเวนต์"). Decided 2026-09-15:
+
+- **Entry points** (more-menu item, list page title) use the umbrella
+  label **"โปรเจกต์ & อีเวนต์" / "Projects & Events"** — whichever word
+  matches the user's intent, they find it while scanning.
+- **Inner screens never say both.** Each context picks one word: neutral
+  verbs where possible ("สร้างใหม่"), the casual word where the context
+  is clearly casual (quick create: "สร้างอีเวนต์จากบิล"), and
+  `projects.type` may drive per-item wording later.
+- Code/API/DB stay `projects` everywhere — same display-term ≠
+  domain-term rule as wallet/account.
+
 ### Project ledger separated from personal transactions
 
 `project_transactions` is its own table, distinct from personal `transactions`. Project rows never touch a personal account at insert time. Real money movement happens via **claim** (the actor mirrors a project_transaction onto their personal book) or **split-resolve** (debtors/creditors create personal entries). See [10-projects.md](10-projects.md).
