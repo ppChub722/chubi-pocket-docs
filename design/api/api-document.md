@@ -707,14 +707,40 @@ There is **no `/claim` endpoint** — the resolve flow is client-side. The FE cr
 
 ### Quick create *(planned — spec §4.24)*
 
-- `POST   /v1/projects/quick` — atomic: create project + auto-add members
-  (split counterparties, shared-wallet members; linked users active +
-  notified, free-text as ad-hoc) + board rows for every included bill,
-  born auto-claimed (`project_id` + `source_project_transaction_id` set
-  on the existing personal transactions). Body: `{name?, new_transaction:
-  {…regular bill form…}, transaction_ids: [uuid…]}` — included bills must
-  belong to the caller and have `project_id IS NULL`. Settled debt state
-  is never modified.
+`POST /v1/projects/quick` — atomic: create project + auto-add members +
+board rows for every included bill, born auto-claimed. Settled debt state
+is never modified.
+
+Request:
+
+```json
+{
+  "name": "แฟน, บี · 15 ก.ย. 2026",
+  "new_transaction": { "…same body as POST /v1/transactions, splits[] allowed…": true },
+  "transaction_ids": ["uuid", "uuid"]
+}
+```
+
+- `name` — required (FE composes the members+date default, editable)
+- `new_transaction` — required; processed through the normal personal
+  transaction create path (account balance moves, splits create debts)
+- `transaction_ids` — optional; each must belong to the caller and have
+  `project_id IS NULL`, else the whole call fails (atomic)
+
+Behavior: caller becomes `owner`; members = union of split counterparties
+across all included bills (linked contact → active linked member +
+`project_added` notification, free-text → ad-hoc member) plus active
+members of any shared wallet a bill lives on. Every included bill (new +
+listed) gets a `project_transactions` parent (+ split children from its
+debts) and the personal row is linked back (`project_id` +
+`source_project_transaction_id`) — auto-claimed. Existing
+`personal_debts` from those bills gain `project_id` only.
+
+Response `201`: the created project (same shape as `POST /v1/projects`)
+plus `"linked_count": n` (board rows created).
+
+Errors: `400 VALIDATION_ERROR`; `404 TX_NOT_FOUND` (missing or not the
+caller's); `409 TX_ALREADY_IN_PROJECT`.
 
 ### Summary
 
