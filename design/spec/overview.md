@@ -44,6 +44,7 @@ Each `NN-*.md` file owns one feature module. File numbering matches `../database
 | [11-scheduled-transactions.md](11-scheduled-transactions.md) | Recurring + installments | `scheduled_transactions` |
 | [12-personal-debts.md](12-personal-debts.md) | Personal debt tracking | `personal_debts` |
 | [13-notifications.md](13-notifications.md) | Notifications + settings | `notifications`, `user_notification_settings` |
+| [14-shared-wallets.md](14-shared-wallets.md) | Shared wallets (multi-member accounts) | `account_members` (wallet rows live in ordinary `transactions`) |
 
 ---
 
@@ -74,5 +75,6 @@ Each `NN-*.md` follows this shape:
 ## Status
 
 - **Phase** — Planning (pre–Phase 1)
-- **Last updated** — 2026-04-26
-- **Version** — 0.2 (restructured as pure entry point: API conventions moved to `../api/api-document.md`; cross-cutting content extracted to dedicated files in this folder)
+- **Last updated** — 2026-09-11
+- **Version** — 0.3 (added module 14 — shared wallets)
+- **Version 0.2** — restructured as pure entry point: API conventions moved to `../api/api-document.md`; cross-cutting content extracted to dedicated files in this folder

@@ -31,6 +31,7 @@ This document is the **canonical API contract**. Postman / OpenAPI exports are d
 | [11 — Scheduled Transactions](#11--scheduled-transactions) | Recurring + installments *(pending)* |
 | [12 — Personal Debts](#12--personal-debts) | Debt tracking *(pending)* |
 | [13 — Notifications](#13--notifications) | Inbox, settings *(pending)* |
+| [14 — Shared Wallets](#14--shared-wallets) | Members, ownership transfer, report scope *(planned — not implemented)* |
 
 ---
 
@@ -656,7 +657,7 @@ Post-migration 27 endpoint surface (project as a separate book — see [`../plan
 - `POST   /v1/projects` — create
 - `GET    /v1/projects` — list (`?status=active|completed|cancelled|archived|all`, `?type=`, `?page=`, `?per_page=`)
 - `GET    /v1/projects/:id`
-- `PUT    /v1/projects/:id` (owner only — name/type/description/start_date/end_date/status)
+- `PUT    /v1/projects/:id` (owner only — name/type/description/start_date/end_date/status/planned_amount; `planned_amount` nullable — set a number to enable the plan-vs-actual display, null to hide) *(planned_amount: planned)*
 - `DELETE /v1/projects/:id` (owner only; rejected with `409 PROJECT_HAS_TRANSACTIONS` if any rows exist)
 - `POST   /v1/projects/:id/leave`
 - `POST   /v1/projects/:id/transfer-ownership` `{new_owner_user_id}`
@@ -706,7 +707,7 @@ There is **no `/claim` endpoint** — the resolve flow is client-side. The FE cr
 
 ### Summary
 
-- `GET    /v1/projects/:id/summary` — totals (parents only, children excluded), member count.
+- `GET    /v1/projects/:id/summary` — totals (parents only, children excluded), member count. *(planned)* when `projects.planned_amount` is set, also returns `planned_amount`, `spent_net` (Σ expense − Σ income parents), `remaining` (may be negative — FE renders "เกินงบ X" instead of a raw negative); all three omitted when planned_amount is NULL.
 
 ### Error codes specific to projects
 
@@ -733,9 +734,81 @@ There is **no `/claim` endpoint** — the resolve flow is client-side. The FE cr
 
 *Pending — see [`../spec/13-notifications.md`](../spec/13-notifications.md).*
 
+## 14 — Shared Wallets
+
+*Planned — not implemented. Spec: [`../spec/14-shared-wallets.md`](../spec/14-shared-wallets.md). Contracts will be formalized here when implementation starts.*
+
+Planned surface (no new ledger endpoints — wallet rows are ordinary transactions):
+
+- `GET    /v1/accounts` — response gains `members[]` per account (active members only)
+- `POST   /v1/accounts/:id/members` — invite by email (project-invite pattern; pending until accepted; converting invite is warning-gated client-side)
+- `DELETE /v1/accounts/:id/members/:member_id` — leave / remove (sets `left_at`; rows untouched, ex-member's rows lock read-only for them)
+- `POST   /v1/accounts/:id/transfer-ownership` — `{new_owner_user_id}`; required before an owner leaves a shared wallet
+- `PUT    /v1/accounts/:id/report-scope` — `{report_scope: none|own|all}` for the caller's own membership (ex-members capped at `own`)
+
+Changed behavior on existing endpoints:
+
+- `POST/PUT/DELETE /v1/transactions` — writes to an account require active membership; editing another member's row excludes `category_id` (author-only)
+- `GET /v1/transactions?account_id=X` — members see all rows on the wallet regardless of author
+- `DELETE /v1/accounts/:id` — rejected with `409` while other active members exist
+- Contribution = plain `type='transfer'` between own account and the wallet (existing transfer machinery; no dedicated endpoint)
+
+Pinned contracts (implementation targets — both FE and BE code to these):
+
+`GET /v1/accounts` — each account gains:
+
+```json
+{
+  "members": [
+    {
+      "id": "member-row-uuid",
+      "user_id": "uuid",
+      "display_name": "แฟน",
+      "icon_code": { },
+      "role": "owner",
+      "joined_at": "2026-09-11T04:00:00Z"
+    }
+  ],
+  "my_report_scope": "none",
+  "is_shared": true
+}
+```
+
+`members` contains **active** members only, always including the caller.
+`is_shared` = active member count > 1. Rows on shared wallets returned by
+transaction endpoints gain denormalized author + category rendering:
+
+```json
+{
+  "created_by": { "user_id": "uuid", "display_name": "แฟน", "icon_code": { } },
+  "category_render": { "name": "ค่ากิน", "icon_code": { } },
+  "is_locked": false,
+  "can_edit_category": false
+}
+```
+
+Member management:
+
+- `POST /v1/accounts/:id/members` body `{"email": "..."}` → `201` pending member (notification-pattern invite, same as projects). Errors: `404 USER_NOT_FOUND`, `409 USER_ALREADY_MEMBER`, `403 NOT_MEMBER`
+- `DELETE /v1/accounts/:id/members/:member_id` → `200`; sets `left_at`. v1 rule: a member may remove **themselves** (leave); the `owner` may remove anyone. Owner leaving with other members present → `409 OWNER_MUST_TRANSFER`
+- `POST /v1/accounts/:id/transfer-ownership` body `{"new_owner_user_id": "..."}` (owner only, target must be active member) → `200`
+- `PUT /v1/accounts/:id/report-scope` body `{"report_scope": "none|own|all"}` → `200`; ex-members may call with `none|own` only (`400 SCOPE_NOT_ALLOWED`)
+
+Error codes specific to shared wallets:
+
+- `NOT_MEMBER` (403) — caller isn't an active member of the account
+- `OWNER_MUST_TRANSFER` (409) — owner tried to leave/delete while other active members exist
+- `ACCOUNT_HAS_MEMBERS` (409) — delete/archive attempted on a still-shared wallet
+- `CATEGORY_AUTHOR_ONLY` (403) — category edit attempted on another member's row
+- `ROW_LOCKED` (403) — ex-member tried to edit/delete their old row
+- `SCOPE_NOT_ALLOWED` (400) — ex-member requested `report_scope=all`
+
 ---
 
 ## Status
 
-- **Last updated** — 2026-04-26
+- **Last updated** — 2026-09-11
+- **Version** — 0.4 (§14 reworked to single-table model: dropped shared-transactions + contribute endpoints; added transfer-ownership + report-scope; documented authz changes on transactions endpoints)
+- **Version** — 0.3 (§10: planned `planned_amount` on project update + plan-vs-actual fields on summary)
+- **Version** — 0.2 (added §14 Shared Wallets planned surface)
 - **Version** — 0.1 (initial extraction; Conventions section + 01-auth migrated as proof of concept; 02–13 pending)

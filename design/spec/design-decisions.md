@@ -59,6 +59,25 @@ Every FK column ends in `<target_table>_id`. Role-prefixed when not the row's pr
 
 The original 3-table shared-expense model (`shared_expenses` + `shared_expense_splits` + `split_settlements`) was collapsed in v0.2 to a single `shared_expense_splits` table with parent FKs to either `transactions` or `project_transactions`. The split-settlements log was replaced by app-level computation from settlement transactions linked via `source_split_id`. Trade-off: drops per-payment audit history in exchange for a simpler model. Acceptable for a personal-finance app (not accounting software). Full rationale in [06-shared-expenses.md](06-shared-expenses.md).
 
+### Display term "wallet", code term "account"
+
+Every user-facing surface (app UI strings, marketing) says **wallet /
+กระเป๋า**; code, DB, and API keep `account`/`accounts`. Two reasons:
+
+- The word "account" is already taken in the UI by the *user account*
+  ("Create account" on register vs "Add account" on the accounts tab) —
+  renaming the money entity to "wallet" removes the collision.
+- Renaming code/DB/API (`accounts` table, `account_id` FKs across 8+
+  migrations, `/v1/accounts` routes, Flutter repositories) is 1–2 days of
+  breaking mechanical churn with zero user-visible value. Display term ≠
+  domain term is normal practice.
+
+The rename is an ARB-only change (`app_en.arb` / `app_th.arb`). If a
+breaking API v2 ever happens, bundle the code rename then. Shared wallets
+(module 14) follow the same rule: the membership table says
+`account_members` and wallet rows live in the ordinary `transactions`
+table; the UI says "shared wallet / กระเป๋าร่วม".
+
 ### Project ledger separated from personal transactions
 
 `project_transactions` is its own table, distinct from personal `transactions`. Project rows never touch a personal account at insert time. Real money movement happens via **claim** (the actor mirrors a project_transaction onto their personal book) or **split-resolve** (debtors/creditors create personal entries). See [10-projects.md](10-projects.md).
@@ -67,5 +86,6 @@ The original 3-table shared-expense model (`shared_expenses` + `shared_expense_s
 
 ## Status
 
-- **Last updated** — 2026-04-26
-- **Version** — 0.2 (extracted from old spec/overview.md; added v0.4 schema decisions — audit columns, FK naming rule, anonymize-on-archive, project ledger separation)
+- **Last updated** — 2026-09-11
+- **Version** — 0.3 (added display-term-wallet naming rule for module 14)
+- **Version 0.2** — extracted from old spec/overview.md; added v0.4 schema decisions — audit columns, FK naming rule, anonymize-on-archive, project ledger separation

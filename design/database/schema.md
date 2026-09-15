@@ -59,6 +59,7 @@ For module behavior, API endpoints, design rationale, and cross-table invariants
 | [11 — Scheduled Transactions](#11--scheduled-transactions)                  | `scheduled_transactions`                                                                            |
 | [12 — Personal Debts](#12--personal-debts)                                  | `personal_debts`                                                                                    |
 | [13 — Notifications](#13--notifications)                                    | `notifications`, `user_notification_settings`                                                       |
+| [14 — Shared Wallets](#14--shared-wallets) _(planned)_                      | `account_members` (wallet rows live in ordinary `transactions`)                                     |
 
 ---
 
@@ -544,11 +545,14 @@ Owned by [`../spec/08-budgets.md`](../spec/08-budgets.md).
 | `period`             | `VARCHAR(20)`   | NOT NULL, CHECK                     | `'weekly'` \| `'monthly'` \| `'yearly'` |
 | `currency`           | `VARCHAR(3)`    | NOT NULL                            | ISO 4217; defaults to user's currency   |
 | `status`             | `VARCHAR(20)`   | NOT NULL, DEFAULT `'active'`, CHECK | `'active'` \| `'archived'`              |
-| `icon_code`          | `JSONB`         | NULLABLE                            | Icon Maker code                         |
+| `description`        | `VARCHAR(200)`  | NULLABLE                            | Primary label rendered by FE; falls back to category name (migration 037) |
+| `note`               | `TEXT`          | NULLABLE                            | Free-form narrative, detail page only (migration 038) |
 | `created_at`         | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`           |                                         |
 | `created_by_user_id` | `UUID`          | FK → `users.id`, NULLABLE           | NULL = system                           |
 | `updated_at`         | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`           | Trigger-updated                         |
 | `updated_by_user_id` | `UUID`          | FK → `users.id`, NULLABLE           | NULL = system                           |
+
+No `icon_code` — dropped in migration 037; a budget's icon comes from its linked category.
 
 **Check constraints:**
 
@@ -629,6 +633,7 @@ Thin container for a project.
 | `end_date`           | `DATE`         | NULLABLE                            |                                                                                     |
 | `status`             | `VARCHAR(20)`  | NOT NULL, DEFAULT `'active'`, CHECK | `'active'` \| `'completed'` \| `'cancelled'` \| `'archived'`                        |
 | `icon_code`          | `JSONB`        | NULLABLE                            | Icon Maker code                                                                     |
+| `planned_amount`     | `DECIMAL(15,2)`| NULLABLE, CHECK (`planned_amount > 0`) _(planned — migration 039+)_ | Planned total spend for the project (UI: "ตั้งงบไว้"). NULL = not set (plan UI hidden). Freely editable via project update. See `10-projects` §4.23 |
 | `created_at`         | `TIMESTAMPTZ`  | NOT NULL, DEFAULT `NOW()`           |                                                                                     |
 | `created_by_user_id` | `UUID`         | FK → `users.id`, NULLABLE           | NULL = system                                                                       |
 | `updated_at`         | `TIMESTAMPTZ`  | NOT NULL, DEFAULT `NOW()`           | Trigger-updated                                                                     |
@@ -640,7 +645,7 @@ Thin container for a project.
 - `INDEX idx_projects_owner ON projects(owner_user_id, status)` — owner's projects list
 - `INDEX idx_projects_status ON projects(status, updated_at DESC)` — member queries
 
-**No `budget_goal` column** — per-project budget tracking is a Phase 2+ feature.
+**`planned_amount` is one nullable number** — no separate table, no period. Named `planned_amount` (not "budget") to stay unambiguous vs the `budgets` table. Spent is computed from `project_transactions` parents (expenses − income); never cached. Decided 2026-09-11, resolving the former "budget_goal" open question.
 
 ### `project_members`
 
@@ -912,9 +917,43 @@ A row is auto-created on user registration with all defaults.
 
 ---
 
+## 14 — Shared Wallets _(planned — migration 039+)_
+
+Owned by [`../spec/14-shared-wallets.md`](../spec/14-shared-wallets.md). A shared wallet is an `accounts` row with more than one active member. **No new ledger table and no new `transactions` columns** — wallet rows are ordinary `transactions` (`user_id` = author, category from the author's own set; ledger view = filter by `account_id`). Contribution = plain `type='transfer'` paired by `transfer_group_id`. Not yet migrated — the table below is the implementation plan.
+
+### `account_members`
+
+Membership of every account. Backfill creates one `owner` row per existing account with `report_scope='all'` (preserves current behavior). Append-only history: leaving sets `left_at`; rows are never deleted. A user may hold multiple join/leave cycles. Active membership = `left_at IS NULL`. An account cannot be deleted/archived while other active members exist; owner exit requires ownership transfer first.
+
+| Column               | Type          | Constraints                                  | Description                                                            |
+| -------------------- | ------------- | -------------------------------------------- | ---------------------------------------------------------------------- |
+| `id`                 | `UUID`        | PK (v7)                                      |                                                                        |
+| `account_id`         | `UUID`        | FK → `accounts.id`, NOT NULL                 |                                                                        |
+| `user_id`            | `UUID`        | FK → `users.id`, NOT NULL                    |                                                                        |
+| `role`               | `VARCHAR(10)` | NOT NULL, CHECK                              | `'owner'` \| `'member'`                                                |
+| `report_scope`       | `VARCHAR(10)` | NOT NULL, CHECK, DEFAULT `'none'`            | `'none'` \| `'own'` \| `'all'` — this member's personal-report inclusion; auto-reset to `'none'` for everyone on conversion; ex-members capped at `'own'` |
+| `joined_at`          | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()`                    |                                                                        |
+| `left_at`            | `TIMESTAMPTZ` | NULLABLE                                     | Set on leave/remove; never hard-deleted. Also locks the ex-member's own rows on this account to read-only |
+| `created_at`         | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()`                    |                                                                        |
+| `created_by_user_id` | `UUID`        | FK → `users.id`, NULLABLE                    | NULL = system (backfill)                                               |
+| `updated_at`         | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()`                    | Trigger-updated                                                        |
+| `updated_by_user_id` | `UUID`        | FK → `users.id`, NULLABLE                    | NULL = system                                                          |
+
+**Indexes:**
+
+- `PRIMARY KEY (id)`
+- `INDEX idx_account_members_account ON account_members(account_id) WHERE left_at IS NULL` — authz checks
+- `INDEX idx_account_members_user ON account_members(user_id) WHERE left_at IS NULL` — "my shared wallets" list
+
+---
+
 ## Status
 
-- **Last updated** — 2026-05-05
+- **Last updated** — 2026-09-11
+- **Version** — 0.12 (§14 reworked: dropped planned `shared_transactions` + `transactions.source_shared_transaction_id` — wallet rows are ordinary `transactions`; `account_members` gains `report_scope`.)
+- **Version** — 0.11 (§08 synced against migrations 037/038: dropped `icon_code`, added `description` + `note` — was 2 migrations stale.)
+- **Version** — 0.10 (Added planned `projects.planned_amount` column — plan-vs-actual single nullable total, resolves the §10 budget_goal open question.)
+- **Version** — 0.9 (Added §14 Shared Wallets plan — `account_members`, `shared_transactions`, `transactions.source_shared_transaction_id`; not yet migrated, targets migration 039+.)
 - **Version** — 0.8 (Removed `bgShape` from `icon_code` JSONB — all entities use circle container; shape is fixed and not stored.)
 - **Version** — 0.7 (Applied migration 033 plan: `projects.icon_id` + `projects.color_id` → `projects.icon_code JSONB`; `project_transactions.category_icon_id` + `project_transactions.category_color_id` → `project_transactions.category_icon_code JSONB`.)
 - **Version** — 0.6 (Synced against all 32 migrations: removed `contacts.nickname` (dropped migration 29); added `contacts.last_used_at` + `idx_contacts_last_used` (migration 28); removed `contact_invites` table (never migrated — invite flow replaced by notifications); removed `project_invites` table (never migrated — invite flow replaced by notifications); added `project_transactions.description` (migration 30); corrected category snapshot columns on `project_transactions` from `category_icon_code JSONB` to `category_icon_id TEXT` + `category_color_id TEXT` (migration 31); corrected `projects` icon columns from `icon_code JSONB` to `icon_id TEXT` + `color_id TEXT` (migration 32).)
