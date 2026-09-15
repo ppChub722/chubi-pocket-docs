@@ -5,7 +5,13 @@ Per-category spending limits with a recurrence period. Advisory (not blocking) �
 Supports two scopes in Phase 1c:
 
 - **User scope** — "I spend max ฿5,000/mo on Food overall"
-- **Project scope** — "Japan trip Food budget: ฿10,000 total" (inherits project visibility)
+- **Project scope** — "my Food spending in the Japan trip: max ฿10,000/mo" (inherits project visibility)
+
+Note there is no `'total'` period — project-scope budgets are periodic like
+all budgets. A whole-project total lives on `projects.planned_amount`
+instead ([`10-projects.md §4.23`](10-projects.md), planned) — that one is
+the *group* lens computed from the shared board; budgets here are the
+*personal* lens computed from your own book.
 
 This module owns `budgets`. References `categories` (target of each budget) and `transactions` (aggregated for progress). Progress is computed at read time — no stored snapshots.
 
@@ -268,7 +274,15 @@ Budgets warn; they don't block transactions. User's money, user's call. Phase 2 
 User-scope budgets enforce personal spending limits regardless of context. Project-scope budgets enforce limits within a specific project. Both can exist for the same category.
 
 - User: "I want to spend max ฿5,000/mo on Food overall"
-- Project: "On this Japan trip, cap Food spend at ฿10,000 total"
+- Project: "my Food spending in the Japan trip: max ฿10,000/mo"
+
+**Project scope is a personal lens.** `spent` is computed from the
+*viewer's own* personal transactions tagged with the project
+(`t.user_id = :user_id` in the §2.2 query) — each member tracks their own
+spending inside the project, so two members legitimately see different
+progress. The *group* total is a different feature:
+`projects.planned_amount` ([`10-projects.md §4.23`](10-projects.md),
+planned), computed from the shared board and identical for everyone.
 
 Project-scope budgets naturally inherit project visibility — all project members see them. Only the project owner can create/edit/delete them.
 
@@ -332,6 +346,7 @@ Caveat: if the budget was edited mid-period (amount changed from ฿5,000 to ฿
 
 ## 5. Open questions
 
+- **Project-scope permissions vs personal-lens semantics.** §4.11 says only the project *owner* creates project-scope budgets, but `spent` is per-viewer (§4.2) — a member can't set their own tracking budget for the trip. If the personal-lens reading is the intent, any member should be able to create budgets scoped to projects they belong to. Revisit when project budget UI ships.
 - **Budget editing history.** Keep a log of budget-amount changes? Phase 3+.
 - **Budget alerts.** Phase 2 notifications for 80% / 100% / 120% thresholds. Configurable per budget?
 - **Projected end-of-period.** Phase 2 UX: "On pace to spend ฿6,200 by end of April." Based on daily burn rate.
@@ -344,5 +359,6 @@ Caveat: if the budget was edited mid-period (amount changed from ฿5,000 to ฿
 ## 6. Status
 
 - **Phase** — Phase 1c shipped (BE migration 000035 + Flutter `/budgets` routes). User-scope budgets live; project-scope still wired via project detail page (Phase 1c plan).
-- **Last updated** — 2026-05-07
+- **Last updated** — 2026-09-11
+- **Version** — 0.2 (project scope documented as the personal lens vs `projects.planned_amount` group total; fixed "฿10,000 total" examples that contradicted the period enum; added permissions-vs-lens open question)
 - **Version** — 0.1 (initial draft; user + project scopes, 3-level hierarchy rollup, advisory-only, fresh rollover)

@@ -1025,6 +1025,53 @@ Reads are never gated by status — members can always see the shared book of an
 
 ---
 
+### 4.23 Planned amount — plan vs actual, one nullable number _(planned — decided 2026-09-11)_
+
+`projects.planned_amount DECIMAL(15,2) NULL` — the amount the group
+planned to spend on the whole project ("Japan trip: ฿30,000"). The
+feature is a plan-vs-actual gap: *how far is real spending from the
+plan* — either "฿18,000 left" or "฿3,500 over". No separate table, no
+period, no category breakdown:
+
+- **Named `planned_amount`, not "budget", deliberately.** "Budget" is
+  module 08's word (per-category, per-period, personal). This is a
+  different thing — a one-shot plan for the shared board — and giving it
+  a different name keeps code, API, and team conversation unambiguous.
+  UI still speaks natural Thai: **"ตั้งงบไว้ ฿30,000"** (verb phrase),
+  which doesn't collide with 08's noun labels ("งบของฉัน").
+- **NULL = off.** Plan UI is hidden entirely; setting a number turns it
+  on. Clearing it back to NULL turns it off. Freely editable any time via
+  the regular project update (owner-only, like other project fields).
+- **Spent is computed, never cached:** Σ expense parents − Σ income
+  parents from `project_transactions` (parents only — children are split
+  annotations of the same money; counting them would double-count).
+  Summary endpoint returns `planned_amount`, `spent_net`, `remaining` so
+  the FE renders one progress bar and is done.
+- **`remaining` may be negative — FE flips the label, not the sign.**
+  Positive → "เหลือ ฿18,000"; negative → "เกินงบ ฿3,500" (red). Never
+  show a raw negative number for the user to interpret.
+- **Display only — never a constraint.** The plan gates nothing:
+  transactions are always accepted regardless of remaining, and going
+  over is normal and expected. No validation anywhere references it.
+- **No alerts in v1.** A `project_plan_exceeded` notification trigger can
+  join the Phase 2 notification batch if wanted.
+- **Total, not monthly.** Bounded projects want one number. Ongoing
+  monthly money lives in shared wallets
+  ([`14-shared-wallets.md`](14-shared-wallets.md)), where a monthly
+  budget is an open question — the two deliberately don't share a
+  mechanism.
+- Currency: THB in the Phase 1 era, same as project transactions;
+  revisit with Phase 2 multi-currency.
+- **Coexists with module 08 project-scope budgets — two lenses, not a
+  conflict.** `planned_amount` is the *group* lens: one total, computed
+  from the shared board, identical for every member. A project-scope
+  budget from [`08-budgets.md`](08-budgets.md) is the *personal* lens:
+  per-category, per-period, computed from the viewer's own personal
+  transactions tagged to the project — each member tracks their own
+  spending inside the trip.
+
+---
+
 ## 5. Open questions
 
 - **Concurrent edit conflict** — Alice edits her transaction while Bob is viewing. Bob's view shows stale data. Acceptable for Phase 1 (last-write-wins per creator-only edit rule). Optimistic locking later if needed.
@@ -1033,7 +1080,7 @@ Reads are never gated by status — members can always see the shared book of an
 - **Visibility for left members** — if Bob leaves Japan trip, can he still see shared book? Proposal: no (`status = 'left'` loses access). But he keeps his personal transactions tagged `project_id = Japan`. Phase 2 decision whether "left" members retain read access.
 - **Transaction splitting UX across project creators** — Alice creates dinner, splits. If Bob wants to pay for a second round, he creates a NEW transaction with his own splits. No shared "split editing" across owners. Confirmed.
 - **Ownership transfer consent** — Phase 3 may require target to accept the transfer before it happens. Phase 1: owner unilaterally transfers.
-- **Project-level budget goal** — dropped for Phase 1. Phase 2+ adds it as a separate column with overspend alerts. Should it count project_transactions toward the budget? (Probably yes — they're real spending in the project.) Decide alongside the budget feature.
+- ~~**Project-level budget goal**~~ — **resolved 2026-09-11**, see §4.23: single nullable `projects.planned_amount`; spent = project_transactions parents (expenses − income); display-only, no alerts in v1.
 - **Bulk absorb of ad-hoc names across members' contacts** — e.g., Carol adds Grandma as her own contact, wants to link existing ad-hoc "Grandma" member row. Complex; Phase 2+.
 - **Per-member transaction privacy** — currently all linked members see all shared-book transactions. What if Alice wants some transactions tagged to the project but private? Proposal: use `project_id = NULL` for private. Phase 2 UX decision.
 - **Claim conflicts and disputes** — what if Bob refuses to claim Alice's recorded project_transaction (says "I didn't pay for that")? Today: Bob/Alice/owner can edit/delete. No formal dispute flow. Phase 2+ may add a dispute marker.
@@ -1045,7 +1092,8 @@ Reads are never gated by status — members can always see the shared book of an
 ## 6. Status
 
 - **Phase** — spec; Phase 1b implementation pending
-- **Last updated** — 2026-04-26
+- **Last updated** — 2026-09-11
+- **Version** — 0.4 (added §4.23 `planned_amount` — plan-vs-actual single nullable total, display-only; resolved the budget_goal open question; two-lens coexistence note with 08 project-scope budgets)
 - **Version** — 0.3 (unified shared-expenses model)
   - Drops `transactions.settles_split_id` references in favor of `transactions.source_split_id` (renamed for naming consistency — see [`04-transactions.md`](04-transactions.md))
   - Resolve endpoints consolidated on the splits router (`POST /v1/shared-expenses/splits/:id/{pay,receive,add-as-debt}`); project-rooted `/resolve/pay`, `/resolve/receive`, `/resolve/add-debt` removed
