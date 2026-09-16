@@ -84,8 +84,10 @@ cd /srv/chubi && sudo docker compose up -d app
 
 ### Build APK ให้แฟน (ที่เครื่อง dev ใน chubi-pocket-app)
 ```powershell
-fvm flutter build apk --release --dart-define=API_BASE_URL=https://chubipocket-api.ppforge.dev/api/v1
-# ไฟล์ออกที่ build\app\outputs\flutter-apk\app-release.apk
+fvm flutter build apk --release --split-per-abi --dart-define=API_BASE_URL=https://chubipocket-api.ppforge.dev/api/v1
+# อัพ Firebase เฉพาะไฟล์นี้ (มือถือยุคใหม่ทุกเครื่อง ~30MB):
+#   build\app\outputs\flutter-apk\app-arm64-v8a-release.apk
+# ตัว armeabi-v7a/x86_64 ไม่ต้องใช้ (มือถือโบราณ/emulator)
 ```
 
 ### Backup & Restore
