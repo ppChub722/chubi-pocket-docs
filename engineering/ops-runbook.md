@@ -144,7 +144,7 @@ sudo docker exec -it shared_postgres psql -U postgres -d chubi_pocket
 
 | Flag | ค่า | หมายเหตุ |
 |---|---|---|
-| `REGISTRATION_OPEN` | `true` | ⚠️ **ปิดเป็น false ทันทีที่สองบัญชี (เจ้าของ+แฟน) สมัครเสร็จ** |
+| `REGISTRATION_OPEN` | `true` | **ตัดสินใจเปิดไว้** (2026-09-16) — beta ปิดวงแคบ โดเมนยังไม่ public ความเสี่ยงต่ำ · ตรวจคนสมัครใหม่: `sudo docker exec shared_postgres psql -U postgres -d chubi_pocket -c "SELECT username, created_at FROM users ORDER BY created_at DESC LIMIT 10"` · ปิดเป็น decoy เมื่อไหร่ก็ได้ (วิธีอยู่ §3) |
 | `LOG_LEVEL` | `debug` | closed beta — เปลี่ยนเป็น `info` ตอน wider beta |
 | `LOG_BODIES` | `true` | closed beta เท่านั้น — **ต้องปิดก่อน wider beta** |
 | `APP_ENV` | `production` | |
