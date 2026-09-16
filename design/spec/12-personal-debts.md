@@ -62,10 +62,15 @@ A `personal_debts` row can be created via:
 
 | Trigger | `source_transaction_id` | Direction |
 |---|---|---|
-| `POST /v1/transactions` with `splits[]` (splitter side) | parent transaction | `owed_to_me` |
-| Same call's mirror on linked partner's side | NULL (no tx in partner's book) | `i_owe` |
+| `POST /v1/transactions` with `splits[]` (splitter side) | parent transaction | **by parent type** _(2026-09-16)_: `expense` → `owed_to_me` (splitter fronted money), `income` → `i_owe` (splitter received money that partly belongs to others) |
+| Same call's mirror on linked partner's side | NULL (no tx in partner's book) | inverse of the splitter's (`i_owe` on expense, `owed_to_me` on income) |
 | Manual `POST /v1/personal-debts` (cash loan, IOU, broken item) | NULL | caller picks |
 | 1b.2: `POST /v1/projects/:id/project-transactions` with `splits[]` | NULL (project context uses `source_project_transaction_id`) | actor side / member side |
+
+Settlement already keys off the debt's own direction (§2), so income-split
+debts settle naturally: the splitter pays their share out as an expense,
+the partner receives it as income. UI wording follows the direction:
+expense splits = "หารกับ…", income splits = "แบ่งให้…".
 
 ---
 
@@ -296,7 +301,8 @@ people view.
 ## 6. Status
 
 - **Phase** — 1b refactor complete (BE + FE + schema)
-- **Last updated** — 2026-05-04
-- **Version** — 1.0 (post-merge of splits + debts)
+- **Last updated** — 2026-09-16
+- **Version** — 1.1 (splits on income transactions: debt direction now follows the parent type — §1.4)
+- **Version 1.0** — post-merge of splits + debts
 - **Predecessor** — `06-shared-expenses.md` v0.3 (deprecated)
 - **Migration** — 24 (drop splits, rebuild personal_debts) + 25 (rename source_split_id)
