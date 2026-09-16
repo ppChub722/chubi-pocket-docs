@@ -15,7 +15,7 @@ Technical design documentation for ChubiPocket — how the app is built. Backend
 | Folder | Purpose | Entry point | Audience |
 |---|---|---|---|
 | [spec/](spec/overview.md) | Backend behavior, business rules, design decisions, per-module flows | [spec/overview.md](spec/overview.md) | BE devs, AI |
-| [frontend/](frontend/overview.md) | Frontend implementation per client (currently `app/` Flutter; Phase 3 adds `admin/` Next.js + `web/` Nuxt 3) | [frontend/overview.md](frontend/overview.md) | FE devs |
+| [frontend/](frontend/overview.md) | Frontend implementation per client (currently `app/` Flutter; Phase 3 adds `web/` — one Next.js app incl. role-gated admin) | [frontend/overview.md](frontend/overview.md) | FE devs |
 | [database/](database/schema.md) | Single consolidated reference for every DB table | [database/schema.md](database/schema.md) | BE devs, AI |
 | [api/](api/api-document.md) | Single source of truth for every HTTP endpoint (contracts) | [api/api-document.md](api/api-document.md) | BE + FE devs, AI |
 
@@ -50,9 +50,8 @@ Each folder owns one concern. No content duplicated between them — instead, fi
 
 | Client | Stack | Rationale |
 |---|---|---|
-| **App** (Phase 0–3) | Flutter (Android + web shell), Bloc (`flutter_bloc`, Cubit-by-default), `go_router`, dio, Material 3 | Single codebase → Android + web; Bloc chosen for class-based clarity + natural Repository pattern + `bloc_test` testability; `go_router` for URL-based deep-linking |
-| **Admin** (Phase 3) | Next.js | React ecosystem, SSR, mature; admin is desktop-first |
-| **Web** (Phase 3) | Nuxt 3 | Power-user paid tier — bulk management, import/export, free editing. Vue ecosystem; deliberate split from admin to keep audiences separate |
+| **App** (Phase 0–3) | Flutter (Android; web build = dev tool only), Bloc (`flutter_bloc`, Cubit-by-default), `go_router`, dio, Material 3 | Bloc chosen for class-based clarity + natural Repository pattern + `bloc_test` testability; `go_router` for URL-based deep-linking |
+| **Web** (Phase 3) | **One Next.js app** (`chubi-pocket-web`) | Full-data power editing (bulk management, import/export, free editing) + role-gated admin pages in the same app. Replaces the former Next-admin + Nuxt-power-web pair — one codebase, one auth, one deploy (decided 2026-09-16) |
 
 ### Database
 

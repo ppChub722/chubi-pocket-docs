@@ -31,7 +31,7 @@ A personal finance application for tracking expenses, splitting bills, automatin
 | **0** — Foundation | Scaffolding ready for feature work | Repo + CI, backend/frontend skeletons, auth, settings, UX state patterns, multiplatform verification | THB | Android, Web |
 | **1** — Feature completeness | Every feature works end-to-end | All modules in 3 sub-milestones (1a single-user core, 1b multi-user + dashboard + notifications, 1c planning) | THB | Android, Web |
 | **2** — UX polish | Pleasant to use | Dashboard + charts, multi-currency, push delivery, onboarding, receipt photos, export, performance | Multi-currency | Android, Web |
-| **3** — Production | Ready to sell / deploy | VPS + CI/CD, monitoring, backups, security, Next.js admin + Nuxt 3 power-user web, monetization, legal | Multi-currency, global | Android, Web, Admin, Power-Web |
+| **3** — Production | Ready to sell / deploy | VPS + CI/CD, monitoring, backups, security, one Next.js web app (power editing + role-gated admin), monetization, legal | Multi-currency, global | Android, Web (Next.js) |
 
 iOS is **not planned** through Phase 3 (no dev device). Revisit post-launch.
 
@@ -44,9 +44,8 @@ Per-phase scope, exit criteria, risks, and dependencies in [`phases.md`](phases.
 Product-level stake-in-the-ground choices. Engineering rationale + per-frontend specifics in [`../design/overview.md`](../design/overview.md).
 
 - **Backend** — Go + Gin, `pgx/v5`, argon2id, JWT, `slog`, `golang-migrate`
-- **Frontend (app)** — Flutter (Android + Flutter web shell), Bloc (`flutter_bloc`, Cubit-by-default), Repository pattern
-- **Admin (Phase 3)** — Next.js
-- **Power-user web (Phase 3)** — Nuxt 3 (paid tier; bulk management, import/export, free editing)
+- **Frontend (app)** — Flutter (Android), Bloc (`flutter_bloc`, Cubit-by-default), Repository pattern. Flutter web builds remain a **dev/testing tool only** — not a shipped surface (decided 2026-09-16).
+- **Web (Phase 3)** — **one Next.js app** (`chubi-pocket-web`, scaffold already exists): full-data power editing (bulk management, import/export, free editing) **plus role-gated admin pages** in the same app. Replaces the old two-app plan (Next.js admin + Nuxt 3 power-web) — one codebase, one auth, one deploy; the UIs would have been near-identical anyway (decided 2026-09-16).
 - **Database** — PostgreSQL 15+, UUID v7 primary keys
 - **Containerization** — Docker (everything dev + prod via `docker-compose`; identical containers deploy to VPS in Phase 3)
 - **Base URL** — `/api` (paths versioned `/v1/...` from day 1; full path `/api/v1/...`)
@@ -135,8 +134,9 @@ docs/
 
 ## Status
 
-- **Phase** — **Phase 1 complete** (1a + 1b + 1c shipped end-to-end). Phase 2 (UX polish) up next. See [`phases.md`](phases.md).
-- **Last updated** — 2026-05-07
+- **Phase** — **Phase 1 complete** (1a + 1b + 1c shipped end-to-end), plus post-1c additions: shared wallets (spec 14), project planned_amount, quick-create events, income splits, closed-beta logging. Phase 2 (UX polish) up next; first VPS deploy in progress. See [`phases.md`](phases.md).
+- **Last updated** — 2026-09-16
+- **Version** — 0.7 (web direction: single Next.js app replaces Flutter-web-shell + Nuxt-3-power-web + separate admin; Flutter web demoted to dev tool)
 - **Version** — 0.6 (restructure: combined per-phase docs into single `phases.md`; moved `ui-design/` from design/ to product/; renamed design folders dropping numeric prefixes; reorganized `frontend/` to anticipate per-client subfolders for Phase 3 admin + power-user web)
 - **Version 0.5** — link rot fix; documented `/v1/` versioning
 - **Version 0.4** — unified shared-expenses model; project_transactions ledger

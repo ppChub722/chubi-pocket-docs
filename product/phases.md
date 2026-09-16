@@ -280,13 +280,12 @@ Any feature beyond auth + users (→ Phase 1). Visual polish (→ Phase 2). Prod
 ### Scope
 
 - **Deployment infra** — VPS (provider TBD: DO, Hetzner, Linode; SEA region), Ubuntu LTS, Caddy (auto-HTTPS via Let's Encrypt), Docker + Compose, managed PostgreSQL, S3-compatible object storage, Cloudflare CDN
-- **CI/CD** — GitHub Actions for backend / Flutter / Next.js / Nuxt 3; staging environment; manual production deploys with rollback plan
+- **CI/CD** — GitHub Actions for backend / Flutter / Next.js; staging environment; manual production deploys with rollback plan
 - **Domain, DNS, SSL** — `chubipocket.com`, `api.`, `admin.`, `app.` subdomains; DNS via Cloudflare
 - **Database operations** — nightly full + hourly WAL backups, weekly automated restore-to-scratch verification, documented RTO/RPO
 - **Monitoring** — Sentry (errors), Prometheus + Grafana or hosted alternative (metrics), structured logs centralized (Loki or hosted), uptime checks, on-call alerts
 - **Security hardening** — rate limiting, account lockout, audit log, secrets management, dependency scanning, security headers, one penetration test before launch
-- **Admin web (Next.js)** — restricted to `role=admin`; user list/search, impersonate-for-debug, platform metrics, feature flags, manual data corrections (audit-logged). Spec lives in [`design/frontend/admin/`](../design/frontend/admin/) (Phase 3 work)
-- **Power-user web (Nuxt 3)** — paid-tier feature for users who want bulk management. Excel-like transaction grid with inline edit, bulk operations (delete, recategorize, tag), advanced filters, saved views, rich reports + export (CSV / Excel / PDF), batch import. Spec lives in [`design/frontend/web/`](../design/frontend/web/) (Phase 3 work)
+- **Web app — one Next.js app (`chubi-pocket-web`)** _(decided 2026-09-16; replaces the former Next-admin + Nuxt-power-web pair)_ — full-data power editing: Excel-like transaction grid with inline edit, bulk operations (delete, recategorize, tag), advanced filters, saved views, rich reports + export (CSV / Excel / PDF), batch import — **plus the admin surface as role-gated pages in the same app** (`role=admin`: user list/search, impersonate-for-debug, platform metrics, feature flags, manual data corrections — audit-logged). Spec lives in [`design/frontend/web/`](../design/frontend/web/) (Phase 3 work)
 - **Monetization** — likely freemium with subscription upgrade. Stripe (global) + optional Thai gateway (Omise / 2C2P) for local. Pricing TBD in Phase 3 planning.
 - **Legal & compliance** — TOS, Privacy Policy, PDPA (Thailand) compliance, GDPR if targeting EU, cookie consent, DPAs with subprocessors
 - **App store submission** — Google Play (developer account, screenshots, privacy URL, content rating, internal → closed beta → production)
@@ -298,10 +297,10 @@ Any feature beyond auth + users (→ Phase 1). Visual polish (→ Phase 2). Prod
 - Domain resolves with valid SSL
 - CI builds and deploys on merge to `main`
 - Backups run nightly; test restore passes
-- Sentry captures errors from all 3 surfaces (mobile, admin, power-user web)
+- Sentry captures errors from both surfaces (mobile, web)
 - A paying user can sign up, subscribe, and use premium features
 - Admin can search a user and view their data with audit-log entry
-- Power-user web lets a user bulk-edit 100+ transactions in <30 seconds
+- The web app lets a user bulk-edit 100+ transactions in <30 seconds
 - TOS, Privacy Policy, PDPA compliance, GDPR export/delete are live
 - Android app approved and live on Google Play
 - Load test passes at target concurrency
@@ -318,7 +317,7 @@ Any feature beyond auth + users (→ Phase 1). Visual polish (→ Phase 2). Prod
 
 - **Solo ops is risky.** Mitigations: managed DB, aggressive alerting, second person with prod access.
 - **Monetization is product, not just engineering.** Paywall line affects what Phase 2 features look like; revisit during Phase 2 planning so paid features are built with billing in mind.
-- **Admin vs power-user web — one app or two?** Current lean: one app (Next.js for admin, Nuxt 3 for power-user — separate stacks because different audiences). Revisit if maintenance becomes a burden.
+- ~~**Admin vs power-user web — one app or two?**~~ **Resolved 2026-09-16: one Next.js app** with role-gated admin pages — a solo dev shouldn't maintain three frontends, and the two UIs would have been near-identical.
 - **Legal compliance is non-trivial.** PDPA + GDPR fines are real. Budget time and possibly money for review.
 - **Support burden scales with users.** Runbook + support inbox aren't optional.
 

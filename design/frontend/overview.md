@@ -1,6 +1,6 @@
 # Frontend — overview
 
-Cross-frontend conventions for every client that talks to the ChubiPocket backend. Today there's one client (Flutter app for Android + Flutter web shell). Phase 3 adds two more (Next.js admin, Nuxt 3 power-user web).
+Cross-frontend conventions for every client that talks to the ChubiPocket backend. Today there's one shipped client (Flutter app for Android; its web build is a dev tool only). Phase 3 adds one more: a single Next.js web app — full-data power editing plus role-gated admin pages (decided 2026-09-16, replacing the former Next-admin + Nuxt-power-web pair).
 
 This file covers what's identical across all clients. Per-client implementation specifics live in subfolders.
 
@@ -10,9 +10,8 @@ This file covers what's identical across all clients. Per-client implementation 
 
 | Client | Folder | Phases | Stack | Audience |
 |---|---|---|---|---|
-| **App** | [`app/`](app/) | 0–3 | Flutter (Android + web shell) | End users, mobile-first |
-| **Admin** | `admin/` *(Phase 3)* | 3+ | Next.js | Internal admin, moderation |
-| **Web** | `web/` *(Phase 3)* | 3+ | Nuxt 3 | Power users, paid tier — focused on bulk management, import/export, free editing |
+| **App** | [`app/`](app/) | 0–3 | Flutter (Android; web build = dev tool) | End users, mobile-first |
+| **Web** | `web/` *(Phase 3)* | 3+ | Next.js (one app) | Power users (bulk management, import/export, free editing) + internal admin via role-gated pages |
 
 Per-client design + UX specs (screens, layouts, interactions, brand) live in [`../../product/ui-design/<client>/`](../../product/ui-design/) — designer-facing, plain UX language. This folder holds engineering-only detail.
 
