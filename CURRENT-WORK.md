@@ -3,12 +3,35 @@
 > **กติกาไฟล์นี้:** เขียนต่อท้ายเรื่อย ๆ **ไม่แก้ของเก่า** — entry ใหม่สุดอยู่**บนสุด** (ใต้หัวข้อนี้)
 > ใช้ส่งงานข้ามเครื่อง/ข้ามวัน: อ่านอันบนสุดก็รู้ว่าตอนนี้ค้างอะไร ทำอะไรไปแล้ว
 >
-> **ของที่ git ไม่พาไป (ต้องก๊อปมือทุกเครื่องใหม่):**
-> - SSH key `~/.ssh/ppforge_vps` — ไม่มี = SSH เข้า VPS ไม่ได้ (password login ปิดถาวร)
+> **ของที่ git ไม่พาไป:**
+> - **SSH เข้า VPS** — อย่าก๊อป private key ข้ามเครื่อง! แต่ละเครื่องสร้าง key ของตัวเอง แล้วแปะ public key ที่ VPS (วิธีเต็มดู entry 2026-09-17 หัวข้อ "SSH หลายเครื่อง")
 > - Auto-memory ของ Claude Code (`~/.claude/.../memory/`) — local machine, ไม่ sync
 >
 > **เริ่มงานบนเครื่องใหม่เสมอ:** `git pull origin main` ทุก repo (app / be / web / docs)
 > **Infra bible:** [engineering/ops-runbook.md](engineering/ops-runbook.md) — ทุกคำสั่ง deploy/backup/gotcha อยู่นั่น
+
+---
+
+## 2026-09-17 — SSH หลายเครื่อง (แนวทางถูกต้อง)
+
+**หลักการ: 1 เครื่อง = 1 keypair ของตัวเอง — private key ห้ามเดินทาง**
+VPS รับได้หลาย public key พร้อมกัน (`~/.ssh/authorized_keys`) เครื่องไหนหาย/เลิกใช้ ลบเฉพาะ key ของมันได้ ไม่กระทบเครื่องอื่น · **อย่าก๊อป private key ผ่าน USB/แชต/cloud**
+
+**เพิ่มเครื่องใหม่ให้เข้า VPS ได้ (ทำครั้งเดียว):**
+1. เครื่องใหม่สร้าง key ตัวเอง:
+   ```powershell
+   ssh-keygen -t ed25519 -f $env:USERPROFILE\.ssh\ppforge_vps -C "machine-2"
+   ```
+2. ก๊อปเนื้อ `ppforge_vps.pub` (บรรทัดเดียว `ssh-ed25519 AAAA... machine-2` — **ไม่ลับ ส่งทางไหนก็ได้**)
+3. จากเครื่องที่เข้า VPS ได้อยู่แล้ว แปะต่อท้าย authorized_keys:
+   ```bash
+   ssh -i ~/.ssh/ppforge_vps Admin@160.238.13.137 'echo "<pubkey เครื่องใหม่>" >> ~/.ssh/authorized_keys'
+   ```
+4. เครื่องใหม่ทดสอบ: `ssh -i ~/.ssh/ppforge_vps Admin@160.238.13.137`
+
+**ถ้าไม่มีเครื่องไหนเข้า VPS ได้เลย** (เข้าตาจน) → happy-host.net → VPS → **Console** → เพิ่ม public key ใหม่เข้า authorized_keys เอง (password login ปิดถาวร)
+
+**ถอนสิทธิ์เครื่องที่เลิกใช้:** ลบบรรทัด public key ของมันออกจาก `~/.ssh/authorized_keys` บน VPS
 
 ---
 
