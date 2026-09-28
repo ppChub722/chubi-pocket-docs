@@ -16,7 +16,7 @@
 | **DNS records** | Cloudflare | `chubipocket-api` → A → 160.238.13.137 → **DNS only (เมฆเทา — ห้ามเปิดส้ม ไม่งั้น cert พัง)** · อนาคต: `chubipocket-web` |
 | **API URL** | https://chubipocket-api.ppforge.dev | health check: `/health` → `{"status":"ok"}` |
 | **GitHub** | github.com/ppChub722 | repos: chubi-pocket-be / -app / -web / -docs (private) — push ในนาม ppChub722 (remote URL ฝัง user ไว้แล้ว) |
-| **Firebase** | (ยังไม่สร้าง) | ไว้แจก APK ผ่าน App Distribution |
+| **Firebase** | console.firebase.google.com → project **chubipocket** | App Distribution แจก APK · Project ID: `chubipocket` · Project number: `1059791337506` · บัญชี: Poompich.e@gmail.com |
 | **SSH key** | เครื่อง dev: `C:\Users\poomp\.ssh\ppforge_vps` | user บนเครื่อง: `Admin` · **password login ปิดถาวร** — key หายคือเข้าไม่ได้ ต้องใช้ Console ในแผง Happy-Host กู้ |
 
 **ค่าใช้จ่ายรวม: ~255฿/เดือน** (VPS 220 + โดเมนเฉลี่ย 35)
