@@ -208,6 +208,7 @@ Any feature beyond auth + users (→ Phase 1). Visual polish (→ Phase 2). Prod
 
 ### Scope
 
+- **Inline-edit UX model (cross-cutting)** — unify `list → detail → edit` into an editable-detail page with a reorder-style Cancel · Undo · Save action bar; detail is directly editable in place (inline fields; icon/rich pickers as modals), edit surfaces move above the shell (no bottom nav). Pilot: categories + tags, then all CRUD modules. Spec: [`phase2/inline-edit-ux.md`](phase2/inline-edit-ux.md).
 - **Project Report tab** — per-member paid / owes / net breakdown; by-category spend totals. UI shows "Coming soon" in Phase 1c; logic to be built in Phase 2 once report calculation rules (how splits affect member net) are validated with real data.
 - **Project Resolve tab** — resolve project transactions to personal book (create personal expense/income or debt entry). UI shows "Coming soon" in Phase 1c; full settlement flow (resolve-to-personal, mark, debt matrix) deferred to Phase 2 to redesign after Phase 1c UX feedback.
 - **Dashboard & reports** — landing screen with monthly income vs expense, spending breakdown by category (pie/donut), trends over time, budget utilization, savings rate, top categories/accounts, owed-to-me/I-owe summary card; drill-down everywhere
@@ -345,9 +346,10 @@ Any feature beyond auth + users (→ Phase 1). Visual polish (→ Phase 2). Prod
 
 ## Status
 
-- **Phase** — **Phase 1 complete.** All sub-milestones shipped: 1a (single-user core), 1b (multi-user + collaboration + dashboard + notifications), 1c (budgets, saving goals, scheduled transactions). BE migrations through **000038** (post-1c polish: budgets dropped per-row icon + gained description/note; idempotency on `contact_link_request`; new `contact_link_request` tap-flow endpoints). Flutter app exposes UI for every Phase 1 module. Phase 2 (UX polish) is next; full l10n cleanup of the notifications module is queued there.
-- **Last updated** — 2026-05-07
-- **Version** — 0.9 (post-1c polish: budgets description/note + category-derived icon; contact_link_request idempotency + accept-with-contact tap flow; l10n cleanup deferred to Phase 2)
+- **Phase** — **Phase 2 (UX polish) — in progress.** Phase 1 is complete (1a single-user core, 1b multi-user + collaboration + dashboard + notifications, 1c budgets / saving goals / scheduled transactions; BE migrations through **000038**; Flutter app exposes UI for every Phase 1 module). The app is now **deployed on a real VPS** — production infra was nominally Phase 3 but landed early, so the live deployment exists ahead of the formal phase plan. Current Phase 2 workstream: **inline-edit UX model** (see [`phase2/inline-edit-ux.md`](phase2/inline-edit-ux.md)), piloting on categories + tags. Full l10n cleanup of the notifications module is also queued in Phase 2.
+- **Last updated** — 2026-10-02
+- **Version** — 1.0 (Phase 2 kickoff: app deployed to VPS ahead of schedule; inline-edit UX workstream specced and started on categories + tags)
+- **Version 0.9** — Phase 1 complete, post-1c polish: budgets description/note + category-derived icon; contact_link_request idempotency + accept-with-contact tap flow; l10n cleanup deferred to Phase 2
 - **Version 0.8** — Phase 1 complete: 1c BE shipped through migration 000036, FE for budgets / saving-goals / scheduled-transactions wired and analyze-clean
 - **Version 0.7** — Phase 1c kickoff: bumped current BE state to 000033, added pointer to phase1c plan
 - **Version 0.6** — added Phase 2 deferrals: project Report tab + project Resolve tab deferred from Phase 1c
