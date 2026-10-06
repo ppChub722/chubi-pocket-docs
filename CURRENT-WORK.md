@@ -12,6 +12,37 @@
 
 ---
 
+## 2026-10-07 — ช่องโหว่ BE + API contract + routing + icon maker ใหม่ (ยังไม่ commit)
+
+- **BE security** (`personal_debts`): create/update debt + split ตรวจว่า contact เป็นของผู้ใช้ → `400 CONTACT_NOT_FOUND` · `people` กรอง contact ตาม user · เจอช่องโหว่หนักกว่าเดิม: split ด้วย contact คนอื่นสร้างหนี้ใส่บัญชีคนอื่นได้ — แก้แล้ว
+- **BE** `IconCode.Shape` (+ allowlist, test) · `go build` ผ่าน · test ผ่าน ยกเว้น `projects/quick_test.go` ที่ compile ไม่ผ่านมาก่อน
+- **API contract**: [design/api/ux-overhaul-contract.md](design/api/ux-overhaul-contract.md)
+- **Routing** (แผน §2): settings/notifications เป็นชั้น overlay · FAB ทุกหน้า · ไฮไลต์ "เพิ่มเติม" · หมวดหมู่กลับเข้า shell · ฟอร์มซ่อน nav (`ShellChromeHider`) · ลบ `MainTopBar` · แก้ top bar ซ้อนหน้ารายการ
+- **Icon maker ใหม่ + shape** ตาม mockup v7 · gallery มีทรงทั้งหมด · app analyze ผ่าน · test 33 ผ่าน
+- ต่อไป: หมวดหมู่ → แท็ก → ผู้ติดต่อ (แผน §4–6)
+
+---
+
+## 2026-10-06 — Phase 2 UX overhaul: วางแผน + widget กลาง + icon maker mockup
+
+**แผนหลัก:** [product/phase2/ux-overhaul-plan.md](product/phase2/ux-overhaul-plan.md) (กติกา UI ทั้งแอป, routing, ทุกหน้า, BE backlog §14, บั๊กที่เจอ §15)
+
+### ทำเสร็จ ✅ (ยังไม่ commit — อยู่ใน working tree ของ app)
+- สแกน BE ครบ → ผลอยู่ในแผน §14–15
+- Shared UI kit `lib/shared/widgets/ui.dart` (ปุ่ม, ช่องกรอก, chip/popover, detail rows, sheet, MoneyText + 👁, ModeActionBar ฯลฯ) + `AppTopBar` เพิ่ม `editing`/`showUniversal`
+- หน้า gallery `/dev/widgets` · ทางเข้า dev: แตะชื่อหน้า login 5 ครั้ง หรือแตะเวอร์ชันแอปในการตั้งค่า 5 ครั้ง
+- ตัวเลือกกระเป๋าใหม่ (grid AccountCard) — ฟอร์มรายการได้หน้าตาใหม่ด้วย
+- icon maker: เพิ่ม `showIcon` / `IconMakerLayers` (7 โหมดชั้น) · ชั้นเดียวซ่อนแถวการ์ด
+- mockup icon maker ใหม่ตกลงแล้ว: https://claude.ai/artifact/P8MZxnpnVqyvoatmAFdxUp (v7) → แผน §3.5 (รวม field `shape`)
+- Flutter ต้องใช้ fvm: `C:\Users\poomp\fvm\versions\3.47.3\bin\flutter` (ตัวใน PATH 3.38 resolve ไม่ผ่าน) · analyze ผ่าน · test 28 ผ่าน
+
+### ต่อพรุ่งนี้ (ตามลำดับ)
+1. แก้ช่องโหว่ BE: `personal_debts` create/update ไม่เช็คเจ้าของ contact + `people` query ไม่กรอง user (แผน §15 #1)
+2. เขียน API contract ของ endpoint ใหม่ทั้งหมด → `design/api/`
+3. Routing (แผน §2) → icon maker ใหม่ + shape (§3.5) → หมวดหมู่ → แท็ก → ผู้ติดต่อ → …
+
+---
+
 ## 2026-09-17 — SSH หลายเครื่อง (แนวทางถูกต้อง)
 
 **หลักการ: 1 เครื่อง = 1 keypair ของตัวเอง — private key ห้ามเดินทาง**
