@@ -214,6 +214,8 @@ Changing `period` mid-cycle: the current period is recomputed against the new pe
 
 Hard delete. Simple since budgets don't have dependent rows.
 
+**Category deleted → its budgets are deleted too** (`budgets.category_id` FK `ON DELETE CASCADE`, migration 000043; was `RESTRICT`, which made category delete fail with 500). See [`05-categories-tags.md §3.5`](05-categories-tags.md).
+
 **Success — `200 OK`:** `{ "message": "Budget deleted" }`.
 
 ### 3.6 `POST /v1/budgets/:id/archive`, `POST /v1/budgets/:id/restore`

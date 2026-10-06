@@ -18,11 +18,10 @@ Global conventions (base URL, error envelope, data types, HTTP verbs) are in [`o
 | System categories (auto-assigned on transfer/adjust/opening) | ✅ | ✅ | ✅ |
 | Default starter category seed at registration | ✅ | ✅ | ✅ |
 | Tags CRUD + attach/detach on transactions | ✅ | ✅ | ✅ |
-| Category archive / restore / permanent delete | ✅ | ✅ | ✅ |
+| Category delete (always hard; tx → no category, budgets cascade) | ✅ | ✅ | ✅ |
 | Localized default seed names (i18n) | English only | ✅ | ✅ |
 | Template category sets at registration | — | — | Phase 4+ |
 | Bulk recategorize tool | — | ✅ | ✅ |
-| Auto-purge archived categories (scheduled job) | — | — | optional |
 | Category-set import / export | — | — | Phase 4+ |
 
 ---
@@ -289,68 +288,31 @@ Update a category. Partial.
 
 ### 3.5 `DELETE /v1/categories/:id`
 
-Delete or archive a category.
+Delete a category. **Always a real (hard) delete** — owner decision 2026-10-07, replacing the old archive-when-used rule. A transaction's category is optional; one whose category is gone simply shows as "no category".
 
 **Backend flow:**
 
 1. Fetch the category
 2. If `is_system = true` → `400 SYSTEM_CATEGORY` (cannot delete)
 3. Reparent children: for all `categories WHERE parent_id = :id`, set their `parent_id` to this category's `parent_id` (shifts to grandparent; NULL if this is a root)
-4. Count transactions where `category_id = :id`:
-   - **If 0** → hard delete the category
-   - **If > 0** → soft delete: `status = 'archived'`
+4. Hard delete the row. Foreign keys do the rest:
+   - `transactions.category_id`, `scheduled_transactions.category_id` → `SET NULL` (uncategorised)
+   - `budgets.category_id` → `CASCADE` (budgets on this category are deleted — a budget can't exist without a category)
+   - `project_transactions` keep their category name/icon snapshot (no FK)
 
 **Response — `200 OK`:**
-
-```json
-{
-  "message": "Category archived",
-  "status": "archived",
-  "transaction_count": 42,
-  "notice": "42 transactions still use this category. Reassign them before permanent deletion."
-}
-```
-
-Or, if hard-deleted:
 
 ```json
 { "message": "Category deleted", "status": "deleted" }
 ```
 
+`status` is always `"deleted"` (kept for client compatibility).
+
+Clients should warn before deleting: `GET /v1/categories/:id` returns `transaction_count` (will become uncategorised) and `budget_count` (will be deleted).
+
 **Errors:** `400 SYSTEM_CATEGORY`, `401`, `403`, `404`.
 
-### 3.6 `POST /v1/categories/:id/restore`
-
-Reactivate an archived category.
-
-**Backend flow:**
-
-1. Set `status = 'active'`
-2. If `parent_id` points to an archived category → silent auto-reparent to nearest active ancestor (or root if none)
-3. Return the restored category
-
-**Success — `200 OK`:** the restored category.
-
-**Errors:** `400 NOT_ARCHIVED`, `401`, `403`, `404`.
-
-### 3.7 `DELETE /v1/categories/:id/permanent`
-
-Hard-delete an archived category. Only works from the archived state and only if no transactions reference it.
-
-**Backend flow:**
-
-1. Must be `status = 'archived'` → else `400 NOT_ARCHIVED`
-2. Count transactions → if > 0 → `400 HAS_TRANSACTIONS` with count
-3. Reparent any children still pointing at this category (same grandparent-shift rule as §3.5)
-4. Hard delete the row
-
-**Success — `200 OK`:**
-
-```json
-{ "message": "Category permanently deleted" }
-```
-
-**Errors:** `400 NOT_ARCHIVED`, `400 HAS_TRANSACTIONS`, `400 SYSTEM_CATEGORY`, `401`, `403`, `404`.
+> §3.6 `POST /restore` and §3.7 `DELETE /permanent` were **removed** together with the archive state (migration 000043 also purged rows archived under the old rule).
 
 ### 3.8 `POST /v1/tags`
 
@@ -505,35 +467,13 @@ Each system concept (Opening, Adjustment, Transfer) needs both income and expens
 
 Rejected: unlimited nesting (complex queries, UI), single-level (too restrictive). Three layers covers 99% of real category hierarchies. Enforced at the API layer via parent-chain traversal.
 
-### 4.5 Soft-delete with display-skip
+### 4.5 Delete is always real; references fall back to "none"
 
-Categories with transactions can't hard-delete without losing references. Soft-delete preserves integrity. The UI display-skip behavior keeps the visual tree clean:
-
-- `A → B (archived) → C` displays as `A → C`
-- `C.parent_id` unchanged (still points to archived B)
-- Restoring B puts it back in the tree automatically
-
-Reference consistency: soft-deleted categories still resolve when transactions join on `category_id` — name still renders, with optional "(archived)" suffix in UI.
+Superseded the original soft-delete/archive design (2026-10-07). Category is optional on a transaction, so a hard delete loses nothing structural: affected transactions show "no category" and can be recategorised later. Budgets require a category and are deleted with it — the client confirm states how many. No archive, restore or permanent-delete flows exist for categories.
 
 ### 4.6 Hard-delete children shift to grandparent
 
-When a category is hard-deleted (either direct delete with no transactions, or permanent delete from archived), its children re-parent to its former parent. This keeps the visual tree close to what the user was seeing in the display-skip state.
-
-If the deleted category was a root, children become roots.
-
-### 4.7 Archive stays until user acts
-
-Phase 1: archived categories are never auto-purged. They sit in Archived until user either restores or permanently deletes.
-
-Rationale: archive is a useful state (undo by reactivating). Silent auto-purge when last transaction moves could surprise users.
-
-Phase 3+ could add a scheduled cleanup job if archive clutter becomes a complaint.
-
-### 4.8 Auto-reparent on restore when parent is archived
-
-If the immediate parent of a restoring category is still archived, silently set the restored category's `parent_id` to the nearest active ancestor (or NULL if none exist).
-
-Avoids the weird state of an active category parented to an archived one. User can always re-reparent manually afterward.
+When a category is deleted, its children re-parent to its former parent. If the deleted category was a root, children become roots.
 
 ### 4.9 User can change `parent_id` freely
 
@@ -599,11 +539,11 @@ System categories have `is_system = true` but `name` is editable. Users might wa
 
 ## 5. Open questions
 
-- **Bulk recategorize tool.** When a user archives a category with 42 transactions, they currently re-categorize one-by-one. Phase 2+ `POST /v1/transactions/bulk-recategorize` with `{ from_category_id, to_category_id }` would speed this up.
+- **Bulk recategorize tool.** Moving many transactions to another category (e.g. before deleting one) is one-by-one today. Phase 2+ `POST /v1/transactions/bulk-recategorize` with `{ from_category_id, to_category_id }` would speed this up.
 - **Template library.** Phase 4+. Schema: templates themselves could be JSONB blobs or a separate `category_templates` table. Deferred until the feature is scoped.
 - **Export / import user's category set.** Related to templates. Export as JSON; import applies to a new user or overlays an existing user (conflict handling TBD).
 - **Icon enum vs free-form.** Keep free-form unless client-side drift becomes a problem.
-- **Per-category budgets reference.** Budgets module references categories; when a category is archived, its budget behavior — freeze at last state? archive too? — decide in budgets spec.
+- **Per-category budgets reference.** ✅ Decided 2026-10-07: deleting a category deletes its budgets (FK CASCADE, §3.5).
 
 ---
 

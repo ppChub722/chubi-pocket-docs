@@ -538,7 +538,7 @@ Owned by [`../spec/08-budgets.md`](../spec/08-budgets.md).
 | -------------------- | --------------- | ----------------------------------- | --------------------------------------- |
 | `id`                 | `UUID`          | PK (v7)                             |                                         |
 | `user_id`            | `UUID`          | FK → `users.id`, NOT NULL           | Owner                                   |
-| `category_id`        | `UUID`          | FK → `categories.id`, NOT NULL      | Target category                         |
+| `category_id`        | `UUID`          | FK → `categories.id`, NOT NULL, `ON DELETE CASCADE` (migration 000043) | Target category — deleting the category deletes the budget |
 | `scope`              | `VARCHAR(20)`   | NOT NULL, CHECK                     | `'user'` \| `'project'`                 |
 | `project_id`         | `UUID`          | FK → `projects.id`, NULLABLE        | Set when `scope='project'`              |
 | `amount`             | `DECIMAL(15,2)` | NOT NULL, CHECK > 0                 | Spending limit                          |

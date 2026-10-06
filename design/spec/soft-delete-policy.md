@@ -21,7 +21,7 @@ These tables stay in the DB so historical references remain valid; default list 
 | Table | Allowed statuses | Notes |
 |---|---|---|
 | `accounts` | `active`, `archived`, `closed` | Archive when transactions exist; `closed` for explicitly-shut accounts |
-| `categories` | `active`, `archived` | Archive if any transactions reference it; the unique-name constraint excludes archived rows so names can be reused |
+| `categories` | `active` (`archived` unused since 2026-10-07) | Always hard-deleted — transactions / scheduled fall back to no category (SET NULL), budgets cascade. See 05 §3.5 |
 | `tags` | (no status — see Category 4) | |
 | `contacts` | `active`, `archived` | Archive preserves linked-user history |
 | `budgets` | `active`, `archived` | |

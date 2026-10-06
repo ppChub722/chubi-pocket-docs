@@ -21,7 +21,7 @@ envelope, money as JSON numbers, dates `YYYY-MM-DD`. "Additive" = existing clien
 | 6 | Projects | summary per-member / per-category, role fixes | additive + behaviour | project dashboard, members |
 | 7 | Personal debts | `people.icon_code`, direct settle w/o account, 400 not 500 | additive + fix | debts |
 | 8 | Contacts | search matches email / phone | behaviour | contacts list |
-| 9 | Categories | delete when referenced by a budget | fix | category delete |
+| 9 | Categories | delete always real; budgets cascade (✅ done) | behaviour + fix | category delete |
 | 10 | IconCode | `shape` field | additive | icon maker / every icon |
 | 11 | Notifications | dismiss vs actioned conflict → 409 | fix | inbox |
 
@@ -155,12 +155,15 @@ Behaviour (no API change):
 `GET /contacts?search=` matches `display_name`, `email` **or** `phone` (case-insensitive substring;
 phone compares digits only). No new params.
 
-## 9. Categories — delete referenced by a budget
+## 9. Categories — delete is always real (✅ implemented 2026-10-07)
 
-`DELETE /categories/:id` when the category has 0 transactions but is referenced by a budget
-(`budgets.category_id … ON DELETE RESTRICT`): **archive instead of hard delete** and return
-`{ "status": "archived", "reason": "in_use_by_budget" }`. Today it fails with a generic 500.
-`reason` is also returned for the existing case: `"has_transactions"`.
+Owner rule: deleting a category is always a hard delete — no archive.
+
+- `DELETE /categories/:id` → reparent children, hard delete, `{ "message": "Category deleted", "status": "deleted" }`.
+  Transactions / scheduled transactions → `category_id = NULL` (shown as "no category");
+  budgets on the category → deleted (`budgets.category_id` FK now `ON DELETE CASCADE`, migration 000043 — fixes the old 500).
+- `GET /categories/:id` adds `budget_count` (alongside `transaction_count`) so the client confirm can say what's affected.
+- **Removed:** `POST /categories/:id/restore`, `DELETE /categories/:id/permanent`. Migration 000043 purged rows archived under the old rule (children moved up first).
 
 ## 10. IconCode — shape
 
@@ -182,6 +185,44 @@ phone compares digits only). No new params.
 
 `POST /notifications/:id/dismiss` on an actioned row (or `actioned` on a dismissed row) →
 `409 NOTIFICATION_STATE_CONFLICT` instead of a 500 from the DB CHECK.
+
+## 12. Auth — Google sign-in (planned, FE placeholder only)
+
+The login and register pages show a disabled "ดำเนินการต่อด้วย Google · เร็ว ๆ นี้" button (`GoogleSignInButton`, no
+`onPressed`). Wiring it needs the following.
+
+`POST /auth/google` (public):
+
+```json
+{ "id_token": "<Google ID token from google_sign_in>", "currency": "THB" }
+```
+
+- BE verifies `id_token` against Google's JWKS. `aud` must be one of our OAuth client IDs (Android/iOS/web), and
+  `email_verified` must be true.
+- Lookup is by `google_sub`:
+  - **Found** → log that user in.
+  - **Not found but the email matches an existing user** → `409 GOOGLE_EMAIL_EXISTS`. Never auto-link: an attacker
+    could otherwise take over the account. Linking happens later, logged in, from settings.
+  - **Not found** → create the user:
+    - `display_name` = Google name.
+    - `email` = Google email.
+    - `username` = a free slug derived from the email local-part, `[a-z0-9_-]{3,50}`, with a numeric suffix on
+      collision.
+    - `password_hash` = NULL.
+    - `currency` from the body (default `THB`).
+- Response: same shape as `POST /auth/login` (`access_token` [+ `refresh_token`], `user`), plus `"is_new": true|false`
+  so the FE can route new users to a short "check your username / currency" step.
+- Errors:
+  - `401 INVALID_GOOGLE_TOKEN`
+  - `409 GOOGLE_EMAIL_EXISTS`
+  - `403 USER_INACTIVE` (same as login)
+- Schema:
+  - `users.google_sub TEXT UNIQUE NULL`.
+  - `users.password_hash` becomes nullable.
+  - For Google-only users (no password), change-password becomes "set password" and must not require the old
+    password.
+- FE: add `google_sign_in`, `AuthRepository.loginWithGoogle(idToken)`, and `AuthCubit.loginWithGoogle()`, then pass
+  `onPressed`/`loading` to `GoogleSignInButton` on both pages.
 
 ---
 
