@@ -89,6 +89,12 @@ fvm flutter build apk --release --split-per-abi --dart-define=API_BASE_URL=https
 #   build\app\outputs\flutter-apk\app-arm64-v8a-release.apk
 # ตัว armeabi-v7a/x86_64 ไม่ต้องใช้ (มือถือโบราณ/emulator)
 ```
+อัพ + แจกผ่าน terminal (login ครั้งแรกครั้งเดียว: `npx -y firebase-tools login` ใน terminal จริง):
+```powershell
+npx -y firebase-tools appdistribution:distribute build\app\outputs\flutter-apk\app-arm64-v8a-release.apk `
+  --app 1:1059791337506:android:426c08daa2b6a91d5a327b --groups firsttester --release-notes "<เวอร์ชัน — สรุป>"
+```
+> build number บน Firebase/ในแอปจะเป็น `2000 + build` (split-per-abi ของ arm64) เช่น `+3` → `2003` — ปกติ
 
 ### Backup & Restore
 ```bash
