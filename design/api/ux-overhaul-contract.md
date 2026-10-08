@@ -340,6 +340,65 @@ The login and register pages show a disabled "ดำเนินการต่�
 
 ---
 
+## 13. Projects — add a bill to an existing event (✅ implemented 2026-10-08)
+
+For the `+` sheet's "เพิ่มเข้าอีเวนต์" (new event **or** an existing one).
+
+`POST /projects/:id/bills`
+
+```json
+{ "new_transaction": { "type": "expense", "amount": 120, "date": "2026-10-08", "account_id": "uuid",
+                       "category_id": "uuid", "note": "…", "splits": [ … ] },
+  "transaction_ids": ["uuid"] }
+```
+
+- Same pipeline as `POST /projects/quick` (now shared code): the new bill goes through the normal create path
+  (balance, split debts), then it and any listed loose bills become board parents + split children, and the
+  personal rows are linked back.
+- The caller must be an active, non-viewer member of a writable project (`403 FORBIDDEN_ROLE` / `NOT_MEMBER`,
+  `409`-family errors as quick create). The bill's actor is the caller's member row.
+- Split counterparties already in the project (same linked user, or same ad-hoc name) are reused; new ones are
+  added like quick create (`project_added` to linked users).
+- The new bill needs a wallet (as quick create). Response: `201`, same shape as quick create.
+- Both responses now carry `transaction_id` (the new bill) so the client can attach tags afterwards.
+
+## 14. Pending transactions (✅ implemented 2026-10-08)
+
+Drafts waiting to be confirmed (owner design; canvas "Pending transactions"). A draft is **not** a transaction:
+it never moves a balance and is in no report. Any field may be empty while it waits; the full transaction
+rules apply only on submit. Migration 000046 (`pending_transactions`).
+
+```json
+{ "id": "uuid", "source": "manual", "kind": "create",
+  "draft": { "type": "expense", "amount": 120, "account_id": "uuid", "category_id": "uuid",
+             "date": "2026-10-08", "note": "…", "transfer_to_account_id": null,
+             "tag_ids": ["uuid"], "splits": [ { "person_name": "Aom", "contact_id": null, "owed_amount": 40 } ] },
+  "target_debt_id": null, "target_transaction_id": null,
+  "source_ref": null, "last_error": { "code": "MISSING_TYPE", "message": "…" },
+  "created_at": "…", "updated_at": "…" }
+```
+
+| Endpoint | |
+|---|---|
+| `GET /pending-transactions` | `{ data: [...], count }`, newest first |
+| `POST /pending-transactions` | `{ items: [ { draft } ] }` (1–100) → `201 { data: [...] }`; manual drafts, all or nothing |
+| `PUT /pending-transactions/:id` | `{ draft }` replaces it and clears `last_error` |
+| `DELETE /pending-transactions/:id` | discard |
+| `POST /pending-transactions/submit` | `{ ids }` → `{ submitted: [ { id, transaction_id } ], failed: [ { id, error: { code, message } } ] }` |
+
+- Draft shape errors (bad type, negative amount, bad date) → `400 VALIDATION_ERROR`; missing fields are fine.
+- **Submit is per draft**: each runs in its own DB transaction (transaction + tags + removing the draft). A
+  failed one stays pending with `last_error`; the others go through. Codes: `MISSING_TYPE`, `MISSING_AMOUNT`,
+  `MISSING_DATE`, `ACCOUNT_NOT_FOUND`, `CATEGORY_NOT_FOUND`, `CATEGORY_TYPE_MISMATCH`, `TRANSFER_SAME_ACCOUNT`,
+  `TRANSFER_NEEDS_WALLETS`, `TRANSFER_CURRENCY_MISMATCH`, `SPLITS_ON_TRANSFER`, `CONTACT_NOT_FOUND`,
+  `TAG_NOT_FOUND`, `DEBT_NOT_FOUND`, `DEBT_ALREADY_SETTLED`, `OVERPAYMENT`, `TRANSACTION_NOT_FOUND`,
+  `NOT_FOUND`, `SUBMIT_FAILED` (with the server message).
+- `kind`: `create` (new transaction) · `settle_debt` (a payment on `target_debt_id`, same rules as settle) ·
+  `update_tx` (writes amount / date / note / category / wallet onto `target_transaction_id`). Only `create` can
+  be made through the API today; the others are for notifications later.
+- `source`: free text — `manual` now; `split_paid`, `project_copy`, `project_update`, `ocr`, `chat` later, with
+  `source_ref` for what to show ("Aom paid ฿300", a scanned slip…). No schema change needed to add one.
+
 ### Out of scope here (noted)
 
 - `currency` is hard-coded `"THB"` in transaction summary and debt `people` totals — revisit with multi-currency.
