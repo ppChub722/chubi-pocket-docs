@@ -55,7 +55,19 @@ sudo docker logs chubi_app | grep <request_id> # ตามรอย request เ�
 cd /srv/chubi && sudo docker compose restart app
 ```
 
-### Deploy โค้ด BE เวอร์ชันใหม่ (จากเครื่อง dev)
+### Deploy ทั้งหมดด้วยคำสั่งเดียว (ใช้อันนี้) — เพิ่ม 2026-10-08
+รันจาก **Git Bash** บนเครื่อง dev (ไม่ต้องเปิด Docker ในเครื่อง — image build บน VPS):
+```bash
+cd chubi-pocket-be
+./scripts/deploy.sh                       # BE + APK
+./scripts/deploy.sh --skip-apk            # BE อย่างเดียว
+./scripts/deploy.sh --skip-be -m "โน้ต"   # APK อย่างเดียว (หรือ chubi-pocket-app/scripts/release-apk.sh)
+```
+- BE: ส่งโค้ดที่ **commit แล้ว** (`git archive HEAD`) → build บน VPS → backup DB → migrate → สลับ image (เก็บตัวเดิมเป็น `chubi-be:prev`) → health check · health ไม่ผ่าน = ถอยกลับ image เดิมเอง (migration ไม่ถอย — ใช้ dump ที่เพิ่ง backup)
+- APK: build number = จำนวน commit ของ repo แอป (ขึ้นเองทุกครั้ง ไม่ต้องแก้ pubspec) → แจกกลุ่ม `firsttester`
+- ถอย BE ด้วยมือ: `sudo docker tag chubi-be:prev chubi-be:prod && cd /srv/chubi && sudo docker compose up -d app`
+
+### Deploy โค้ด BE เวอร์ชันใหม่ (ทำมือ — ใช้เมื่อ script ใช้ไม่ได้)
 ```powershell
 # 1. build + export (ที่เครื่องเรา ใน chubi-pocket-be)
 docker compose build app
