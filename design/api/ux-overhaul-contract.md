@@ -1,6 +1,6 @@
 # API contract — Phase 2 UX overhaul additions
 
-Status: **contract agreed, BE not implemented** (2026-10-06) — except §0, already shipped in code.
+Status: **§0–§11 implemented** (2026-10-08). §12 (Google sign-in) is still planned only.
 The app is pre-release (single user), so the FE is written against this contract **before** the BE lands;
 until then the affected UI hides itself or shows a placeholder.
 
@@ -13,17 +13,17 @@ envelope, money as JSON numbers, dates `YYYY-MM-DD`. "Additive" = existing clien
 | § | Area | Change | Kind | FE consumer |
 |---|---|---|---|---|
 | 0 | Personal debts / splits | contact ownership checks | ✅ **done** | — |
-| 1 | Transactions | `q` search + `tag_id` filter | additive | tx list search bar |
-| 2 | Transactions | summary groups split income/expense | additive | dashboard "by category" |
-| 3 | Accounts | bulk reorder | new | accounts reorder mode |
-| 4 | Dashboard | one aggregated endpoint | new | dashboard |
-| 5 | Notifications | per-type mute + automation flags honoured + split notifications sent | additive + behaviour | notification settings |
-| 6 | Projects | summary per-member / per-category, role fixes | additive + behaviour | project dashboard, members |
-| 7 | Personal debts | `people.icon_code`, direct settle w/o account, 400 not 500 | additive + fix | debts |
-| 8 | Contacts | search matches email / phone | behaviour | contacts list |
+| 1 | Transactions | `q` search + `tag_id` filter (+ `include_children`, `uncategorized`) | ✅ **done** | tx list search bar, dashboard drill-down |
+| 2 | Transactions | summary groups split income/expense + reportable-only fix | ✅ **done** | dashboard |
+| 3 | Accounts | bulk reorder (per member) | ✅ **done** | accounts reorder mode |
+| 4 | Dashboard | one aggregated endpoint | ✅ **done** | dashboard |
+| 5 | Notifications | per-type mute + automation flags honoured + split notifications sent | ✅ **done** | notification settings, inbox |
+| 6 | Projects | summary per-member / per-category, role fixes | ✅ **done** | project dashboard, members |
+| 7 | Personal debts | `people.icon_code`, direct settle w/o account, 400 not 500 | ✅ **done** | debts |
+| 8 | Contacts | search matches email / phone | ✅ **done** | contacts list |
 | 9 | Categories | delete always real; budgets cascade (✅ done) | behaviour + fix | category delete |
-| 10 | IconCode | `shape` field | additive | icon maker / every icon |
-| 11 | Notifications | dismiss vs actioned conflict → 409 | fix | inbox |
+| 10 | IconCode | `shape` field | ✅ **done** (unknown → dropped) | icon maker / every icon |
+| 11 | Notifications | dismiss vs actioned conflict → 409 | ✅ **done** | inbox |
 
 ---
 
@@ -50,16 +50,28 @@ envelope, money as JSON numbers, dates `YYYY-MM-DD`. "Additive" = existing clien
 
 Pagination/sort unchanged. FE debounces `q` by 300 ms.
 
-## 2. Transactions summary — typed groups
+## 2. Transactions summary — typed groups (✅ implemented 2026-10-07)
 
-`GET /transactions/summary?group_by=…` — each `groups[]` item gains:
+`GET /transactions/summary?group_by=…`: each `groups[]` item gains `income` and `expense`.
 
 ```json
 { "key": "…", "name": "Food", "total": 1240.0, "count": 9, "income": 0.0, "expense": 1240.0 }
 ```
 
-`total` keeps its current meaning for compatibility. New optional `type=expense|income` filters rows before
-grouping (dashboard "top spending categories" uses `group_by=category&type=expense`).
+- `total` keeps its current meaning for compatibility.
+- New optional `type=expense|income` filters rows before grouping. Any other value returns `400 VALIDATION_ERROR`.
+- New `group_by=parent_category` rolls subcategories up into their top-level parent. Categories are two levels
+  deep, so this gives one row per parent.
+- Uncategorized rows come back with key `""` and name `""` (previously `'(uncategorized)'`). The client
+  localises the label.
+
+Behaviour fixes shipped with this section. They apply to every summary and to budget spent:
+- **Reportable rows only.** Rows whose category has `include_in_report = false` are excluded: opening balance,
+  adjustments, transfers, debt received/paid. This is the same rule the per-account summary already used, now
+  shared as `shared.ReportableCategoryPredicate`. Previously a new wallet's opening balance showed up as this
+  month's income.
+- **Floating rows count.** `shared.ReportScopePredicate` now counts rows with `account_id IS NULL` for their
+  author. Previously no-wallet transactions were missing from every report and every budget.
 
 ## 3. Accounts — bulk reorder
 
@@ -69,35 +81,102 @@ grouping (dashboard "top spending categories" uses `group_by=category&type=expen
 { "items": [ { "id": "uuid", "sort_order": 0 }, { "id": "uuid", "sort_order": 1 } ] }
 ```
 
-- Applies all in one DB transaction. Only accounts the caller **owns**; any other id → `403 FORBIDDEN`,
-  nothing applied. Ids not listed keep their order.
-- `200` → `{ "data": [Account…] }` in the new order (same shape as `GET /accounts`).
+**Revised 2026-10-07 (owner decision): every member keeps their own order.**
+- The order lives per member, in `account_members.sort_order`, added by a migration that backfills it from
+  `accounts.sort_order`.
+- `GET /accounts` sorts by the caller's membership order.
+- Reordering never changes what other members of a shared wallet see.
+- `accounts.sort_order` stays for compatibility but is no longer read.
 
-## 4. Dashboard — aggregated
+Rules:
+- All changes are applied in one DB transaction.
+- `items` may contain any wallet the caller has an **active membership** in, whether owned or shared.
+- Any other id, including an unknown id, returns `403 FORBIDDEN` and nothing is applied.
+- A duplicate id returns `400 VALIDATION_ERROR`.
+- Ids that are not listed keep their order.
+- `200` returns `{ "data": [Account…] }` in the new order, in the same shape as `GET /accounts`.
+- CORS must allow `PATCH`. Today it doesn't, which also breaks web preflight for `/categories/reorder`.
 
-`GET /dashboard?period=week|month|year|all` (default `month`; timezone from `X-Timezone`)
+## 4. Dashboard — aggregated (✅ implemented 2026-10-07)
+
+Revised 2026-10-07 for the "see everything at a glance" dashboard (plan §8). It replaces the earlier
+`?period=` draft. There are no "safe to spend" or pace figures: the response is an overview, not alerts.
+
+`GET /dashboard?month=YYYY-MM`
+- `month` defaults to the current month.
+- Timezone comes from `X-Timezone`, then the user's preference, then `Asia/Bangkok`. This is the same rule
+  budgets use.
+- A malformed `month` returns `400 VALIDATION_ERROR`.
 
 ```json
 {
-  "period": { "key": "month", "from": "2026-10-01", "to": "2026-10-31" },
-  "net_worth": { "total": 1996618.0, "assets": 1999818.0, "liabilities": 3200.0, "accounts_count": 3 },
-  "summary": { "income": 3000.0, "expense": 12400.0, "net": -9400.0, "transaction_count": 41 },
-  "budgets": [ { "id": "uuid", "category_name": "Food", "amount": 6000.0, "spent": 4200.0,
-                 "utilization_pct": 70.0, "over_limit": false } ],
-  "upcoming": [ { "id": "uuid", "name": "Netflix", "type": "expense", "amount": 419.0,
-                  "next_billing_date": "2026-10-09", "days_until": 3 } ],
-  "debts": { "owed_to_me": 2000.0, "i_owe": 800.0, "net": 1200.0, "open_count": 4 },
-  "saving_goals": [ { "id": "uuid", "name": "Japan trip", "target_amount": 60000.0,
-                      "current_amount": 42000.0, "progress_pct": 70.0, "deadline": "2027-03-01" } ],
-  "top_categories": [ { "category_id": "uuid", "name": "Food", "icon_code": { }, "expense": 6200.0 } ],
-  "recent": [ Transaction… ],
-  "currency": "THB"
+  "month": "2026-10", "from": "2026-10-01", "to": "2026-10-31", "today": "2026-10-07", "currency": "THB",
+  "net_worth": { "total": 245000.0, "assets": 260000.0, "liabilities": 15000.0, "accounts_count": 4 },
+  "summary":  { "income": 32000.0, "expense": 18580.0, "net": 13420.0, "transaction_count": 41 },
+  "previous": { "income": 30000.0, "expense": 24000.0, "net": 6000.0, "transaction_count": 52 },
+  "top_categories": [ { "category_id": "uuid", "name": "Food", "icon_code": { }, "expense": 6200.0, "count": 23 } ],
+  "other_expense": 6880.0,
+  "trend": [ { "month": "2026-05", "income": 30000.0, "expense": 21000.0 } ],
+  "upcoming": {
+    "days": 14, "total_expense": 4850.0, "total_income": 32000.0,
+    "items": [ { "kind": "scheduled", "id": "uuid", "name": "Netflix", "type": "expense", "amount": 419.0,
+                 "due_date": "2026-10-05", "days_until": -2, "overdue": true,
+                 "icon_code": { }, "logo_url": "https://…" } ]
+  },
+  "budgets": { "count": 5, "total_budget": 20000.0, "total_spent": 12400.0, "utilization_pct": 62.0,
+               "over_limit_count": 1 },
+  "debts": { "owed_to_me": 5000.0, "i_owe": 2000.0, "net": 3000.0, "open_count": 4 },
+  "saving_goals": { "count": 2, "completed_count": 0, "total_target": 100000.0, "total_current": 48000.0,
+                    "progress_pct": 48.0 },
+  "recent": [ Transaction… ]
 }
 ```
 
-Limits: `budgets` top 3 active by utilisation · `upcoming` next 7 days, max 3 · `saving_goals` active, max 2,
-closest to completion · `top_categories` max 5 · `recent` max 5 (same shape as `GET /transactions` rows).
-Empty sections are `[]` / zeroed objects, never omitted. Until this ships the FE calls the individual endpoints.
+**These follow `month`:**
+
+| Field | Contents |
+|---|---|
+| `summary` | Totals for the selected month. |
+| `previous` | Totals for the month before it. |
+| `top_categories` + `other_expense` | Expense rolled up to parent categories. The top 4 are listed and the rest is summed into `other_expense`. `category_id` is `null` for uncategorized rows. |
+| `trend` | 6 points ending at `month`, zero-filled. |
+
+All money in these fields comes from `/transactions/summary`, so the report-scope and reportable-row rules in
+§2 apply.
+
+**These are a snapshot of right now:**
+
+`net_worth`
+- Covers active wallets whose `my_report_scope` is not `none`.
+- Positive balances count as assets. Negative balances (cards, overdrafts) count as liabilities.
+
+`upcoming` uses a 14-day window from `today`, sorted by `due_date`, with at most 10 items.
+- `scheduled` items:
+  - Active scheduled transactions due on or before `today + 14`.
+  - Overdue ones are included with `overdue: true` and a negative `days_until`. Nothing auto-generates
+    scheduled rows yet, so a past date means the transaction was never recorded.
+- `card_due` items:
+  - Credit-card and pay-later wallets that have a `payment_due_date` and an outstanding balance.
+  - The date is the next occurrence of that day of the month, clamped to the month's length.
+  - `amount` is the outstanding balance and `id` is the account id.
+  - A card is never marked overdue.
+
+`budgets`
+- Covers every active personal budget, each measured over its own current period (weekly, monthly or yearly).
+- Values come from `/budgets/overview`.
+
+`debts`
+- Values come from `/personal-debts/people`.
+- `open_count` is the sum of each person's `open_count`.
+
+`saving_goals`
+- Covers active goals.
+- `progress_pct` is the sum of each goal's current amount (capped at its target) divided by the sum of targets.
+
+`recent`
+- The 5 newest transactions, in the same shape as rows from `GET /transactions`.
+
+Empty sections are `[]` or zeroed objects, never omitted.
 
 ## 5. Notifications — preferences
 
@@ -119,6 +198,29 @@ Behaviour (no API change):
   the split / payment / project flows. Today nothing reads them.
 - `split_created`, `split_paid`, `split_received` must be dispatched (types + payloads exist, no caller).
 - `PUT` must allow clearing `default_account_id` with explicit `null`.
+
+**Owner decisions (2026-10-07):**
+
+`auto_add_to_personal_debt_on_split_notification`
+- The default becomes **TRUE**. A migration flips the column default and existing rows, so today's
+  behaviour, where the partner's mirror debt is always created, stays the same for everyone.
+- When the recipient turns it off:
+  - No mirror debt is created.
+  - Their `split_created` notification becomes actionable: an "add to my debts" action creates the mirror
+    debt.
+
+`auto_resolve_own_in_projects`
+- When on, recording a project transaction where the caller is the actor also creates the caller's personal
+  transaction, in the same DB transaction, with `source_project_transaction_id` set.
+- That personal transaction is always a **floating (no-wallet) row**: `account_id = NULL`. The user can move it
+  to a wallet later.
+- Its category is matched by name against the caller's own categories of the same type. With no match, it has
+  no category.
+
+**Debt links:**
+- Mirror debts get linked through a new column, `personal_debts.counterpart_debt_id`. A migration adds it and
+  backfills it best-effort from the source transaction and the linked users.
+- `split_paid`, `split_received` and auto-record follow this link.
 
 ## 6. Projects
 
@@ -165,7 +267,11 @@ Owner rule: deleting a category is always a hard delete — no archive.
 - `GET /categories/:id` adds `budget_count` (alongside `transaction_count`) so the client confirm can say what's affected.
 - **Removed:** `POST /categories/:id/restore`, `DELETE /categories/:id/permanent`. Migration 000043 purged rows archived under the old rule (children moved up first).
 
-## 10. IconCode — shape
+## 10. IconCode — shape (✅ implemented — unknown shapes dropped, not rejected)
+
+> Owner decision 2026-10-07: an unknown `shape` is **silently dropped** (renders as `circle`) instead of `400`,
+> so mismatched app/BE versions never fail a save. Pinned by `TestIconCodeUnknownShapeDropped`. The bullet
+> below about `400` is superseded.
 
 `icon_code` (JSONB on every icon-bearing entity) gains an optional field:
 
