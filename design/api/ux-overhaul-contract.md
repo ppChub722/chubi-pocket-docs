@@ -178,49 +178,56 @@ All money in these fields comes from `/transactions/summary`, so the report-scop
 
 Empty sections are `[]` or zeroed objects, never omitted.
 
-## 5. Notifications — preferences
+## 5. Notifications — per-type receive + auto (✅ implemented, revised 2026-10-08)
 
-`GET /notifications/settings` / `PUT /notifications/settings` — new field:
+**Principle (owner):** the app is each user's own ledger. A notification tells you something happened in someone
+else's book and offers a one-tap action that records it in yours. Nothing is synced or enforced between books:
+if the other side deletes or never records, that's their book. No action-less "acknowledgement" notices.
+
+**Settings** — `GET/PUT /notifications/settings`:
 
 ```json
-{ "muted_types": ["project_tx_changed"] }
+{ "user_id": "uuid",
+  "muted_types": ["project_added"],
+  "auto_types": ["split_created", "split_paid"],
+  "default_account_id": "uuid | null",
+  "auto_resolve_own_in_projects": false }
 ```
 
-- Allowed values = notification `type` values. Unknown value → `400 VALIDATION_ERROR`.
-- PUT replaces the whole array when present (send `[]` to unmute all); absent = unchanged.
-- Dispatcher skips creating a notification whose type is in the recipient's `muted_types`.
-- `account_invite`, `project_invite`, `contact_link_request` **cannot** be muted (they need an action) →
-  `400 TYPE_NOT_MUTABLE`.
+- The recipient decides everything; the sender has no switch (`auto_notify_linked_split_contacts`,
+  `auto_add_…`, `auto_record_…` columns are gone — migration 000045 folds them into `auto_types`).
+- `muted_types`: not delivered. A muted type also **ignores** its `auto_types` entry (nothing happens at all);
+  the auto choice is kept for when it's unmuted. Mutable: `split_created`, `split_paid`,
+  `project_tx_recorded_for_you`, `project_tx_changed`, `project_added`.
+- `auto_types`: run the notification's action on arrival; the row is inserted already actioned ("ทำแล้ว").
+  Allowed: `split_created`, `split_paid`, `project_tx_recorded_for_you`, `project_tx_changed`.
+  Default `["split_created"]` (keeps today's auto-mirror).
+- Invites / link requests (`account_invite`, `project_invite`, `contact_link_request`) can't be muted or automated
+  → `400 TYPE_NOT_MUTABLE`. Unknown type → `400 VALIDATION_ERROR`.
+- `default_account_id`: wallet for the `split_paid` auto-action; must be an active wallet you're a member of
+  (`400 VALIDATION_ERROR`); explicit `null` clears it = record without a wallet.
+- `auto_resolve_own_in_projects`: not a notification (I recorded it) — a project row where I'm the actor also
+  gets my personal copy.
+- Each list replaces the stored one when present.
 
-Behaviour (no API change):
-- The four automation flags (`auto_notify_linked_split_contacts`, `auto_add_to_personal_debt_on_split_notification`,
-  `auto_record_received_payment` + `default_account_id`, `auto_resolve_own_in_projects`) must actually drive
-  the split / payment / project flows. Today nothing reads them.
-- `split_created`, `split_paid`, `split_received` must be dispatched (types + payloads exist, no caller).
-- `PUT` must allow clearing `default_account_id` with explicit `null`.
+**Types and their action:**
 
-**Owner decisions (2026-10-07):**
+| Type | Sent to · when | Action (button / auto) | Payload extras |
+|---|---|---|---|
+| `split_created` | linked partner · a split is saved | "เพิ่มเข้าหนี้ของฉัน" → `POST /personal-debts/split-requests/:notification_id/accept` (creates + links the mirror debt) | `recipient_debt_id` (set when auto ran) |
+| `split_paid` | creditor · the debtor settles their side of a linked pair, **only while the creditor's side is still open** | "บันทึกรับเงิน" → normal settle of `recipient_debt_id` (prefilled `amount`); auto records income into `default_account_id` or floating | `recipient_debt_id`, `recorded_transaction_id` (auto) |
+| `project_tx_recorded_for_you` | the row's actor · someone else recorded it | "บันทึกเข้าบัญชีส่วนตัว" → `POST /projects/:id/project-transactions/:pt_id/copy` | `personal_transaction_id` (auto) |
+| `project_tx_changed` | members on the row · edited / deleted | edited + I have a personal copy: "อัปเดตตาม" → `PUT /transactions/:personal_transaction_id` with `suggested` | `personal_transaction_id`, `suggested{amount,date,note}` |
+| `project_added` | added member | — (informational) | — |
 
-`auto_add_to_personal_debt_on_split_notification`
-- The default becomes **TRUE**. A migration flips the column default and existing rows, so today's
-  behaviour, where the partner's mirror debt is always created, stays the same for everyone.
-- When the recipient turns it off:
-  - No mirror debt is created.
-  - Their `split_created` notification becomes actionable: an "add to my debts" action creates the mirror
-    debt.
-
-`auto_resolve_own_in_projects`
-- When on, recording a project transaction where the caller is the actor also creates the caller's personal
-  transaction, in the same DB transaction, with `source_project_transaction_id` set.
-- That personal transaction is always a **floating (no-wallet) row**: `account_id = NULL`. The user can move it
-  to a wallet later.
-- Its category is matched by name against the caller's own categories of the same type. With no match, it has
-  no category.
-
-**Debt links:**
-- Mirror debts get linked through a new column, `personal_debts.counterpart_debt_id`. A migration adds it and
-  backfills it best-effort from the source transaction and the linked users.
-- `split_paid`, `split_received` and auto-record follow this link.
+- `split_received` is **retired** (no longer sent). Creditor recording a receipt sends nothing.
+- "Skip" on an action = `POST /notifications/:id/dismiss`; the FE marks the row actioned after the button's call.
+- Linked pairs: `personal_debts.counterpart_debt_id` (migration 000045, best-effort backfill — each row paired
+  at most once).
+- Personal copies of project rows are always floating (no wallet), category matched by name. Amount basis: the
+  actor copies the full amount, a split member their share. `suggested.amount` keeps the copy's basis (full →
+  new full, share → new share); a copy edited to another amount keeps its amount.
+- Deep links: split types → `/personal-debts/:recipient_debt_id` (or `/personal-debts`).
 
 ## 6. Projects
 
@@ -246,8 +253,9 @@ Behaviour (no API change):
 ## 7. Personal debts
 
 - `GET /personal-debts/people` rows add `icon_code` (the contact's, `null` for free-text names).
-- `POST /personal-debts/:id/settle?direct=true` → `account_id` **optional** (ignored). Still required when
-  `direct` is false/absent (`400 VALIDATION_ERROR`).
+- `POST /personal-debts/:id/settle` **always records a transaction** (revised 2026-10-08): `account_id` optional —
+  omitted / null = a floating (no-wallet) row; income for owed_to_me, expense for i_owe. `?direct=true` is gone
+  (ignored); write-offs use cancel. A settle of my `i_owe` side of a linked pair sends `split_paid` (§5).
 - `PUT /personal-debts/:id` with `settled_amount > amount` (resulting) → `400 INVALID_SETTLED_AMOUNT`
   (today the DB CHECK raises a 500).
 - `PUT` allows clearing `note` and `counterparty_contact_id` with explicit `null`.
