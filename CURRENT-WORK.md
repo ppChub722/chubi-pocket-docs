@@ -12,7 +12,9 @@
 
 ---
 
-## 2026-10-10 — 0.3.2 FE: เลขบัญชีในหน้ากระเป๋า · สวิตช์หมวดค่าธรรมเนียม (ยังไม่ commit)
+## 2026-10-10 — 0.3.1.1 (FE): เลขบัญชีในหน้ากระเป๋า · สวิตช์หมวดค่าธรรมเนียม — ปล่อยแล้ว
+
+> **ปล่อยแล้ว:** owner commit รวมกับงาน nav แท็บต่อหน้าของ session "ราก" เป็น app `6e0fd5a` · tag `v0.3.1.1` (app) · APK **0.3.1 build 41** ส่ง Firebase `firsttester` (owner เลือกคงชื่อ 0.3.1 + build ใหม่ — Flutter ไม่รับเลข 4 ส่วน `0.3.1.1`) · BE ไม่ได้ deploy (ไม่มีอะไรเปลี่ยน) · ก่อนปล่อย: analyze ผ่าน · test 91 ผ่าน (รวม `main_shell_test`)
 
 > session `chubi-pocket-5f` (ต่อจากเจ้าของ 0.3.1) · FE checklist ข้อ 10 ใน entry (5) · app analyze ผ่าน · test ใหม่ 8 ผ่าน · test ทั้งชุด: ล้ม 1 ตัวใน `test/app/shell/main_shell_test.dart` (ไฟล์ของ session nav/แอนิเมชันที่กำลังแก้อยู่ — ตัวที่ล้มเปลี่ยนไประหว่างรัน 2 รอบ ไม่ใช่ของงานนี้) · **ยังไม่ได้รันบนโทรศัพท์** (owner รันเอง) · ทำงานคู่กับงาน nav ของ session "ราก" ใน working tree เดียวกัน — แตะ `account_detail_page.dart` / `category_detail_page.dart` แบบเพิ่มเท่านั้น
 
