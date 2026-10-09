@@ -12,6 +12,36 @@
 
 ---
 
+## 2026-10-10 — 0.3.2 FE: เลขบัญชีในหน้ากระเป๋า · สวิตช์หมวดค่าธรรมเนียม (ยังไม่ commit)
+
+> session `chubi-pocket-5f` (ต่อจากเจ้าของ 0.3.1) · FE checklist ข้อ 10 ใน entry (5) · app analyze ผ่าน · test ใหม่ 8 ผ่าน · test ทั้งชุด: ล้ม 1 ตัวใน `test/app/shell/main_shell_test.dart` (ไฟล์ของ session nav/แอนิเมชันที่กำลังแก้อยู่ — ตัวที่ล้มเปลี่ยนไประหว่างรัน 2 รอบ ไม่ใช่ของงานนี้) · **ยังไม่ได้รันบนโทรศัพท์** (owner รันเอง) · ทำงานคู่กับงาน nav ของ session "ราก" ใน working tree เดียวกัน — แตะ `account_detail_page.dart` / `category_detail_page.dart` แบบเพิ่มเท่านั้น
+
+### หน้ากระเป๋า — ส่วน "เลขบัญชี · พร้อมเพย์ · บัตร" (แท็บภาพรวม ต่อจาก `_infoSection`)
+- model `AccountIdentifier` (`accounts/domain/account_identifier.dart`): kind 4 แบบ · normalize เหมือน BE · `formatted` (บัญชี 10 หลัก `123-4-52780-6`, เบอร์, เลขบัตร ปชช., บัตร 4-4-4-4) · `masked` = `•••• 2780`
+- `Account.identifiers` · สร้าง = ส่งเมื่อมี · แก้ = ส่งทั้งรายการเสมอ (BE แทนที่) — `_save` ส่งจาก draft ทั้งสองทาง
+- โหมดดู: รายการ + **👁 ตัวเดียวกับเงิน** (`MoneyVisibilityToggle`/`isMoneyHidden`) ซ่อน = `•••• 2780` · ว่าง = แถว "ยังไม่มีเลข" แตะเพื่อเข้าโหมดแก้ · คนที่ไม่ใช่เจ้าของเห็นเฉพาะเมื่อมีเลข
+- โหมดแก้ / สร้าง: แตะแถว = แก้ · × = ลบ · `AddTile` = เพิ่ม → sheet (`widgets/identifier_widgets.dart`): เลือกชนิด (การ์ด 4) · **ธนาคาร** (เฉพาะเลขบัญชี; จาก `GET /v1/payment-providers` + "ไม่ระบุ") · ช่องเลข (ตัวเลข/x/ขีด, ≥4 หลัก, ≤32)
+- `AccountsRepository.paymentProviders()` cache ครั้งเดียวต่อรันแอป · `INVALID_IDENTIFIER` → `walletErrorInvalidIdentifier` · `AppIcons.accountNumber` ใหม่ (ชนิด "อื่น ๆ")
+- widget อยู่ใน feature (ไม่ใช่ shared) จึงไม่ได้ใส่ gallery
+
+### หน้าแก้ไขหมวด — สวิตช์ "ใช้เป็นหมวดค่าธรรมเนียม"
+- เฉพาะหมวด**รายจ่าย**ที่บันทึกแล้ว · มีผลทันที (preference ไม่ใช่ field ของหมวด) · เปิด = `PUT /users/me {preferences:{fee_category_id}}` · ปิด = `null` · ทีละหมวด
+- `User.feeCategoryId` (อ่านจาก `preferences`) · `UsersRepository.getMe()` / `setFeeCategory()` · หน้าโหลด `GET /users/me` ตอนเปิด (login ไม่ส่ง preferences) แล้ว `AuthCubit.updateUser`
+
+### l10n ใหม่
+`accountIdentifiers*` · `identifierKind*` · `identifierSheet*` · `identifierBank*` · `identifierValue*` · `identifierDelete` · `walletErrorInvalidIdentifier` · `categoryFeeSwitch*`
+
+### owner ทดสอบ
+1. กระเป๋า → แก้ไข → เพิ่มเลข (เลขบัญชี + ธนาคาร / พร้อมเพย์ / บัตร) → บันทึก → 👁 ซ่อน/แสดง
+2. หมวดรายจ่าย → เปิดสวิตช์ค่าธรรมเนียม → เปิดอีกหมวด → หมวดแรกต้องปิดเอง
+3. Imports lab ลองสลิป: กระเป๋าที่ใส่เลขแล้วต้องถูกเลือกใน JSON (`account_id`)
+
+### ค้าง
+- (ไม่บังคับ) Imports lab แสดงชื่อกระเป๋าแทน `account_id`
+- 0.3.2 ส่วนหลัก: ข้อความอิสระ → LLM → JSON
+
+---
+
 ## 2026-10-09 (9) — ปล่อย 0.3.1 (release owner = session `chubi-pocket-32`)
 
 > owner สั่งขึ้น 0.3.1 ก่อนเลิกงาน · session `0b` / `0d` หยุดแล้วตอน commit · app analyze ผ่าน · test 72 ผ่าน · BE vet/test ผ่าน · **owner ทดสอบบนแอปที่ชี้ VPS ต่อ**
