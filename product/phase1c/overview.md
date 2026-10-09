@@ -118,7 +118,7 @@ WHERE `status='active'`.
 - `POST /v1/budgets` — create; rejects income/system categories; project-owner-only for project-scope
 - `GET /v1/budgets` — list with computed `current_period`, `child_breakdown`
 - `GET /v1/budgets/:id`
-- `PUT /v1/budgets/:id` — partial; `category_id` / `scope` / `project_id` not editable
+- `PUT /v1/budgets/:id` — partial; `scope` / `project_id` not editable (`category_id` became editable 2026-10-09, see spec 08 §3.4)
 - `DELETE /v1/budgets/:id`
 - `POST /v1/budgets/:id/archive` / `restore`
 - `GET /v1/budgets/overview` — aggregate across active budgets for a period/scope

@@ -203,12 +203,14 @@ Get a single budget with full current-period breakdown (same shape as list item)
 
 Update budget fields. Partial.
 
-**Editable:** `amount`, `period`, `currency`, `status`.
-**Not editable:** `category_id`, `scope`, `project_id` (delete + recreate if wrong).
+**Editable:** `category_id`, `amount`, `period`, `currency`, `description`, `note`, `status`.
+**Not editable:** `scope`, `project_id` (delete + recreate if wrong).
+
+Changing `category_id` (owner decision 2026-10-09): must be an expense-typed, non-system category owned by the budget's user (same rule as create, else `400 INVALID_CATEGORY`). Spent is computed live from transactions, so the new anchor's figures apply immediately; nothing is migrated.
 
 Changing `period` mid-cycle: the current period is recomputed against the new period boundaries immediately.
 
-**Errors:** `400 VALIDATION_ERROR`, `400 DUPLICATE_BUDGET`, `401`, `403`, `404`.
+**Errors:** `400 VALIDATION_ERROR`, `400 INVALID_CATEGORY`, `400 DUPLICATE_BUDGET` (category / period change collides with another active budget), `401`, `403`, `404`.
 
 ### 3.5 `DELETE /v1/budgets/:id`
 
