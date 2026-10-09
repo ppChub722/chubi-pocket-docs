@@ -84,6 +84,7 @@ Create a new account. If a non-zero opening balance is given, an "Opening Balanc
 | `statement_date` | integer | — | 1–31 |
 | `payment_due_date` | integer | — | 1–31 |
 | `minimum_payment` | number | — | ≥ 0 |
+| `identifiers` | array | — | 0.3.1 — `[{kind, value, bank_code?}]`, the numbers this wallet is known by on bank slips ([spec 15 §5](15-slip-import.md)). `kind`: `bank_account` · `promptpay` · `card` · `other`. `value`: digits, `x` for hidden ones, separators dropped (`123-4-52780-6` → `1234527806`, `xxx-x-x2780-x` → `xxxxx2780x`), ≥ 4 digits, ≤ 32 chars. `bank_code`: 3 digits. Identical entries collapse; ≤ 10. On update: present → replaces the list (`[]` clears), absent → unchanged. Owner only. Bad entry → `400 INVALID_IDENTIFIER`. |
 
 **Backend flow:**
 
@@ -301,6 +302,23 @@ Balance summary and income/expense totals for an account over a date range.
 - Any user category the user has explicitly toggled off
 
 The flag is the single rule the FE relies on; transfers no longer have special-case handling here. See [`05-categories-tags.md §4.14c`](05-categories-tags.md) for the seed defaults and rationale.
+
+### 2.8 `POST /v1/accounts/:id/identifiers` (0.3.1)
+
+Appends **one** identifier — the pending page's "จำเลขนี้ไว้กับกระเป๋านี้"
+([spec 15 §8](15-slip-import.md)). Same rules as the `identifiers` field
+(§2.1); an identical entry isn't added twice. Owner only.
+
+```json
+{ "kind": "other", "value": "xxx-x-x2780-x", "bank_code": "004" }
+```
+
+`200` → the whole account (with `identifiers`). `400 INVALID_IDENTIFIER` ·
+`404 NOT_FOUND` (not the owner, or no such wallet).
+
+Every account response carries `identifiers` (always an array). Slip
+import matches a slip's masked numbers against them to pick the wallet
+and the draft's direction — see [spec 15 §5](15-slip-import.md).
 
 ---
 

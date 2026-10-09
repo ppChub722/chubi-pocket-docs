@@ -130,6 +130,19 @@ sudo docker system prune -f     # เคลียร์ขยะ docker (backup.
 sudo docker exec -it shared_postgres psql -U postgres -d chubi_pocket
 ```
 
+### เปิดดู import logs (นำเข้าสลิป — ไม่มี cron, เปิดดูตามรอบเอง)
+ระบบเขียนทันทีที่เจอ: `unknown_provider` (รหัสธนาคารจาก QR ไม่มีใน `payment_providers` → เพิ่มด้วย migration) · `unsupported_bank` (รู้จักธนาคาร แต่ยังไม่มีกฎอ่านสลิป) · `incomplete` (อ่านยอด/วันที่ไม่ได้) · ไม่มีข้อความ/รูปสลิปในตารางนี้ ([spec 15 §11](../design/spec/15-slip-import.md))
+```bash
+# สรุปตามชนิด + รหัส (กี่ครั้ง · กี่คน · ล่าสุด)
+sudo docker exec shared_postgres psql -U postgres -d chubi_pocket -c "
+  SELECT kind, scheme, code, count(*) AS times, count(DISTINCT user_id) AS users, max(created_at) AS last
+  FROM import_logs GROUP BY 1,2,3 ORDER BY last DESC;"
+# รายการล่าสุดพร้อมผู้ใช้
+sudo docker exec shared_postgres psql -U postgres -d chubi_pocket -c "
+  SELECT l.created_at, l.kind, l.code, l.trans_ref, l.details, u.username, u.email
+  FROM import_logs l JOIN users u ON u.id = l.user_id ORDER BY l.created_at DESC LIMIT 30;"
+```
+
 ---
 
 ## 4. เพิ่มแอป/โปรเจกต์ใหม่ลงเครื่องนี้ (สูตรตายตัว)

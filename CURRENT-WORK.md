@@ -12,6 +12,239 @@
 
 ---
 
+## 2026-10-09 (9) — ปล่อย 0.3.1 (release owner = session `chubi-pocket-32`)
+
+> owner สั่งขึ้น 0.3.1 ก่อนเลิกงาน · session `0b` / `0d` หยุดแล้วตอน commit · app analyze ผ่าน · test 72 ผ่าน · BE vet/test ผ่าน · **owner ทดสอบบนแอปที่ชี้ VPS ต่อ**
+
+### commit
+- **be:** `7bab423` identifiers + fee category (mig 48) · `0d02d25` payment providers + import logs (mig 49–50) · `6c1668f` อ่านสลิป → JSON (Tesseract ใน Docker, กฎ KBank, จับคู่กระเป๋า)
+- **app:** `d088a57` slip lab + QR บนเครื่อง (entry 5) · `0747046` UX polish ทั้งหมดของ `0b`/`0d` (entry 6–8) — รวมเป็น commit เดียว เพราะไฟล์ทับกันเยอะ (+ `dart format` ทั้งแอป) แยกตามหัวข้อไม่ได้โดยไม่ใช้ interactive add · `cb61ac4` version 0.3.1
+- **docs:** spec 15 + schema + spec 03 + ops-runbook + log นี้
+
+### deploy
+- `be/scripts/deploy.sh` (BE + APK) ✅ · **BE** commit `6c1668f` live · backup `chubi_pocket-20261009-1043.dump.gz` · migration 48/49/50 ผ่าน · health ✓ · route ใหม่ตอบ 401 (มีจริง) · **APK** 0.3.1 build 40 (`cb61ac4`) ส่ง Firebase `firsttester` แล้ว
+- ยังไม่ได้ยืนยัน: tesseract ทำงานบน VPS (ลองสลิปจริงใน lab — ถ้าได้ 503 `OCR_UNAVAILABLE` = image ไม่มี tesseract)
+- ไม่มีบน prod: OCR dump (`OCR_DUMP` ไม่ได้ตั้ง + `APP_ENV=production`)
+
+### owner ทดสอบบนแอป (APK ชี้ VPS)
+1. ทุกอย่างใน entry 6–8 (top/bottom bar, ปัดแท็บ, back ปิด sheet, เหรียญ pull to refresh, หน้ากระเป๋าแท็บ, แท็ก, ผู้ติดต่อ, หมวดหมู่, เปิดแอปตอนเน็ตหลุด)
+2. Dev hub → Imports lab → Real slip → OCR กับสลิปจริง — **ดูเวลา OCR บน VPS** (บน PC ~2–3 s)
+3. log ฝั่ง prod: `sudo docker logs chubi_app | grep imports` · import logs: ops-runbook §3
+
+### ถัดไป
+- 0.3.2: FE checklist ข้อ 10 ใน entry 5 (identifiers ในหน้ากระเป๋า + สวิตช์หมวดค่าธรรมเนียม) + free text → LLM → JSON
+- เศษ 0.3.0 ที่ยังค้าง: entry 8 ข้อ 3 · entry 7 ข้อ 3–4
+
+---
+
+## 2026-10-09 (8) — เก็บเศษ 0.3.0 (ขึ้น 0.3.1): top bar/bottom bar motion · pull to refresh เหรียญ · หน้ากระเป๋าแบ่งแท็บ · บั๊ก token/จอแดง (ยังไม่ commit)
+
+> session `0b` = คนเก็บเศษ 0.3.0 (owner 0.3.1 เป็นอีก session) · app analyze ผ่าน · test 58+ ผ่าน · `dart format` ทั้งแอปแล้ว (owner อนุญาต) · **รันบนโทรศัพท์บางส่วน** (owner รันเอง)
+> **ถึง owner 0.3.1 (checklist 10-B):** `account_detail_page.dart` เปลี่ยนโครงแล้ว — การ์ดหัว (ชื่อ+คำอธิบายแก้ในการ์ด) ค้างด้านบน · ใต้ลงมาเป็นแท็บ **ภาพรวม | รายการ** (`PageView`) · ส่วนเลขบัญชีให้ใส่ใน `_overview()` (แท็บภาพรวม, ต่อจาก `_infoSection`) · แถวคำอธิบายย้ายขึ้นการ์ดหัวแล้ว · รายการล่าสุด 5 อันเอาออก (มีแท็บรายการแทน)
+
+### 1. เครื่องมือ
+- `app/run-phone.sh` — รันบนมือถือผ่านสาย: `./run-phone.sh` (API prod) · `local` (เปิด docker BE ให้ + `adb reverse`) · `attach` (แอปปิดแล้วต่อกลับไม่ต้อง build) · debug/profile manifest เปิด `usesCleartextTraffic` (release ยัง https)
+
+### 2. บั๊ก
+- จอแดงหน้ากระเป๋า: `context.select` ผิด context — ที่หน้ากระเป๋า + `isMoneyHidden`/`moneyString` (ใช้ `watch` แทน แก้ทั้งแอป)
+- **เปิดแอปตอนเน็ตหลุด → token ถูกลบ ต้อง login ใหม่:** `AuthCubit.init` ลบ token เฉพาะ 401/403 · อื่น ๆ เก็บ token + splash โชว์ `ErrorView` + ลองใหม่ (`AuthInitial.startupError`) · test 3 เคส
+- ดึงรีเฟรชหน้าว่าง → skeleton แวบเต็มจอ: `AsyncStateView` โชว์ skeleton เฉพาะโหลดครั้งแรก
+- หน้ากระเป๋าเคย `TransactionsCubit.load(accountId)` บน cubit กลาง → แท็บรายการหลักถูกกรองตามไปด้วย · ตอนนี้แท็บรายการของกระเป๋าใช้ cubit ของตัวเอง
+- เปิดรายการจาก list ที่ใช้ cubit แยก → "ไม่พบ": detail ดึงแถวเองด้วย `TransactionsCubit.refreshOne(id)` ใหม่
+
+### 3. Bottom bar
+- ทุกแท็บ = ไอคอน 28 + ชื่อ 10pt ข้างใต้ · ไฮไลต์ก้อนเดียว**เลื่อน**ไปแท็บที่เลือก (ลอดใต้ +) · แถบโค้ง 30 / ไฮไลต์ 24 / เว้น 6 · ไม่มี ripple
+
+### 4. Top bar (กติกาใหม่ owner)
+- **ไม่ขยับตอน push/back** — ซ้ายและขวาเป็น `Hero` · ฝั่งซ้าย cross-fade (ชื่อ, breadcrumb, ← / ✕ / ไม่มี)
+- **ชิปขวา ⏳🔔👤 ลอยขึ้นพ้นจอ** ในหน้าที่ไม่มีชิป (ตั้งค่า, แจ้งเตือน, รอยืนยัน) **และใน edit mode** (เปลี่ยนจากกติกาเดิมที่ชิปค้างใน edit mode)
+- หน้าเพิ่มเติม (ไม่มีกล่องซ้าย): กล่องซ้ายลอยขึ้น/ลง ทั้งตอน push/back และตอนสลับแท็บ (shell จำว่าแต่ละแท็บโชว์อะไร — `TabSwitchScope`)
+- ทุกการเคลื่อนไหวผ่าน `_ParkingHero` ตัวเดียว · `AppDurations.chrome` 450ms + `chromeCurve` (= page transition Android + Hero) · สลับแท็บ: เนื้อหา fade ใต้ top bar (`TabSwitchBody`), top bar นิ่ง · แท็บที่ซ่อน `HeroMode(false)`
+
+### 5. Pull to refresh
+- หน้าตาใหม่ **เหรียญ ฿ หย่อนลงกระเป๋า** (`PullToRefresh` บน `RefreshIndicator.noSpinner`, `CoinDropIndicator`) · gallery มี
+- `AsyncStateView`: หน้าว่าง / error / ไม่พบ ดึงรีเฟรชได้เอง (ผ่าน `onRetry`) · `PullToRefresh(enabled:)`
+- เพิ่มที่ detail: งบ · หมวด · ผู้ติดต่อ · หนี้ · เป้าออม · รายการประจำ · รายการ (ปิดตอนสร้าง; ผู้ติดต่อ/หนี้ปิดตอนแก้)
+
+### 6. หน้า detail กระเป๋า
+- การ์ดหัว: ชื่อ + คำอธิบาย (ใหญ่ขึ้น แก้ตรงนี้) ข้างไอคอน · [ปรับยอด] ข้าง ✏️ · ประเภท = chip สีกระเป๋า · edit mode ซ่อนสรุป · บันทึกว่าง = บรรทัดเดียว
+- แท็บ **ภาพรวม | รายการ** ปัด/แตะ · การ์ดหัวค้าง · edit mode ล็อกภาพรวม · แท็บรายการ = `TransactionsListPage(embedded:, lockedAccount:)` (ค้นหา/กรอง/โหลดเพิ่ม, ซ่อนตัวกรองกระเป๋า, `AddTile` ท้ายรายการ preset กระเป๋านี้)
+- `showQuickCreateSheet(account:)` ใหม่ — preset กระเป๋า
+
+### 7. Shared widget ที่เปลี่ยน
+- `SelectCardGroup`: ที่เลือก = ไอคอนในวงทึบ + ✓ มุม + เงาสี (ทุกที่ที่ใช้)
+- `InlineField`: ว่าง = บรรทัดเดียว (`minLines: 1`) · `InlineTitleField(style:, maxLines:)`
+
+### ค้าง / ต่อไป
+1. owner: ทดสอบบนโทรศัพท์ทั้งหมดข้างบน · offline start (ปิดเน็ต → ปิดแอปจริง → เปิด)
+2. ~~ปัดแท็บมี 2 แบบ~~ ✅ owner เลือกแบบกระเป๋า (ตามนิ้ว) → **`AppTabPager<T>`** ใหม่ใน `app_tab_bar.dart` (PageView + keep-alive · แตะแท็บ 320ms `easeInOutCubic` ช้า-เร็ว-ช้า · ปล่อยนิ้ว spring แข็งขึ้น · `enabled:false` หยุดด้วย physics ไม่เปลี่ยน tree) · `AppTabBar(pager:)` เส้นใต้ตามตำแหน่งหน้า (ตามนิ้วด้วย) · ใช้ที่กระเป๋า + หมวดหมู่ (หมวดหมู่: `ScrollController` แยกต่อแท็บ, auto-scroll ใช้ของแท็บที่เลือก, เปลี่ยนแท็บผ่าน `_setListType`) · **ลบ `AppTabSwipe`** (entry 7) · gallery + `test/shared/app_tab_bar_test.dart` เปลี่ยนเป็น pager
+3. ~~เศษ 0.3.0 ที่เหลือ (A1–A6 + docs)~~ ✅
+   - **A1** shared ใหม่ `showActionSheet` + `ActionSheetHeader` + `SheetAction` (`sheets/action_sheet.dart`) — sheet จัดการสมาชิกโปรเจกต์ + sheet แตะแถวรายการโปรเจกต์ (เดิมต่อ `ListTile` เอง)
+   - **A2** detail รายการประจำ: ข้อมูล / สร้างตอนนี้ / ประวัติ → `SectionCard` + `DetailRow` (เลิก `Card` + แถวทำเอง)
+   - **A3** shared ใหม่ `showChoiceDialog` + `DialogChoice` (`feedback/choice_dialog.dart`, ปุ่มเรียงเต็มกว้าง) — dialog ปิด quick create (เก็บร่าง / แก้ต่อ / ทิ้ง)
+   - **A4** เพิ่มแท็กโหมด event → `showAppSheet` + `AppTextField` (เลิก `AlertDialog` + `TextField`)
+   - **A5** `showAppSheetCustom` = route เดียวกับ `showAppSheet` สำหรับ sheet ที่มี `AppSheetScaffold` เอง — ปรับยอด + เชิญสมาชิกกระเป๋า · `showModalBottomSheet` ที่เหลือตั้งใจ (quick create ปิดลากลง, icon maker, dev)
+   - **A6** ลบ l10n ไม่ใช้ 6 ตัว (`accountDetailSeeAll` `accountDetailDescription` `transactionsEmptyAccountMessage` `quickAllCategories` `quickCreateNameSection` `quickCreateSubmit` — owner ตัดชิปหมวดล่าสุด) · สคริปต์ย้ายมา `app/scripts/unused_l10n.js` (`node scripts/unused_l10n.js [--apply]`, เว้น `common*`/`pending*`) · เพิ่ม `appExitTitle`/`appExitConfirm` ให้ session `0d`
+   - **docs** `schema.md` project_transactions: `category_name`/`category_icon_code` → `tags TEXT[]` (mig 47) · contract §6a: `by_category` → `by_tag` + §6a′ แท็กโปรเจกต์ (`tags` บนแถว, `GET /projects/:id/tags`)
+   - gallery: `showActionSheet` · `showChoiceDialog` (Feedback) · ตัดออก (เช็คแล้วไม่ใช่ปัญหา): `TextFormField` หน้าแท็ก (ช่องแก้ชื่อในแถว ตั้งใจ) · spinner เล็กในแถวหน้าหนี้รายคน
+   - app analyze ผ่าน · test 72 ผ่าน
+4. ~~หน้า home~~ ✅ (owner เลือก 4 ข้อ): การ์ดไม่ได้เก่า (ใช้ cardTheme อยู่แล้ว) แต่ปรับให้เข้ากับชุดใหม่ — ทรัพย์สินสุทธิ = แบบการ์ดกระเป๋า (สีหลัก + ลายน้ำ) · การ์ด งบ/หนี้/ออม = สีกลุ่ม `ModuleColors` + ไอคอนแบบหน้าเพิ่มเติม · แถบเดือน = `AppIconButton` กลม ไม่มี spinner (เนื้อหาจางตอนโหลด) · รายการล่าสุดมี `AddTile` ท้าย · **shared ใหม่ `TintedCard` + `TintedIconBadge`** (`layout/tinted_card.dart`, gallery) — `AccountCardSurface` + การ์ดหน้าเพิ่มเติมใช้ตัวนี้ (หน้าตาเดิม โค้ดไม่ซ้ำ)
+5. commit แยกหัวข้อเมื่อ owner สั่ง
+
+---
+
+## 2026-10-09 (7) — UX polish: แท็ก (หน้าตาใหม่ทั้งแอป) · ผู้ติดต่อ · หมวดหมู่ (filter + ปัดเปลี่ยนแท็บ) · AppTabBar เส้นใต้เลื่อน (ยังไม่ commit)
+
+> session `chubi-pocket-0d` · app analyze ผ่าน · test 72 ผ่าน (ล่าสุดหลัง §10) · `dart format` เฉพาะไฟล์ที่แก้ · **ยังไม่ได้รันบนโทรศัพท์** (owner รันเอง) · ทำคู่กับ session `0b` (เก็บเศษ 0.3.0) — แจ้งไฟล์ที่ทับกันแล้ว ไม่ได้แตะ `transactions_list_page` / `quick_create_sheet` / `account_detail_page` ของเขา · `test/zz_scratch_topbar_test.dart` ที่ entry (6) เห็นเป็นของ session นี้ (probe ชั่วคราว) — ลบแล้ว
+
+### 1. แท็ก — หน้าตาเดียวทั้งแอป
+- **แบบเต็ม `TagChip`** (`features/tags/presentation/widgets/tag_chip.dart`): ทรงแท็ก · กรอบ + ไอคอน + ตัวอักษร = สีแท็ก · พื้น = สีเดียวกันจาง · `selected:` ใช้เป็นตัวเลือก (เลือก = เต็มสี, ไม่เลือก = กรอบเทา) · `showUsage:` โชว์ ×n
+- **แบบย่อ `TagShortList`**: `#ชื่อ #ชื่อ` สีตามแท็ก บรรทัดเดียว · `tagColor(iconCode, palette)` = สีไอคอนก่อนเสมอ (แท็กไม่ใช้ bg)
+- ใช้ที่: ฟอร์ม quick create (`_TagsBlock`) · แท็กโปรเจกต์ในโหมด event (ชื่อตรงกับแท็กเราใช้สีนั้น ไม่ตรง = สีหลัก) · หน้า transaction detail · **แถวรายการ: แท็กย่อขึ้นบรรทัดที่ 3** (`MoneyListTile(footer:)` ใหม่, เอาตัวนับแท็กออก) · แถวหน้ารอยืนยัน
+- **บั๊ก:** `EmbeddedTag` อ่าน `color`/`icon` แต่ BE ส่ง `icon_code` → สี/ไอคอนแท็กในรายการไม่เคยมาถึงจอ · แก้เป็น `iconCode` + `asTag` (repo `attachTags` ใช้ `fromJson` ด้วย)
+- **หน้าแท็ก:** โหมดแก้ไม่มี filter สี/ไอคอนแล้ว (ค้นหาอย่างเดียว; โหมดดูยังมี) · ปุ่มเข้าโหมดแก้ = ปุ่มกลม `AppIconButton` ไม่มี label · การ์ดแท็กใช้สีแท็ก (ยังเป็นการ์ดมุมโค้ง ไม่ใช่ทรงแท็ก เพราะมีช่องพิมพ์ชื่อ + error)
+- **icon maker (แท็ก):** preview อยู่กลาง · ช่องเลือกไอคอนไม่มีพื้นหลัง/วงกลม (ไอคอน + สีเท่านั้น) · สร้างใหม่ไม่ใส่ bg อัตโนมัติแล้ว (เดิมได้ bg สีหลัก → ไอคอนสีหลักจมหายในช่องเลือก และ bg ไปชนะเป็นสีแท็ก)
+- `_IconSwatchGrid` ในหน้าแท็ก → shared `IconSwatchGrid` (ข้อ 3)
+
+### 2. ผู้ติดต่อ
+- **"เพิ่มผู้ติดต่อ → title เลื่อน":** probe (widget test) ตอนเข้าหน้า: top bar + การ์ดหัว **นิ่งทุกเฟรม** · ที่กระตุกจริงคือ**ตอนบันทึก**: เดิม flip เป็นโหมดดู 1 เฟรม → `pushReplacement` เลื่อนหน้าใหม่เข้ามา → skeleton โหลด → ค่อยเห็นข้อมูล · แก้: บันทึกแล้วเปลี่ยนเป็นผู้ติดต่อที่สร้าง**ในหน้าเดิม** (แก้ → ดู เหมือน save ปกติ) + `context.replace` แค่แก้ URL (page key เดิม ไม่มี transition ไม่โหลดใหม่) · `_isCreate` ดูจาก state แทน `widget`
+- **placeholder โหมดแก้:** ชื่อ "ชื่อ (จำเป็น)" · อีเมล/เบอร์/บันทึก "ไม่บังคับ · ตัวอย่าง" (เดิมโหมดแก้ช่องว่างไม่มี hint เลย ส่วนโหมดดูขึ้น "กดค้างเพื่อแก้ไข")
+- **ไม่เจอผลลัพธ์ = `EmptyView` แบบเดียวกันทุกกรณี** (เลื่อนได้ ดึง refresh ได้): ค้นไม่เจอ (ไอคอนค้นหา) · เก็บถาวรว่าง (ไอคอนเก็บถาวร + คำอธิบาย) — เดิมเก็บถาวรขึ้นแค่ข้อความ
+- **ปุ่ม `+` กลม** ขวาสุดแถว filter (ยังมีเส้นประเพิ่มท้ายรายการ)
+- l10n ใหม่: `contactsNoMatchMessage` `contactsArchivedEmptyTitle/Message` `contactName/Email/Phone/NotesHint`
+
+### 3. หมวดหมู่ + แท็บ
+- **แถว filter** ใต้ค้นหา: `[สี▾][ไอคอน▾] … (✏️)(+)` · กรองตามสี/ไอคอนที่แถว**แสดง** (L2/L3 ใช้ของ L1) โชว์ผล + บรรพบุรุษเหมือนค้นหา · เปลี่ยนแท็บล้าง filter · ✏️ = เข้าโหมดจัดลำดับ (ล้างค้นหา/filter ก่อน; ต้องมี ≥2 หมวด) · ซ่อนทั้งแถวตอนจัดลำดับ
+- **ปัดซ้าย/ขวาเปลี่ยนแท็บ รายจ่าย ↔ รายรับ** · ปิดตอนจัดลำดับ (ลากแนวนอน = เลือกชั้น)
+- **`AppTabBar`** (shared อยู่แล้ว ใช้ 9 ที่: หมวดหมู่ · กระเป๋า · การ์ดงบ · inbox แจ้งเตือน · โปรเจกต์ · แถวรายการโปรเจกต์ · ตั้งค่า · icon maker · gallery): เส้นใต้เป็นตัวเดียว**เลื่อน**ไปแท็บที่เลือก + สีตัวอักษร fade · API เดิม ทุกที่ได้ animation เลย
+- **`AppTabSwipe<T>`** ใหม่ (ไฟล์เดียวกัน): ครอบเนื้อหาใต้แท็บ → ปัดเปลี่ยนแท็บ + เนื้อหาเลื่อนเข้าจากฝั่งนั้น · ไม่เปลี่ยน tree ตอน `enabled` สลับ (long-press → ลากจัดลำดับไม่หลุด) · ตอนนี้ใช้ที่หมวดหมู่ที่เดียว
+- **`IconSwatchGrid`** ใหม่ (`menus/option_menu.dart` ข้าง `ColorSwatchGrid`) — ใช้ที่แท็ก + หมวดหมู่
+- test ใหม่ `test/shared/app_tab_bar_test.dart` (ปัด · ปิดแล้วไม่ปัด · เส้นใต้เลื่อนไม่กระโดด)
+- gallery `/dev/widgets`: TagChip · TagShortList (โดเมน) · IconSwatchGrid · AppTabBar + AppTabSwipe (Chip)
+
+### 4. กระเป๋า: การ์ดหลักเปลี่ยนเลย์เอาท์ตอนเข้าโหมดแก้
+- **สาเหตุ:** โหมดแก้ [ปรับยอด] + ✏️ หายไป → คอลัมน์ชื่อกว้างขึ้น (ชื่อ 2 บรรทัดอาจเหลือ 1) · บรรทัดคำอธิบายโผล่เฉพาะโหมดแก้ (ถ้าว่าง) → การ์ดสูงขึ้น · ทั้งหมดกระโดดทันที
+- **แก้ (`_header` / `_HeroHeader` เท่านั้น):** ปุ่มทั้งสองยังกินที่เดิม แค่ fade ออก (`actionsActive`, ใช้ `AppDurations.chrome`) + กดไม่ได้ · เจ้าของเห็นบรรทัดคำอธิบายทั้งสองโหมด (ว่าง = hint จาง ๆ) · คนอื่นเห็นเฉพาะที่มีข้อความ (เข้าโหมดแก้ไม่ได้อยู่แล้ว)
+- ไม่แตะ `_overview()` / ส่วนแท็บ (`AppTabPager` ของ session `0b`)
+
+### 5. top bar ซ้ายบน "เลื่อนลงแล้วเด้งกลับ" ตอนเข้าหน้าสร้าง/แก้ (กระเป๋า · ผู้ติดต่อ · ทุกหน้าที่ซ่อน nav)
+- **สาเหตุ (ยืนยันด้วย test):** หน้าโหมดแก้/สร้างสั่ง shell ซ่อน bottom nav (240 ms) **ระหว่าง** hero flight ของ top bar · Flutter วาง shuttle ด้วย offset บน+ล่าง จากขนาด navigator ตอนเริ่มบิน → navigator สูงขึ้น กล่อง shuttle ยืด → เนื้อที่จัดกึ่งกลางแนวตั้งจมลง (ครึ่งความสูง nav = 48 px) แล้วเด้งกลับตอนลงจอด · ขากลับ (nav โผล่) ลอยขึ้นแทน · probe ครั้งแรกที่ข้อ 2 ไม่เจอเพราะไม่มี nav ที่ยุบ
+- **แก้ (`app_top_bar.dart`):** shuttle ทุกตัว (กลุ่มซ้าย cross-fade + ชิปขวา) ผ่าน `AppTopBar._pinned` = ขนาดของ hero เอง ปักมุมซ้ายบน → กล่องยืดแค่ไหนก็ไม่ขยับ
+- **test `test/app/shell/app_top_bar_test.dart`:** push เข้าโหมดแก้ขณะ nav ยุบ + pop ขณะ nav กลับ → y ต้องคงที่ทุกเฟรม · ลองย้อนเป็นจัดกึ่งกลางแล้ว fail ทั้ง 2 เคส (= จับบั๊กได้จริง)
+- ข้อ 2 (ผู้ติดต่อ title เลื่อน) = สาเหตุเดียวกัน → ปิดข้อค้างนั้น
+
+### 6. ชิปขวาบน (⏳🔔👤) โชว์ในหน้ารอยืนยัน · แจ้งเตือน (+ ตั้งค่าแจ้งเตือน) · ตั้งค่า
+- เอา `showUniversal: false` ออกจาก 4 หน้านั้น · ยังซ่อน: register (ยังไม่ login) · หน้าฟอร์ม (เพิ่มหลายร่าง `pending_batch_add_page`, แก้โปรไฟล์, เปลี่ยนรหัส — กติกาฟอร์ม = โหมดแก้)
+- `_UniversalChips._open`: กดชิปของหน้าที่อยู่ = ไม่ทำอะไร (ไม่ push ซ้ำ) · อยู่หน้าลูกของมัน (ตั้งค่าแจ้งเตือน → 🔔) = ถอยกลับ · นอกนั้น push เหมือนเดิม
+
+### 7. เข้าหน้าสร้าง (แทบทุกหน้า) กระตุกนิด ๆ ระหว่างหน้ากำลังเลื่อนเข้า
+- **สาเหตุ:** หน้าที่เปิดมาในโหมดแก้สั่งซ่อน bottom nav ตั้งแต่เฟรมแรก → nav ยุบ 240 ms **พร้อมกับ** page transition → ทั้งแท็บ (2 หน้า) layout ใหม่ทุกเฟรมระหว่างเลื่อน (+ ทำ hero ของ top bar ยืดใน §5)
+- **แก้:** `whenRouteSettled(route, action)` ใหม่ใน `app/shell/shell_chrome.dart` — รอให้หน้าเลื่อนเข้าเสร็จก่อนค่อยซ่อน nav (ถ้าปิดหน้าก่อน = ไม่ซ่อนเลย) · ข้ามเฟรมแรกที่ route ยัง offstage (Flutter วัด hero, animation ถูกปักเป็น "เสร็จ") · ใช้ใน `EditModeMixin._syncShellChrome` + `ShellChromeHider` · เข้าโหมดแก้ในหน้าเดิม (ไม่มี transition) ยังซ่อนทันทีเหมือนเดิม
+- ผลที่เห็น: หน้าเลื่อนเข้ามาพร้อม nav ก่อน แล้ว nav ค่อยเลื่อนลงหายทีหลัง
+- test `test/app/shell/shell_chrome_test.dart`: ไม่ยิงระหว่างเลื่อน · ยิงหลังเสร็จ · ปิดก่อนเสร็จไม่ยิง
+- ถ้ายังกระตุกบนเครื่อง → ต้องดู profile mode (`flutter run --profile` + DevTools) ว่าเป็นค่า build หน้าแรกของหน้านั้นเอง
+
+### 8. Dashboard: "เงินไปไหน" ไม่มี "ดูทั้งหมด ›" แล้ว (รายการล่าสุดยังมี)
+
+### 9. ปัดซ้าย/ขวาเปลี่ยนแท็บล่าง (`main_shell.dart`)
+- fling แนวนอน (≥300 px/s) ที่ไหนก็ได้บนหน้า → แท็บข้าง ๆ (ไม่วนรอบ) · ทำงานเฉพาะ**หน้าแรกของแท็บ** (navigator ของแท็บ pop ไม่ได้) และตอน nav ไม่ถูกซ่อน (ไม่อยู่โหมดแก้/จัดลำดับ)
+- อะไรข้างในที่ใช้ลากแนวนอนเอง (แท็บในหน้า/pager · แถวชิปเลื่อนข้าง · ปัดลบ) อยู่ลึกกว่าใน gesture arena → ชนะเสมอ ("กรณีไม่มี gesture อะไรบัง")
+
+### 10. Back ที่หน้าแรกของแท็บไม่ปิดแอปทันที
+- `MainShell` มี `PopScope(canPop: false)` — shell เป็นหน้าเดียวของ root navigator · back มาถึงตรงนี้เฉพาะตอนไม่มีอะไรให้ pop (หน้าลึก · sheet · หน้า overlay pop ก่อนเสมอ)
+- แท็บอื่น → ไปแท็บหน้าแรก (dashboard) · อยู่ dashboard → dialog "ปิดแอป?" → ยืนยัน = `SystemNavigator.pop()`
+- l10n ใหม่ `appExitTitle` ("ปิดแอป?") / `appExitConfirm` ("ปิดแอป") — session `0b` เพิ่ม + gen-l10n ให้แล้ว
+- test `test/app/shell/main_shell_test.dart` (GoRouter + StatefulShellRoute จริง): ปัดไป/กลับ · ขอบแท็บแรกไม่ไป · แถวเลื่อนข้างไม่โดนแย่ง · หน้าลึกไม่ปัด · back แท็บอื่น → หน้าแรก · back หน้าลึก = pop · back หน้าแรก = dialog, ยกเลิกแล้วอยู่ต่อ
+
+### ค้าง / ต่อไป
+1. owner: ทดสอบบนโทรศัพท์ — ปัดเปลี่ยนแท็บล่าง + back (แท็บอื่น → หน้าแรก → ถามปิดแอป) · แท็กทุกที่ (quick create · detail · แถวรายการบรรทัด 3) · icon maker แท็ก · ผู้ติดต่อ: เพิ่มแล้วบันทึก (ต้องไม่เลื่อน/ไม่แวบ skeleton) · หมวดหมู่ filter + ปัด · แท็บทุกหน้าเส้นใต้เลื่อน · กระเป๋า: เข้า/ออกโหมดแก้ การ์ดหลักต้องไม่ขยับ
+2. ~~ผู้ติดต่อข้อ 1 ตอนกดเข้า~~ → เจอสาเหตุแล้ว แก้ในข้อ 5 · owner ลองเข้าหน้าสร้างกระเป๋า / เพิ่มผู้ติดต่อ / แก้ไขอะไรก็ได้ที่ nav หาย ดูว่า top bar นิ่ง
+3. แท็กในแถวรายการโปรเจกต์ (`project_tx_tiles.dart` `#tag` ในข้อความ) ยังไม่เปลี่ยน — แท็กโปรเจกต์ไม่มีสี · session โปรเจกต์ดูต่อ
+4. เสนอ: ใส่ `AppTabSwipe` หน้าอื่นที่มีแท็บ (inbox · โปรเจกต์ · กระเป๋า) — รอ owner
+5. commit แยกหัวข้อ (แท็ก / ผู้ติดต่อ / หมวดหมู่+แท็บ) เมื่อ owner สั่ง
+
+---
+
+## 2026-10-09 (6) — บั๊ก: ปัด back (Android) แล้ว sheet / dialog ไม่ปิด (ยังไม่ commit)
+
+> app analyze ผ่าน (เหลือ 2 อันใน `test/zz_scratch_topbar_test.dart` ของอีก session) · test 57 ผ่าน · `dart format` แล้ว · **ยังไม่ได้รันบนโทรศัพท์** (owner รันเอง)
+
+### อาการ
+- เปิด quick create / sheet / dialog แล้วปัด back จากขอบจอ → นิ่ง ไม่ปิด
+
+### สาเหตุ
+- Flutter 3.47 + targetSdk 36 → Android ใช้ `PredictiveBackPageTransitionsBuilder` เป็นค่าเริ่มต้น · ทุกหน้าคอยรับ back gesture เองถ้าเป็นหน้าบนสุดของ **navigator ตัวเอง** (`isCurrent` ไม่ดู navigator ชั้นบน)
+- shell มี navigator ซ้อน (root → แท็บ) + `FadeBranchContainer` เก็บทุกแท็บไว้ใน `IndexedStack` → ถ้าแท็บไหน (ที่เห็น**หรือที่ซ่อน**) มีหน้าลึกค้าง หน้านั้นแย่ง gesture แล้ว pop ตัวเองใต้ sheet / ในแท็บที่มองไม่เห็น · sheet บน root ไม่ได้รับ back เลย
+- โดนทั้ง sheet · dialog · หน้า overlay (settings / notifications) · และหน้าลึกในแท็บอื่นหายเงียบ ๆ
+- ทุกแท็บอยู่หน้าแรก = ไม่มีใครแย่ง → back ไปที่ go_router → ปิด sheet ได้ปกติ (เลยเป็นบ้างไม่เป็นบ้าง)
+
+### แก้ (เก็บ predictive back ไว้)
+- **`core/theme/app_page_transitions.dart` (ใหม่):** `AppPageTransitionsBuilder` ห่อ `PredictiveBackPageTransitionsBuilder` + ใส่ `PopScope(canPop: !covered)` ทุกหน้า · covered = route ชั้นบนไม่ current (ส่งต่อผ่าน `_RouteCover` จากหน้า shell ลงหน้าในแท็บ) หรือ tickers ปิด (แท็บที่ซ่อน) · หน้าที่ veto รับ gesture ไม่ได้ → back ตกไปที่ go_router (`popRoute`) ซึ่งเลือก sheet → overlay → แท็บที่เปิดอยู่ ถูกเอง · ใช้แค่ public API ไม่ได้ copy โค้ด Flutter
+- **`theme_builder.dart`:** `pageTransitionsTheme` → Android ใช้ builder ใหม่ (แพลตฟอร์มอื่น = default เดิม)
+- **`fade_branch_container.dart`:** แท็บที่ไม่ได้เลือก `TickerMode(enabled: false)` — animation ในแท็บที่ซ่อนหยุด (ประหยัด) + เป็นสัญญาณ "ซ่อนอยู่" ให้ builder
+- **test `test/core/theme/app_page_transitions_test.dart`:** จำลอง predictive back ผ่าน channel `flutter/backgesture` · 3 เคส: pop หน้าที่เห็น · ปิด sheet แต่หน้าใต้ยังอยู่ · หน้าลึกในแท็บที่ซ่อนไม่หาย · ลองกับ builder เดิมของ Flutter แล้ว 2 เคส sheet fail (= ยืนยันสาเหตุ)
+
+### ข้อจำกัด
+- ตัว sheet ไม่ขยับตามนิ้วระหว่างปัด (Flutter ยังไม่มี predictive back ให้ bottom sheet) — ปล่อยนิ้วแล้วปิด · quick create มีของค้าง → dialog ทิ้ง/เก็บร่าง
+
+### ค้าง / ต่อไป
+1. owner: ทดสอบบนโทรศัพท์ (`fvm flutter run`) — หน้าลึก + กด `+` + ปัด back · เปิดหน้าลึกค้างอีกแท็บแล้วลองซ้ำ · settings ปัด back · หน้าลึกปกติยังเห็นหน้าก่อนโผล่ตามนิ้ว
+2. commit แยกเป็นหัวข้อของตัวเอง เมื่อ owner สั่ง
+
+---
+
+## 2026-10-09 (5) — 0.3.1 เริ่ม: OCR สลิป (Tesseract) · QR บนเครื่อง · Imports lab ใช้สลิปจริง (ยังไม่ commit)
+
+> owner 0.3.1 = session นี้ · 0.3.0 deploy แล้ว (owner) · เก็บเศษ 0.3.0 = อีก agent · BE build/vet/test ผ่าน · app analyze ผ่าน · test 52 ผ่าน · **ยังไม่ได้รันบนโทรศัพท์** (owner รันเอง)
+
+### กติกาที่ owner ตัดสิน
+- **นำเข้าสลิปทำได้บนแอป Android เท่านั้น** — บนเว็บซ่อนปุ่ม (`SlipQrReader.isSupported`) · ถ้ายังมีอะไรเรียกบนเว็บ → `UnsupportedError`
+- QR อ่าน**บนเครื่อง** (ML Kit) · ทดสอบบนโทรศัพท์ด้วยสลิปจริง (owner จะส่งให้) — ไม่ทำ bench tool
+- `scan-slip` ตอบผล OCR กลับเลย (ยังไม่สร้างร่าง — 0.3.3)
+
+### BE
+- **Docker:** `apk add tesseract-ocr` (5.3.4) + `tha`/`eng` จาก `tessdata_best` tag 4.1.0 (`ADD` ตอน build) · โมเดล 2 ตัวรวม ~23 MB + lib ของ tesseract
+- **`internal/modules/imports/ocr`:** `Reader` interface · `Tesseract` เรียก CLI (stdin → txt + tsv ใน temp dir) · `--oem 1` · `preserve_interword_spaces=1` · `OMP_THREAD_LIMIT=1` · slot พร้อมกัน 1 · timeout 30 s · ผล = ข้อความ + บรรทัด (กรอบ + conf) + เวลา prep/ocr
+  - preprocess (เทา + ขยายถ้ากว้าง < 1600) — **ปิดเป็นค่าเริ่มต้น**: ลองกับภาพสังเคราะห์แล้วไม่ช่วย แค่ช้าลง
+  - แก้ "ํา" → "ำ" (Tesseract เขียนสระอำแยก)
+  - Alpine build tesseract แบบ OpenCL → profile เครื่องทุกครั้งถ้าเขียนไฟล์ไม่ได้ → รันใน `/tmp`
+- **`POST /v1/pending-transactions/scan-slip`:** รับ PNG/JPEG เท่านั้น (`UNSUPPORTED_IMAGE`) · field ใหม่ `psm` (3/4/6/11, default 6) · `preprocess` ("1" = เปิด) · ตอบ `{file_key, trans_ref, filename, size, content_type, ocr:{text, lines[{text,conf,box}], conf, width, height, lang, psm, preprocess, scale, prep_ms, ocr_ms}}` · error: 503 `OCR_UNAVAILABLE` (ไม่มี tesseract เช่น `go run` บน Windows) · 504 `OCR_TIMEOUT` · file_key นับว่า "เห็นแล้ว" เฉพาะตอนอ่านสำเร็จ · ขยาย read/write deadline ของ request นี้เป็น 90 s (server ปกติ 10 s) · log **ไม่เก็บข้อความ** (มีชื่อ/เลขบัญชี) เก็บแค่ความยาว/conf/เวลา
+- config ใหม่ (มี default ไม่ต้องตั้ง): `OCR_TESSERACT_BIN` `OCR_LANG` `OCR_TIMEOUT` `OCR_CONCURRENCY`
+- `go.mod`: เพิ่ม `golang.org/x/image v0.36.0` (ตัวล่าสุดบังคับ go 1.26 — Docker ใช้ 1.25)
+- smoke test กับ tesseract จริง (build tag `ocrsmoke`, วิธีรันอยู่หัวไฟล์ `ocr/smoke_test.go`): สลิปสังเคราะห์ภาษาไทยอ่านยอด/เลขอ้างอิง/ชื่อ/วันที่ถูก · conf ~93 · ~2–6 s บน PC (VPS น่าจะช้ากว่า)
+
+### App
+- `features/pending/domain/slip_qr.dart` — แยก QR สลิป ธปท. (tag 00 → API id / รหัสธนาคาร / `trans_ref` · 51 TH · 91 CRC-16/CCITT-FALSE) · CRC ไม่ตรงยังคืน ref แต่ติดธง · test 4 เคส
+- `features/pending/data/slip_qr_reader.dart` — ML Kit อ่าน QR จากไฟล์ · deps ใหม่ `image_picker`, `google_mlkit_barcode_scanning`
+- หน้ารอยืนยัน: ปุ่ม "นำเข้าสลิป" ไม่โชว์บนเว็บ (ยังกดแล้วไม่ทำอะไรบนแอป — flow จริงคือ 0.3.3)
+- **Imports lab การ์ดใหม่ "Real slip → OCR"** (บนสุด): เลือกหลายรูปจากแกลเลอรี → QR บนเครื่อง → อัปโหลด → โชว์ผล QR · conf/เวลา · รูปสลิป + กรอบแต่ละบรรทัด (เขียว ≥80 / ส้ม ≥60 / แดง) · ข้อความ · รายบรรทัด · request/response · เลือก psm / preprocess แล้วกด "Run again" เทียบได้ · บนเว็บการ์ดขึ้น error แทนปุ่ม
+
+### ทดสอบบนโทรศัพท์
+- BE ในเครื่อง: `cd chubi-pocket-app && ./run-phone.sh local` (สร้าง BE จาก Dockerfile นี้ — มี tesseract) → Dev hub → Imports lab
+- หรือ deploy BE ก่อนแล้วใช้ `./run-phone.sh` ปกติ
+
+### ค้าง / ต่อไป
+1. owner: ส่งสลิปจริง 10–20 ใบ (คละธนาคาร) · ทดสอบใน lab บนโทรศัพท์ → ดู QR อ่านได้ไหม / CRC ตรงไหม / OCR ครบไหม / เวลา
+2. จากผลจริง: เลือก psm + preprocess default · ถ้าช้าบน VPS ลอง `tessdata_fast` หรือ crop
+3. commit + deploy เมื่อ owner สั่ง (BE image ต้อง build ใหม่ — ADD โหลดโมเดลจาก GitHub ครั้งแรก)
+4. 0.3.2 = ข้อความอิสระ (แชต) → LLM → JSON (owner แก้ลำดับ 2026-10-09)
+5. **OCR dump (เก็บไว้, เปิดปิดได้):** `be/internal/modules/imports/ocr_dump.go` — `OCR_DUMP=1` (dev compose เปิดไว้, prod ไม่ทำงาน) สลิปที่สแกนถูกอ่านซ้ำทุก psm × preprocess แล้ว dump รูป + `result.json` ไว้ที่ `/tmp/ocr-dump` ใน container (`docker cp chubi_pocket_app:/tmp/ocr-dump .`) · ใช้เทียบเมื่อได้สลิปธนาคารอื่น
+6. **ผล 12 สลิป K PLUS:** QR 12/12 · ยอด 12/12 · psm 11 อ่านชื่อผู้รับถูก 11/12 (3/4 = 7/12) → **default psm 11** · preprocess ทำให้วันที่แย่ลง → ปิด
+7. **spec ส่วนที่เหลือของ 0.3.1 (owner ตัดสินแล้ว — ทั้งเส้นทางสลิปคือ 0.3.1, ไม่ใช้ LLM):** [design/spec/15-slip-import.md](design/spec/15-slip-import.md) — กฎแยกข้อความ (ไม่ใช้ LLM) · `accounts.identifiers` JSONB + จับคู่เลขบัญชี → +/−/โอน · ค่าธรรมเนียมแยกร่าง · หมวด: จำจากผู้รับ → ว่าง (LLM เดาหมวดรอ 0.3.2) · "จำเลขนี้ไว้กับกระเป๋า" · `slip_imports` กันซ้ำด้วย `trans_ref`
+8. **รูป → JSON ทำได้แล้ว (KBank):** `be/internal/modules/imports/slip` (ตัวแยก K PLUS, หา label ไม่ใช่ตำแหน่ง, กรองขยะโลโก้ด้วยตำแหน่ง x) · `imports/result.go` (`ScanResult` v1: status · slip · pending · ocr เมื่อ `debug=1`) · `imports/draft.go` (ตอนนี้: รายจ่าย กระเป๋าว่าง + ร่างค่าธรรมเนียมเมื่อ > 0) · `scan-slip` รับ `bank_code` จาก QR (ไม่มีกฎ → `unsupported_bank` + log) · OCR ใช้ข้อความจาก txt แทนการต่อคำจาก TSV (ช่องว่างไทยถูกขึ้น) · test: สลิปปลอม 10 ใบจากของจริง (ชื่อ/เลขบัญชีเปลี่ยนแล้ว) ใน `slip/testdata/kbank` · lab: ไม่มี QR สลิป = `not_slip` ไม่อัปโหลด, โชว์ status + slip + pending · ลองรูปจริง 3 ใบผ่าน BE ในเครื่องได้ JSON ถูก · user ทดสอบในเครื่อง `ocrbot` · **ถัดไป:** `accounts.identifiers` (migration 48) + จับคู่ +/−/โอน → สวิตช์หมวดค่าธรรมเนียม
+9. **identifiers + จับคู่กระเป๋า (BE เสร็จ, FE รอ):** migration `000048_account_identifiers` (`accounts.identifiers` JSONB) · `accounts/identifiers.go` (ตรวจ/จัดรูป: ตัวเลข+x, ≥4 หลัก, ≤10 อัน, bank_code 3 หลัก) · สร้าง/แก้กระเป๋ารับ `identifiers` · `POST /accounts/:id/identifiers` (เพิ่มทีละอัน, เจ้าของเท่านั้น) · `imports/match.go` + `draft.go` (ฝั่งผู้โอน=รายจ่าย · ผู้รับ=รายรับ · ทั้งคู่=โอน · ไม่เจอ=รายจ่ายกระเป๋าว่าง · ตรงหลายกระเป๋า=ว่าง) · preference `fee_category_id` (ต้องเป็นหมวดรายจ่ายของตัวเอง, ร่างค่าธรรมเนียมใช้หมวดนี้) · ลองกับ DB ในเครื่อง: สลิปโอนเข้าบัญชีตัวเอง → โอน 2780→0693 ✓ · docs: schema.md, spec 03 §2.8, spec 15 §5.2 · **FE ถัดไป:** ส่วน identifiers ในหน้ากระเป๋า (ซ่อน/แสดงเลข, เลือกธนาคาร) + สวิตช์หมวดค่าธรรมเนียมในหน้าแก้ไขหมวด
+9b. **payment_providers + import_logs (BE เสร็จ):** migration `000049_payment_providers` (kind · scheme · code, seed bot 002/004/006/014 เท่านั้น — รหัสที่ยืนยันได้) · `GET /v1/payment-providers` (module `providers`) · migration `000050_import_logs` + `imports/logs.go`: เขียนทันทีเมื่อเจอ `unknown_provider` / `unsupported_bank` / `incomplete` (ไม่มี cron — owner เปิดดูเองตามรอบ, คำสั่งอยู่ ops-runbook §3) · ไม่มี API ทางการ/โอเพนซอร์สที่ดูแลอยู่สำหรับรหัสธนาคาร 3 หลัก (ค้นแล้ว) → ระบบเรียนรู้จากรหัสใน QR สลิปแทน · `slip_imports` เลื่อนเป็น migration 51 · ลองกับ DB ในเครื่องแล้ว ✓
+10. **FE ที่ต้องทำ — ย้ายไป 0.3.2 (owner 2026-10-09, ปล่อย 0.3.1 โดยไม่มีส่วนนี้) — checklist:**
+    - [ ] **A. model/repo กระเป๋า:** `AccountIdentifier {kind, value, bankCode}` · อ่าน `identifiers` จาก API · ส่งไปกับสร้าง/แก้กระเป๋า (ส่ง = แทนทั้งรายการ) · map error `INVALID_IDENTIFIER` ใน `wallet_errors.dart`
+    - [ ] **B. ส่วน "เลขบัญชี · พร้อมเพย์ · บัตร" ในหน้ากระเป๋า** (`account_detail_page.dart`): โหมดดู = รายการ (ชนิด · ธนาคาร · เลข) + **ซ่อน/แสดงเลขด้วยปุ่ม 👁 ตัวเดียวกับ `MoneyText`** (ซ่อน = `•••• 2780`) · โหมดแก้ = `AddTile` → sheet: เลือกชนิด 4 แบบ (การ์ด) · **เลือกธนาคาร** (bank_account; รายชื่อจาก `GET /v1/payment-providers` + ตัวเลือก "อื่น ๆ" = ไม่ระบุ) · ช่องเลข (รับตัวเลข/x/ขีด) · ลบทีละแถว · ใช้ได้ตอนสร้างกระเป๋าด้วย · กระเป๋าแชร์: สมาชิกที่ไม่ใช่เจ้าของดูได้อย่างเดียว
+    - [ ] **C. สวิตช์ "ใช้เป็นหมวดค่าธรรมเนียม"** ในหน้าแก้ไขหมวด (เฉพาะหมวดรายจ่าย): อ่าน `preferences.fee_category_id` จากโปรไฟล์ · เปิด = `PUT /users/me {preferences:{fee_category_id: id}}` · ปิด = `null` · ได้ทีละหมวด (เปิดอันใหม่ = อันเก่าหลุดเอง) · อาจมีป้ายในรายการหมวด
+    - [ ] **D. l10n** ไทย/อังกฤษ ของ A–C
+    - [ ] **E. widget ใหม่ที่ใช้ร่วม** (ถ้ามี เช่น ตัวเลือกธนาคาร) → `ui.dart` + gallery `/dev/widgets` ตามกติกา
+    - [ ] **F. (ไม่บังคับ) Imports lab:** แสดงชื่อกระเป๋าแทน `account_id` ใน JSON ร่างรายการ
+    - ไม่อยู่ใน 0.3.1 (→ 0.3.3): ปุ่ม "จำเลขนี้ไว้กับกระเป๋านี้" ในหน้ารอยืนยัน · ปุ่มนำเข้าจริง + เลือกอัลบั้ม + progress chip · บันทึกร่างลง pending
+
+---
+
 ## 2026-10-09 (4) — UI unification รอบใหญ่: top bar ใหม่ · ปุ่มย้ายลงหน้า · กระเป๋า/งบ/เป้าออมเป็นหน้าเดียว · รายการประจำเข้า quick create (ยังไม่ commit)
 
 > อยู่ในขอบเขต **0.3.0** (release owner = session `chubi-pocket-6f`, ดู entry 3) · session นี้ทำงานคู่กับ entry ล่าง (อีก session) ใน working tree เดียวกัน — ตอน commit แยกตามหัวข้อ · app analyze ผ่าน · test 43 ผ่าน · `dart format` ไฟล์ที่แก้แล้ว · **ยังไม่ได้รันบนเครื่อง** (owner รันเอง: `cd chubi-pocket-app && ./run-web.sh`)

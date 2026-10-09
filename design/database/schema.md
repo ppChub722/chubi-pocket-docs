@@ -232,6 +232,7 @@ One row per user, 1:1 with `users`. Preferences are stored as a JSONB blob so ne
 | `timezone` | string | 1     | IANA tz identifier                  |
 | `theme`    | string | 2     | `"light"` \| `"dark"` \| `"system"` |
 | `language` | string | 2     | IETF tag                            |
+| `fee_category_id` | string or null | 0.3.1 | UUID of one of the user's **expense** categories — fee drafts from bank slips get it (the "ใช้เป็นหมวดค่าธรรมเนียม" switch). `null` clears. Validated on write; a deleted category is ignored on read. [spec 15 §7](../spec/15-slip-import.md) |
 
 Unknown keys are ignored on read, rejected on write.
 
@@ -306,6 +307,7 @@ One row per account owned by a user. Credit-type accounts (credit card, pay-late
 | `payment_due_date`   | `SMALLINT`      | NULLABLE, CHECK (1–31)                       | Day of month payment is due                                                                   |
 | `minimum_payment`    | `DECIMAL(15,2)` | NULLABLE                                     | Minimum payment amount                                                                        |
 | `sort_order`         | `INTEGER`       | NOT NULL, DEFAULT `0`                        | Phase 2 — user-defined ordering                                                               |
+| `identifiers`        | `JSONB`         | NOT NULL, DEFAULT `'[]'::jsonb`               | 0.3.1 (migration 48) — numbers the wallet is known by on bank slips: `[{kind, value, bank_code?}]`, kind `bank_account` · `promptpay` · `card` · `other`, value digits with `x` for hidden ones. See [spec 15 §5](../spec/15-slip-import.md) |
 | `created_at`         | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                    |                                                                                               |
 | `created_by_user_id` | `UUID`          | FK → `users.id`, NULLABLE                    | NULL = system                                                                                 |
 | `updated_at`         | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                    | Trigger-updated                                                                               |
@@ -703,8 +705,7 @@ The canonical project ledger. Every transaction recorded in a project context go
 | `note`                          | `TEXT`          | NULLABLE                                                    |                                                                                                                                                                        |
 | `marks`                         | `UUID[]`        | NOT NULL, DEFAULT `'{}'`                                    | Set of `project_member.id` values that have marked this row "resolved on the board". Independent of personal-book actions — toggling does NOT create personal entries. |
 | `description`                   | `TEXT`          | NULLABLE                                                    | Optional user-supplied label for the transaction; editable                                                                                                             |
-| `category_name`                 | `TEXT`          | NULLABLE                                                    | Denormalized snapshot of the category name at record time; read-only                                                                                                   |
-| `category_icon_code`            | `JSONB`         | NULLABLE                                                    | Denormalized snapshot of `categories.icon_code` at record time; read-only                                                                                              |
+| `tags`                          | `TEXT[]`        | NOT NULL, DEFAULT `'{}'`                                    | Free tag names on the row (≤ 20, ≤ 40 chars each; trimmed, deduped case-insensitively). The project's tag list = whatever its rows use. Migration 47.               |
 | `created_at`                    | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                                   |                                                                                                                                                                        |
 | `created_by_user_id`            | `UUID`          | FK → `users.id`, NULLABLE                                   | NULL = system                                                                                                                                                          |
 | `updated_at`                    | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                                   | Trigger-updated                                                                                                                                                        |
@@ -721,7 +722,7 @@ The canonical project ledger. Every transaction recorded in a project context go
 
 **No `account_id`** — project_transactions never hit a personal account. Personal entries are created client-side via the regular `POST /transactions` (with `source_project_transaction_id` set for traceback) or `POST /personal-debts`.
 
-**No `category_id` FK** — categories are user-scoped resources and ambiguous on a shared row. Categories are picked fresh by each user at resolve time, on the personal-book entry. Dropped in migration 27. `category_name` and `category_icon_code` are denormalized read-only snapshots set at record time for display on the shared board (migration 31 added TEXT columns; migration 033 converts to JSONB).
+**No categories** — categories are user-scoped resources and ambiguous on a shared row. Categories are picked fresh by each user at resolve time, on the personal-book entry (a personal copy matches the user's category by tag name). `category_id` dropped in migration 27; the `category_name` / `category_icon_code` snapshots (migrations 31 / 33) were replaced by `tags` in migration 47 — the old name became the row's first tag, the icon was dropped.
 
 **Indexes:**
 
@@ -944,6 +945,53 @@ Membership of every account. Backfill creates one `owner` row per existing accou
 - `PRIMARY KEY (id)`
 - `INDEX idx_account_members_account ON account_members(account_id) WHERE left_at IS NULL` — authz checks
 - `INDEX idx_account_members_user ON account_members(user_id) WHERE left_at IS NULL` — "my shared wallets" list
+
+---
+
+## 15 — Slip Import _(0.3.1, migrations 049–050)_
+
+Spec: [`../spec/15-slip-import.md`](../spec/15-slip-import.md). Wallet
+identifiers live on `accounts.identifiers` (§03); the fee category on
+`user_preferences.preferences.fee_category_id` (§02).
+
+### `payment_providers`
+
+Who a slip's money moved through — banks now, e-wallets / card issuers
+later. Read-only over the API (`GET /v1/payment-providers`); rows come from
+migrations as unknown codes show up in `import_logs`.
+
+| Column       | Type          | Constraints                                             | Description |
+| ------------ | ------------- | ------------------------------------------------------- | ----------- |
+| `id`         | `UUID`        | PK, DEFAULT `gen_random_uuid()`                         | |
+| `kind`       | `VARCHAR(20)` | NOT NULL, CHECK (`bank` · `e_wallet` · `card_issuer` · `other`) | |
+| `scheme`     | `VARCHAR(20)` | NOT NULL                                                | Whose code: `bot` = Bank of Thailand 3-digit bank code (a slip QR's) |
+| `code`       | `VARCHAR(20)` | NOT NULL                                                | e.g. `004` |
+| `name_th`    | `TEXT`        | NOT NULL                                                | |
+| `name_en`    | `TEXT`        | NOT NULL                                                | |
+| `short_name` | `VARCHAR(20)` | NULLABLE                                                | `KBANK` |
+| `color`      | `VARCHAR(9)`  | NULLABLE                                                | `#rrggbb` |
+| `created_at` / `updated_at` | `TIMESTAMPTZ` | NOT NULL                                  | `updated_at` trigger-updated |
+
+**Unique:** `(scheme, code)`. **Seed:** `bot` 002 BBL · 004 KBANK · 006 KTB · 014 SCB (codes confirmed; others added when met).
+
+### `import_logs`
+
+Written the moment slip import meets something it can't handle yet. No
+cron — read by hand (ops-runbook §3). Never holds slip text or images; the
+user's email etc. come from a join on `users`.
+
+| Column       | Type          | Constraints                                   | Description |
+| ------------ | ------------- | --------------------------------------------- | ----------- |
+| `id`         | `UUID`        | PK, DEFAULT `gen_random_uuid()`               | |
+| `user_id`    | `UUID`        | NOT NULL, FK → `users.id` ON DELETE CASCADE   | |
+| `kind`       | `VARCHAR(32)` | NOT NULL                                      | `unknown_provider` · `unsupported_bank` · `incomplete` (free text) |
+| `scheme`     | `VARCHAR(20)` | NULLABLE                                      | `bot` |
+| `code`       | `VARCHAR(20)` | NULLABLE                                      | The QR's bank code |
+| `trans_ref`  | `VARCHAR(64)` | NULLABLE                                      | The slip's ref (from its QR) |
+| `details`    | `JSONB`       | NOT NULL, DEFAULT `'{}'`                      | e.g. `{"missing": ["amount"]}` |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()`                     | |
+
+**Indexes:** `(kind, created_at DESC)`.
 
 ---
 

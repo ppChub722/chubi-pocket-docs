@@ -237,12 +237,21 @@ if the other side deletes or never records, that's their book. No action-less "a
 {
   "my_position": { "member_id": "uuid", "paid": 8000.0, "share": 4133.33, "net": 3866.67 },
   "members": [ { "member_id": "uuid", "display_name": "Aom", "paid": 3400.0, "share": 4133.33, "net": -733.33 } ],
-  "by_category": [ { "name": "Food", "total": 6200.0, "count": 12 } ]
+  "by_tag": [ { "name": "Food", "total": 6200.0, "count": 12 } ]
 }
 ```
 
 `paid` = parent rows recorded with that member as actor · `share` = sum of that member's split rows ·
-`net = paid − share`. Parent rows only for `by_category`. `my_position` omitted when the caller isn't a member.
+`net = paid − share`. `by_tag` (was `by_category` before migration 47) = expense parent rows grouped by tag;
+a row with several tags counts under each, untagged rows come back as `name: ""` (the client localises it).
+`my_position` omitted when the caller isn't a member.
+
+**6a′. Project tags** (migration 47 — free tags replace the per-row category):
+- Rows carry `tags: [string]` (create / update `project-transactions`; on update, sending `tags` replaces
+  the whole set). The server trims, drops empties and dedupes case-insensitively (≤ 20 tags, ≤ 40 chars).
+- `GET /projects/:id/tags` (members only) → `{ "data": [ { "name": "Food", "count": 12 } ] }`, most used
+  first. There's no tag table — a tag no row uses simply disappears.
+- "Copy into my book" matches the user's own category by the row's tag name.
 
 **6b. Role / membership fixes** (behaviour):
 - `PUT /projects/:id/members/:member_id` on the **owner's** row → `409 CANNOT_CHANGE_OWNER` (use transfer-ownership).
