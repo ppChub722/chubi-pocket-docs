@@ -149,6 +149,25 @@ Closure signal — tells the debtor "the creditor confirmed they got it." Mostly
 
 **Deep-link:** project view → project_transaction detail (or project view if deleted).
 
+### 2.8 `split_changed` (2026-10-10, migration 052)
+
+**When:** the splitter edits a bill's splits (`PUT /v1/transactions/:id/splits`) and a linked partner **already has the mirror debt**:
+- `change: "amount"`: their share was re-amounted;
+- `change: "removed"`: they were taken off.
+
+Added people get the ordinary `split_created`. If the partner hasn't added the split yet, nothing new is sent:
+- their pending `split_created` is refreshed in place (`payload.amount`);
+- or, on removal, it gets `payload.superseded = true` (and accepting it answers `409 SPLIT_CHANGE_STALE`).
+
+**Payload:** `{split_id, parent_kind: "transaction", parent_id, change, splitter_display_name, old_amount, new_amount (0 when removed), currency, description, recipient_debt_id, superseded?}`. Deep link: `/personal-debts/<recipient_debt_id>`.
+
+**Action "อัปเดตตาม" (one shot):** `POST /v1/personal-debts/split-changes/:id/apply` (spec 12 §3.10).
+- A newer change to the same split supersedes the older pending one (`superseded: true`).
+- Applying a superseded or out-of-date change → `409 SPLIT_CHANGE_STALE`.
+- Show the button only when `actioned_at` is null and `superseded` isn't true.
+
+**Switches:** mutable; autoable (auto = apply on arrival, the notification lands actioned). Default: not auto.
+
 ### 2.6 `project_invite`
 
 **Fires when:** a `project_invites` row is created (someone is invited to a project as a linked member).

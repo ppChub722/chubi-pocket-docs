@@ -285,15 +285,49 @@ List transactions for the caller's own book (not shared-book — that's `GET /v1
       "created_at": "..."
     }
   ],
-  "pagination": { "page": 1, "per_page": 20, "total": 142, "total_pages": 8 }
+  "pagination": { "page": 1, "per_page": 20, "total": 142, "total_pages": 8 },
+  "totals": { "income": 12000.00, "expense": 8540.00, "net": 3460.00, "count": 57 }
 }
 ```
 
 Derived booleans in response: `has_splits` (any `shared_expense_splits` for this tx), `is_recurring` (`scheduled_transaction_id IS NOT NULL`), `is_resolve` (`source_split_id IS NOT NULL` OR `source_project_transaction_id IS NOT NULL`).
 
+`totals` (2026-10-10): money over the **whole filtered set** — every page, the same filters and visibility as the rows (all of them optional; no `from`/`to` = all time). `income` / `expense` = sums of income / expense rows; transfers count in neither. `net` = income − expense. `count` = the income + expense rows (`pagination.total` also counts both transfer rows). System rows (opening balance, adjustments, debt settlements) count like any other row the list shows. Sent on every page. Unlike `GET /v1/transactions/summary`, there is no report-scope or reportable-category narrowing.
+
 ### 3.3 `GET /v1/transactions/:id`
 
 Single transaction with full details — account, category, splits, project, scheduled_transaction reference, transfer pair (if transfer).
+
+Fields added 2026-10-10 (list rows carry them too unless noted):
+
+- `split_count` — how many debt rows this transaction made in its owner's book (0 = none; `has_splits` = `split_count > 0`).
+- `splits` — **detail only**, always an array: `[{debt_id, person_name, contact_id, direction, amount, settled_amount, status}]`, oldest first, only the caller's own debt rows (a shared-wallet member who isn't the author gets `[]`).
+- `project` — `{id, name}` when `project_id` is set; key absent otherwise.
+- `created_at` / `updated_at` — RFC3339 timestamps (were always there).
+
+### 3.4a `PUT /v1/transactions/:id/splits` — edit a bill's splits (2026-10-10)
+
+Body = the **whole new list**: `{"splits": [{"debt_id": uuid, "owed_amount": n} | {"person_name", "contact_id"?, "owed_amount"}]}`. Each item:
+- an existing `debt_id` → keeps it, re-amounted;
+- no `debt_id` → adds a person;
+- a split left out → removed; `[]` removes all.
+
+Rules:
+- Author only, expense / income only.
+- Σ `owed_amount` ≤ the transaction amount (`400 SPLITS_EXCEED_AMOUNT`).
+- Repayments **don't** constrain edits: amounts may go below what was repaid (overpaid, spec 12 §3.9). A removed person who repaid keeps a 0-amount debt; an unpaid one is deleted.
+- Other errors:
+  - `403 SPLITS_AUTHOR_ONLY`
+  - `400 SPLITS_ON_TRANSFER`
+  - `400 VALIDATION_ERROR` (unknown or duplicate `debt_id`, a new person without a name)
+  - `400 CONTACT_NOT_FOUND`
+  - `409 CONTACT_ARCHIVED`
+
+Response: the transaction detail with updated `splits`. Linked partners hear about it through `split_created` (added) / `split_changed` (re-amounted / removed), spec 13.
+
+### 3.4b Deleting a repayment row (2026-10-10)
+
+A row with `source_personal_debt_id` (a debt repayment, system category Debt Paid / Received) can now be **deleted**: the balance is reversed and its amount comes off the debt's `settled_amount` (floored at 0). Editing or unlinking repayments ("ไม่ใช่การจ่ายหนี้") is deferred to the debt-repayment round — they stay read-only (`SYSTEM_TRANSACTION_IMMUTABLE`).
 
 ### 3.4 `PUT /v1/transactions/:id`
 

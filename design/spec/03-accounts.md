@@ -95,7 +95,7 @@ Create a new account. If a non-zero opening balance is given, an "Opening Balanc
    - `amount`: `abs(balance)`
    - `category_id`: Opening Balance system category
    - `date`: today (in user's timezone)
-   - `note`: "Opening balance"
+   - `description` / `note`: empty — the app labels the row by its system category (owner 2026-10-10: no canned text on server-made rows)
 4. Transaction service updates `accounts.balance` to match the inserted transaction
 5. Commit
 
@@ -231,7 +231,7 @@ Manually adjust the balance to a target value. Backend computes the delta and cr
    - `amount`: `abs(delta)`
    - `category_id`: Adjustment system category
    - `date`: as given
-   - `note`: as given (or "Balance adjustment" default)
+   - `description` / `note`: as given — empty when not sent (no canned default; the app labels the row by its system category)
 6. Transaction service updates `accounts.balance` to `new_balance`
 7. Commit
 

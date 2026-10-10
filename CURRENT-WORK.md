@@ -12,6 +12,92 @@
 
 ---
 
+## 2026-10-10 — ส่งต่องาน UI ก่อนล้าง session (UI lead `d2` รวบรวมจาก ui · ราก · ปั้น · BE)
+
+> 0.3.1-4 **live แล้ว** (app `58d74a3` · be `d8f32c7` · migration 052 · APK build 45 · `LATEST_APP_BUILD=45` · `MIN_APP_BUILD=0`) — รายละเอียดใน entry "ปล่อย 0.3.1-4" ข้างล่าง · **owner ยังไม่ได้ลองบนเครื่องจริง**
+
+**วิธีทำงาน (owner)**
+- คุย UI กับ UI lead → UI lead ส่ง brief ให้ session ตามหน้าที่: **ui** (หน้าจอ) · **ราก** (navigation / kit / ลิสต์รายการ) · **ปั้น** (motion / shell / แดชบอร์ด) · **BE** · **release** (commit / deploy / APK เท่านั้น)
+- ชื่อ session (`chubi-pocket-xx`) เปลี่ยนทุกครั้งที่เปิดใหม่ → `ListAgents` แล้วถามทีละตัวว่าเป็นใคร
+- **แก้ UI ทีละหน้า ให้จบเป็นหน้าๆ** · รายการ (สร้าง / ลิสต์ / detail) จบแล้ว · หน้าถัดไป = **กระเป๋า** (ค้างคำถามด้านล่าง)
+- commit / deploy: owner สั่งเองใน release session · ก่อน release ให้ทุก session หยุดแก้ไฟล์
+
+**กฎที่ owner ตัดสินรอบนี้ (ยังไม่มีในโค้ดบางส่วน)**
+- **name / description / note:** สิ่งของมีครบ 3 ช่อง · รายการมี description (= "ค่าอะไร") + note · คำบนจอ ชื่อ / คำอธิบาย / โน้ต · **แท็กมีแค่ชื่อไปก่อน** · รายการระบบ description = ว่าง (แอปแปลชื่อหมวดระบบเอง)
+- **ลบ / เก็บถาวร:** แผนอนุมัติแล้ว ทำใน v0.3.3 → [engineering/v0.3.3-delete-archive-plan.md](engineering/v0.3.3-delete-archive-plan.md) · รายการ / หนี้ / หมวด / แท็ก = ลบอย่างเดียว · เก็บถาวร = ซ่อน + ไม่นับ + กู้ได้
+- **หน้า detail รายการ:** โหมดดูไม่มีแถวประเภท (ใช้สี) · ไม่มีคำอธิบายก็ว่าง (ใส่ชื่อหมวดแทนเฉพาะในลิสต์) · ✏️ มุมขวาบน มีชิปวันที่อยู่ซ้าย · ยอดไม่มี ± และ ฿ ติดตัวเลข · ประเภทแก้ไม่ได้หลังบันทึก
+- **การหาร:** แก้หลังบันทึกได้อิสระ ยอดจ่ายคืนไม่จำกัด · คงเหลือติดลบ = จ่ายเกิน แสดงกลับทิศ · ลบคนที่จ่ายคืนแล้ว = ยอด 0 · อีกฝ่ายได้แค่แจ้งเตือน "อัปเดตตาม" (หลักสมุดบันทึก ไม่แก้ของคนอื่น)
+- **back ในโหมดแก้ไข:** ถามเฉพาะตอนมีของที่แก้ค้าง (owner กลับคำจาก "ไม่ถาม") · ปุ่มยกเลิกไม่ถาม
+- **การปัด:** ปัดที่บาร์ล่าง = เปลี่ยน tab เสมอ · ปัดเนื้อหา = หน้านั้นก่อน (แดชบอร์ด / ลิสต์ เปลี่ยนช่วงเวลา) สุดทางค่อยเปลี่ยน tab · ไม่มีโซนขอบจอ
+
+**รอ owner ตอบ**
+- **หน้ากระเป๋า 5 ข้อ:** แยกกลุ่ม ของฉัน / กระเป๋าร่วม + ปุ่ม ⇅ จัดลำดับ · การ์ดหัว detail มีชิป ประเภท / แชร์ / วงเงิน และย้ายปรับยอดออกนอกการ์ด · ปุ่มลัด ปรับยอด / เพิ่มรายการ / โอน · เอาการ์ดสรุปช่วงเวลาออก (ใช้ tab รายการแทน) · คนที่ไม่ใช่เจ้าของปรับยอดได้ไหม
+- **ลิสต์รายการ:** tab รายการในหน้ากระเป๋าเปิดที่ "ทั้งหมด" (ตอนนี้) หรือเดือนนี้ · แท็กเป็น badge จิ๋ว vs ข้อความสี (ดู gallery) · ส่วนหัวเลื่อนไปกับลิสต์ vs ติดค้าง
+- **หนี้:** แก้หนี้ตรงๆ (`PUT /personal-debts/:id`) ยังห้ามตั้งยอดคืนแล้วให้เกินยอดหนี้ จะผ่อนกฎไหม
+- **รอบ "จ่ายหนี้" (owner จะคุยเอง):** แก้ยอดรายการจ่ายคืน · ปุ่ม "ไม่ใช่การจ่ายหนี้" (เลิกผูก) · แถว "จ่ายหนี้ให้: ลี ›" — BE จดวิธีทำไว้แล้ว
+
+**ยังไม่ได้ลองบนเครื่อง:** ระยะขยับตามนิ้วตอนปัด (`_maxNudge` 24 / `_enterShift` 0.06) · "ต้องจัดการ" บนแดชบอร์ด (ไม่มี widget test) · ปุ่มดาวน์โหลดในหน้าบังคับอัปเดต · ทั้งส่วนรายการ 0.3.1-4
+
+**บั๊ก / จุดที่ยังค้าง**
+- บน prod: ลบรายการในโปรเจกต์ที่มีคนคัดลอกไปแล้ว → 500 (CHECK `transactions_project_id_implies_source`) · รายการประจำที่หยุดไว้หายจากลิสต์ — ทั้งคู่อยู่ในแผน v0.3.3 ขั้น 1–2
+- สร้างรายการยังไม่เช็ค Σ ยอดหาร ≤ ยอดรายการ (ตอนแก้เช็คแล้ว)
+- อีกฝ่ายกดซ่อนแจ้งเตือนการหารไปแล้ว → กดอัปเดตตามไม่ได้ (`NOTIFICATION_STATE_CONFLICT`) รอกู้คืนแจ้งเตือนใน v0.3.3
+- module ที่ปิด: route redirect แล้ว แต่การ์ดแดชบอร์ด / แถวในตั้งค่ายังโผล่ · `push` ใน tab เดียวกันไปหน้า module ที่ปิดยังได้หน้าสำรอง
+- **ความเสี่ยง:** push หน้าขึ้น root navigator ตรงๆ ทับ shell (ไม่มี sheet คั่น) อาจ assert "multiple heroes share the same tag" (tag ของ AppTopBar ตายตัว)
+
+**เลื่อนไว้:** โหมดอีเวนต์ / รายการประจำใน sheet ยังเป็นแบบเก่า (รีวิวพร้อมหน้าของมัน) · เปลี่ยนคำ โปรเจกต์ → อีเวนต์ (ทำตอนรีวิวหน้าโปรเจกต์) · เอา pill kit (`chips/pill.dart`) ไปใช้แทน pill เก่า ~9 จุด · month picker ไปใช้ในหน้างบ · section แบบใหม่ในหน้าโปรเจกต์ / สมาชิกกระเป๋า / กระเป๋าที่เก็บถาวร · LLM ของ 0.3.2 รอ owner เปิดเรื่องเอง · l10n ที่ไม่ใช้แล้วลบได้ (`homeComingUp`, `pendingBlockTitle`, `homePrevMonth`, `homeNextMonth`, `commonDiscard*` ถ้าไม่ใช้)
+
+**จุดที่ต้องระวัง (แอป)**
+- ลิงก์ไปหน้าของ tab อื่นต้องใช้ `openPage` / `pageOpener` (มี `cross_tab_links_test` จับ) · page group ใหม่ = `ShellTab` + `_tabRoutes` + `ShellRow` + `ShellTab._segments`
+- หลังเขียนข้อมูลฝั่ง server ใช้ `TransactionsCubit.bookChanged()` หรือ `refresh()` **ห้าม `load()` เปล่า** (ล้างตัวกรอง)
+- sheet ที่มีช่องพิมพ์: controller ต้องอยู่ใน State แล้ว dispose ใน `dispose()` — dispose ทันทีหลัง `await showAppSheet` = พังตอนแอนิเมชันปิด
+- `AppSheetScaffold` เว้นที่ keyboard ให้แล้ว ของข้างในห้ามบวก viewInsets ซ้ำ
+- หมวดระบบดูจากไอคอนที่สงวนไว้ (`category_label.dart`) เพราะ BE ไม่ส่ง `system_kind`
+- ลิสต์ไม่มี `splits` (มีแค่ `GET /:id`) · ปุ่มกดของแจ้งเตือนทุกอันอยู่ที่ `notification_actions.dart` (inbox + แดชบอร์ดใช้ร่วม)
+- หน้าแรกของ tab ใหม่ต้องห่อ body ด้วย `TabSwitchBody` / `TabRootScaffold` · motion ทุกตัวต้องเคารพ `MediaQuery.disableAnimations`
+- `SectionCard` วาดเส้นคั่น + แถบเอง (section แรก `first: true`) · แถบยื่นเลย padding `lg` ตายตัว · แถบปุ่มล่างใช้ `PinnedBar`
+- text limits จาก `TextLimits` · label จาก `commonName` / `commonDescription` / `commonNote` · กระเป๋าล่าสุด `StorageKeys.lastAccountId`
+- arb แก้แบบต่อท้ายเมื่อหลาย session ทำพร้อมกัน · ใช้ flutter ของ fvm 3.47.3
+
+**จุดที่ต้องระวัง (BE)**
+- test ที่ใช้ DB: `TEST_DATABASE_URL=postgres://chubadmin:admin1234@localhost:5433/chubi_pocket_db?sslmode=disable` — ไม่ตั้ง = skip เงียบๆ
+- รัน migrate ผ่าน PowerShell (Git Bash ทำ path ของ docker เพี้ยน) · `core.autocrlf=true` มี noise CRLF/LF ไม่ใช่ diff จริง · gofmt เฉพาะไฟล์ที่แตะ
+- version gate: บังคับอัปเดต = ส่ง APK ก่อน แล้วค่อยตั้ง `MIN_APP_BUILD` (+ recreate container) · **ขั้นลบกระเป๋าใน v0.3.3 ต้องออกพร้อมแอป + ขยับ `MIN_APP_BUILD`** ไม่งั้นแอปเก่ากด "เก็บเข้าคลัง" = ลบจริง
+
+---
+
+## 2026-10-10 — ปล่อย 0.3.1-4 (release = session `chubi-pocket-32`)
+
+> owner สั่งผ่าน d2 + ยืนยันใน session นี้ · ก่อน commit: app analyze ผ่าน · test 183/183 · BE go vet + go test ผ่าน · migration **052** `editable_splits` (ไม่ breaking สำหรับ build 44)
+
+- **be** `d8f32c7` แก้ยอดหารหลังบันทึก · split_changed · ลบรายการจ่ายหนี้ · ยอดรวมหน้ารายการ · detail fields — งาน 0b · live · backup `chubi_pocket-20261010-1303.dump.gz` · migration 52 ✓ · health ✓
+- **app** `58d74a3` redesign สร้าง / รายการ / รายละเอียด transaction · แก้ยอดหาร · tag picker · ต้องจัดการ · swipe แถบล่าง · แจ้งเตือน split_changed · แก้ crash sheet ซ้อน + version `0.3.1-4` (commit เดียว → build **45**) · APK ส่ง `firsttester` แล้ว (Firebase 2045)
+- **prod `.env`:** `LATEST_APP_BUILD=45` (backup `.env.bak-<เวลา>`) · `MIN_APP_BUILD=0` คงเดิม · recreate app · `GET /api/v1/app/version` → latest 45 ✓ — เครื่อง build 44 จะเห็นแถบ "มีเวอร์ชันใหม่" ครั้งแรก
+- tag `v0.3.1-4`: app `58d74a3` · be `d8f32c7` · docs (commit นี้)
+- **owner ทดสอบ:** แถบอัปเดตบน build 44 → ติดตั้ง 45 · แก้ยอดหารหลังบันทึก + อีกฝ่ายได้ split_changed / "อัปเดตตาม"
+- อื่น ๆ: `ppforge-infra` `950c2f1` — `pull-to-dev.sh` ดึง backup prod แล้ว restore เข้า DB dev ในเครื่องทุกครั้ง (`NO_RESTORE=1` ข้าม)
+
+---
+
+## 2026-10-10 — BE สำหรับ 0.3.1-4: แก้ยอดหารหลังบันทึก · split_changed · ลบรายการจ่ายหนี้ · ยอดรวมหน้ารายการ (ยังไม่ commit)
+
+> session BE 0.3.2 · brief ผ่าน d2 · local เท่านั้น · migration **052** (`editable_splits`) · `go vet` + `go test ./...` ผ่าน (DB จริง, ไม่ skip)
+
+- **แก้ยอดหาร:** `PUT /v1/transactions/:id/splits` (ส่งรายการทั้งชุด: เพิ่ม / แก้ยอด / เอาออก) · ยอดจ่ายคืน**ไม่จำกัด**การแก้ → ยอดคงค้างติดลบได้ (= จ่ายเกิน แสดงเป็นหนี้กลับด้าน) · เอาคนที่จ่ายคืนแล้วออก = เก็บแถวไว้ยอด 0 · คนที่ยังไม่จ่าย = ลบแถว
+- **แจ้งอีกฝ่าย:** คนเพิ่ม → `split_created` เดิม · แก้ยอด / เอาออก (อีกฝ่ายเพิ่มหนี้ไว้แล้ว) → `split_changed` + ปุ่ม "อัปเดตตาม" ใช้ครั้งเดียว `POST /v1/personal-debts/split-changes/:id/apply` · อันใหม่แทนอันเก่า (superseded) · ยังไม่เพิ่ม → แก้ยอดใน split_created ที่รออยู่
+- **หนี้จ่ายเกิน:** ยอดรวมคน / แดชบอร์ดนับฝั่งกลับ · `settled` เมื่อจ่ายคืน = ยอดพอดี · ปิดหนี้ที่จ่ายเกิน → `DEBT_OVERPAID`
+- **ลบรายการจ่ายหนี้ได้แล้ว:** ยอดจ่ายคืนของหนี้ลดตาม (แก้ / ยกเลิกการผูก "ไม่ใช่การจ่ายหนี้" → รอบ "จ่ายหนี้")
+- รอบก่อนหน้า (ยังไม่ commit เช่นกัน): ไม่ใส่ข้อความอังกฤษในรายการระบบ · `totals` ใน `GET /transactions` · detail `split_count` / `splits` / `project`
+- docs: spec 04 / 12 / 13 · api-document 0.7 · schema (personal_debts) · แผน v0.3.3 เลื่อนเป็น migration 053
+
+---
+
+## 2026-10-10 — แผน v0.3.3: ลบ / เก็บถาวร / สถานะกลาง (owner อนุมัติ · ยังไม่เริ่ม)
+
+> แผนเต็ม: [engineering/v0.3.3-delete-archive-plan.md](engineering/v0.3.3-delete-archive-plan.md) — สถานะ active / inactive / completed / archived / ลบ · ลบกระเป๋าจริง (รายการไม่ผูกกระเป๋า) · เก็บถาวร = ซ่อน + ไม่ถูกนับ · migration 053 · 12 ขั้น (บั๊กลบรายการในโปรเจกต์ + รายการประจำที่พักไว้หาย ทำก่อน) · **ขั้น 12 ต้องปล่อยพร้อมแอป + ตั้ง `MIN_APP_BUILD`**
+
+---
+
 ## 2026-10-10 — ปล่อย 0.3.1-3 (release = session `chubi-pocket-5f`)
 
 > owner สั่งผ่าน d2 + ยืนยันใน session นี้ · ก่อน commit: BE build/vet/test ผ่าน (กับ DB เครื่อง) · app analyze ผ่าน · test 138 ผ่าน · ไม่มี migration

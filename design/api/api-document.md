@@ -207,7 +207,7 @@ Exempt: users, project members, wallet identifiers, notifications, import logs, 
 - **Update (partial):** key absent → unchanged · `null` → clear · `""` → clear. No `clear_*` flags. `name` on things can't be cleared — except a budget's, which goes back to its category's name.
 - **Budgets:** `name` is optional on create (absent / blank → the category's name) and always present in responses. Migration 051 moved the old `description` labels into `name`; `description` is a real description now.
 - **Contacts:** `notes` was renamed to `note` (responses, create / update, and both link-request bodies).
-- **Action bodies:** settle debt `{account_id, amount, date, description, note}` — `description` absent → the debt's own description. Adjust balance `{new_balance, date, description, note}` — `description` absent → "Balance adjustment".
+- **Action bodies:** settle debt `{account_id, amount, date, description, note}` — `description` absent → the debt's own description. Adjust balance `{new_balance, date, description, note}` — stored as sent; nothing typed → empty. Server-made rows (opening balance, adjustment) never get canned text — the app labels them by their system category (owner 2026-10-10).
 - **Copies map description → description, note → note:** a project row's personal copy and its "update to match" suggestion (`personal_update: {amount, date, description, note}`); scheduled pay-now / generated transactions (`description` = the schedule's `name`, `note` = its note); split debts (both sides take the bill's description); slip drafts (`description` = payee — fee draft "ค่าธรรมเนียม · payee" —, `note` = the slip's memo).
 - **Notification payloads** carry `description` beside `note`: `split_created`, `project_tx_recorded_for_you`; `project_tx_changed` diffs may include a `description` key.
 - **Search:** `GET /v1/transactions?q=` matches `description` too.
@@ -656,6 +656,8 @@ Change username. **Rate-limited to once per 30 days per user** — username live
 
 *Pending — see [`../spec/04-transactions.md`](../spec/04-transactions.md).*
 
+Recent additions (2026-10-10): `GET /v1/transactions` `totals` · detail `split_count` / `splits` / `project` · `PUT /v1/transactions/:id/splits` (edit splits) · repayment rows deletable (debt follows) — spec 04 §3.2–3.4b. Overpaid debts + `POST /v1/personal-debts/split-changes/:id/apply` — spec 12 §3.9–3.10. `split_changed` — spec 13 §2.8.
+
 ## 05 — Categories & Tags
 
 *Pending — see [`../spec/05-categories-tags.md`](../spec/05-categories-tags.md).*
@@ -873,6 +875,7 @@ Error codes specific to shared wallets:
 ## Status
 
 - **Last updated** — 2026-10-10
+- **Version** — 0.7 (Pointers: editable splits, overpaid debts, deletable repayment rows, split_changed — 2026-10-10)
 - **Version** — 0.6 (Conventions: app version check — `X-App-Build`, `GET /v1/app/version`, 426 `APP_OUTDATED`)
 - **Version** — 0.5 (Conventions: name / description / note standard — migration 051)
 - **Version** — 0.4 (§14 reworked to single-table model: dropped shared-transactions + contribute endpoints; added transfer-ownership + report-scope; documented authz changes on transactions endpoints)

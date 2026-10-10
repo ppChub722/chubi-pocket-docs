@@ -213,6 +213,33 @@ Records a settlement. Default mode (`direct=false`) creates a transaction.
 
 ---
 
+### 3.9 Editing a bill's splits, overpaid debts, repayment rows (2026-10-10, migration 052)
+
+**Repayments don't constrain edits (owner).** A split debt's `amount` can be edited below what was already repaid. `outstanding = amount − settled_amount` may then be **negative = overpaid**. Apps show it as `|outstanding|` owed the **other way** (e.g. Pond owed Lee 100, Lee repaid 50, the split is edited to 20 → outstanding −30 → "Pond owes Lee 30"). DB checks are now `amount >= 0` and `settled_amount >= 0` (the old `settled_amount <= amount` is gone).
+
+- **Status:** `settled` only when repaid exactly matches the amount (incl. 0/0); otherwise `open`. Overpaid rows stay `open` so they show. `cancelled` is sticky.
+- **People / dashboard totals:** an overpaid row counts on the opposite side (`owed_to_me` overpaid → adds to `i_owe`, and vice versa). Net is unchanged.
+- **Settle** on an overpaid debt → `400 DEBT_OVERPAID`. Auto-bump never runs on an overpaid row.
+- **Removing a person** from a split (`PUT /v1/transactions/:id/splits`, spec 04): an unpaid debt is deleted. A debt with repayments is **kept at amount 0**, so what they paid shows as overpaid. The repayment transaction is untouched.
+- **Repayment rows** (`transactions.source_personal_debt_id`): deleting one takes its amount off the debt's `settled_amount` (floored at 0). Editing / unlinking repayments is deferred to the debt-repayment round.
+- **Linked partner** (ledger rule): deleting MY repayment changes only my debt. The partner's book isn't touched and no notification is sent for it (their recorded receipt is theirs). Split re-amounts / removals reach them as `split_changed` (spec 13 §2.8).
+
+### 3.10 `POST /v1/personal-debts/split-changes/:notification_id/apply`
+
+"อัปเดตตาม" on a `split_changed` notification, **one shot**. It makes the caller's own (mirror) debt match:
+- `change: amount` → their amount = `new_amount`;
+- `removed` → their debt is deleted, or kept at 0 if they recorded repayments.
+
+→ `200 {result: "updated" | "deleted" | "zeroed", debt}`, and the notification is marked actioned.
+
+Errors:
+- `409 NOTIFICATION_ACTIONED` — already used
+- `409 SPLIT_CHANGE_STALE` — superseded by a newer change, or the split changed or was deleted since
+- `400 NOT_SPLIT_CHANGE`
+- `404` — their debt is gone
+
+`POST /split-requests/:id/accept` also answers `409 SPLIT_CHANGE_STALE` when the split was removed before it was added.
+
 ## 4. Design decisions
 
 ### 4.1 Why bidirectional in one table
