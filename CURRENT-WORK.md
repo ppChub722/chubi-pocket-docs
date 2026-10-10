@@ -12,6 +12,35 @@
 
 ---
 
+## 2026-10-10 — 0.3.1-6 released (DevOps session `chubi-pocket-14`)
+
+> Brief from Lead (`4c`) with the owner's go. Pre-checks run by Lead: app analyze clean, flutter test 221/221; BE go vet clean, go test ./... ok on :5433. **No migration** (prod stays at 052).
+> From 0.3.1-7 on, DevOps runs these pre-checks as part of the release flow (owner rule).
+
+- **be** `c1e453d`:
+  - rename / link a saved unlinked split in place
+  - event ↔ splits move; repaid / forgiven → 422; event bills may carry personal splits up to my share
+  - `my_share` + `can_split` / `can_edit_splits` / `can_join_event`
+  - reports, dashboard, list totals, wallet summary and budgets now count `my_share` (spec 12 §4.5)
+  - F1 / F2 / F5 fixes
+  - Status: live, health ✓, migrate "no change". Backup `chubi_pocket-20261010-1631.dump.gz` (+ `roles-20261010-1631.sql.gz`).
+- **app** `1ec670b`: UI pass on transactions, wallets, categories, tags and contacts, plus kit PickerSheet / HeroSpacing / ListRow / ChoicePill. Version `0.3.1-6` (one commit → build **47**). APK sent to `firsttester` (Firebase 2047).
+- **prod `.env`:**
+  - `LATEST_APP_BUILD=47`; `MIN_APP_BUILD=0` unchanged (BE works with builds 45 / 46)
+  - backup copy `.env.bak-0.3.1-6`; app recreated
+  - `GET /api/v1/app/version` → latest 47 ✓
+  - unauthenticated `/api/v1/transactions` → 401; no errors in the app log
+- tag `v0.3.1-6`: app `1ec670b` · be `c1e453d` · docs (this commit)
+- **Release note:** dashboard / report numbers switch to the share basis (`my_share`). This is intended, so totals for split transactions will look lower than in 0.3.1-5.
+- **Owner to test:** update banner on build 46 → install 47; dashboard / report totals on split transactions; splits via the contact picker; moving a tx into and out of an event.
+- Also today (DevOps, ppforge-infra `b26a575`):
+  - server `backup.sh` now matches the repo and adds a roles dump each run
+  - dumps are 640 root:Admin in a 750 dir
+  - cron output goes to `/var/log/chubi-backup.log`, with logrotate
+- DevOps follow-up: `deploy.sh` prints the newest file in the dumps dir, which is now the roles file. It should filter `*.dump.gz`.
+
+---
+
 ## 2026-10-10 — 0.3.1-6 พร้อมปล่อย: UI รายการ · กระเป๋า · หมวด · แท็ก · ผู้ติดต่อ (Lead `4c` รวบรวม)
 
 > owner สั่ง commit FE + BE แล้วให้ DevOps deploy · Lead ตรวจก่อน freeze: app analyze ผ่าน · test 221/221 · BE go vet + go test ผ่าน (DB จริง) · **ไม่มี migration** (prod ยัง 052) · BE ใช้กับ build 45/46 ได้ → `MIN_APP_BUILD=0` คงเดิม
