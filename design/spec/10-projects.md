@@ -711,7 +711,7 @@ Update fields. `record_user_id` OR project owner only. Project must allow edits 
 
 #### `DELETE /v1/projects/:id/project-transactions/:pt_id`
 
-`record_user_id` OR project owner only. Hard delete cascades to splits. Affected users get `project_tx_changed` (`change_kind=deleted`).
+`record_user_id` OR project owner only. Hard delete cascades to splits. Affected users get `project_tx_changed` (`change_kind=deleted`). Personal rows linked to the deleted row or its splits (the recorder's own bill, members' copies) are unlinked first (`project_id` + `source_project_transaction_id` → NULL) and stay as loose transactions — a copy is just a copy (2026-10-10).
 
 Personal entries that referenced the deleted splits via `source_split_id` keep their data but lose the FK link (cascaded SET NULL on splits' parent → split deleted → personal_debts.source_split_id set to NULL per [`12-personal-debts.md`](12-personal-debts.md) §4.6).
 
@@ -1111,6 +1111,28 @@ picker of past eligible transactions to pull in:
 **v1 scope-cut:** the FAB always creates a *new* project. Adding a later
 bill to an existing project uses the project page's own flow ("add to
 existing" from the picker is a v2 candidate if users ask).
+
+### 4.25 Attach / remove / move an existing transaction _(owner 2026-10-10)_
+
+From the transaction page, one transaction at a time (multi-select from the
+event page later reuses the same list-shaped add):
+
+- **Add to an existing event** — `POST /v1/projects/:id/bills` with
+  `transaction_ids` only. **New event from it** — `POST /v1/projects/quick`
+  with `transaction_ids` only. Same pull as §4.24 (auto members, auto-claimed
+  board row, settled stays settled).
+- **Remove** — `DELETE /v1/projects/:id/bills/:transaction_id`. Always
+  allowed, author only; the transaction itself is never deleted. If it is
+  the board row's origin (I recorded the row and I'm its actor), the board
+  row and its splits go and every copy is unlinked (copies stay as plain
+  loose transactions in their owners' books); if it's my copy of someone
+  else's row, only my copy is unlinked. Its own splits stay (they lose
+  `project_id`); auto-added members stay.
+- **Move** = remove + add in one call: `"move": true` on either endpoint.
+- **Not eligible:** transfers, debt repayments (`source_personal_debt_id`).
+  Wallet-less transactions are fine — a wallet exists only on my side, an
+  event has none; the board row takes the wallet's currency, else the
+  author's user currency.
 
 ---
 

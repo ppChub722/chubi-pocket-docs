@@ -200,22 +200,25 @@ Splits create rows in `shared_expense_splits` (schema in [`06-shared-expenses.md
 
 **Notification side effects:** for each split with a debtor whose `contact.linked_user_id` is set (linked contact), a `split_created` notification fires per the splitter's `auto_notify_linked_split_contacts` setting (see [`13-notifications.md`](13-notifications.md)).
 
-**Success — `201 Created`:**
+**Success — `201 Created`:** expense / income answer with the same detail as `GET /v1/transactions/:id` (§3.3: `splits`, `split_count`, tags, project, shared-wallet fields) plus `account_balance_after` (2026-10-10; before that `splits` was missing from the create response).
 
 ```json
 {
   "id": "0190e5-tx1",
   "type": "expense",
   "account_id": "0190e5-kbank",
+  "account": { "id": "0190e5-kbank", "name": "KBank" },
   "amount": 3000.00,
   "category": { "id": "...", "name": "Food" },
   "date": "2026-04-24",
   "note": "Team dinner",
-  "project_id": "0190e5-japan",
+  "has_splits": true,
+  "split_count": 2,
   "splits": [
-    { "id": "0190e5-split1", "contact_id": "0190e5-bob",   "owed_amount": 1000.00, "my_resolution_status": "unresolved" },
-    { "id": "0190e5-split2", "contact_id": "0190e5-carol", "owed_amount": 1000.00, "my_resolution_status": "unresolved" }
+    { "debt_id": "0190e5-d1", "person_name": "Bob",   "contact_id": "0190e5-bob", "direction": "owed_to_me", "amount": 1000.00, "settled_amount": 0, "status": "open" },
+    { "debt_id": "0190e5-d2", "person_name": "Carol", "contact_id": null,         "direction": "owed_to_me", "amount": 1000.00, "settled_amount": 0, "status": "open" }
   ],
+  "tags": [],
   "account_balance_after": 12000.00,
   "created_at": "2026-04-24T14:00:00Z"
 }
@@ -301,7 +304,7 @@ Single transaction with full details — account, category, splits, project, sch
 Fields added 2026-10-10 (list rows carry them too unless noted):
 
 - `split_count` — how many debt rows this transaction made in its owner's book (0 = none; `has_splits` = `split_count > 0`).
-- `splits` — **detail only**, always an array: `[{debt_id, person_name, contact_id, direction, amount, settled_amount, status}]`, oldest first, only the caller's own debt rows (a shared-wallet member who isn't the author gets `[]`).
+- `splits` — **detail only** (GET /:id, the create / update / PUT splits responses; never on list rows), always an array: `[{debt_id, person_name, contact_id, direction, amount, settled_amount, status}]`, oldest first, only the caller's own debt rows (a shared-wallet member who isn't the author gets `[]`).
 - `project` — `{id, name}` when `project_id` is set; key absent otherwise.
 - `created_at` / `updated_at` — RFC3339 timestamps (were always there).
 

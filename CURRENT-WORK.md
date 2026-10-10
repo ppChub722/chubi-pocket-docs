@@ -12,6 +12,19 @@
 
 ---
 
+## 2026-10-10 — ปล่อย 0.3.1-5 (release = DevOps session `chubi-pocket-14`)
+
+> brief จาก Lead (`chubi-pocket-4c`) ซึ่ง owner ให้ go · owner ยืนยันใน session นี้ว่า go ที่ Lead ส่งต่อมาให้ถือว่าใช้ได้ · ก่อน commit (Lead ตรวจ): app analyze ผ่าน · test 188/188 · BE go vet + go test ผ่าน · **ไม่มี migration** (prod อยู่ที่ 052)
+
+- **be** `0f8f0a0` POST /transactions ตอบ detail เต็ม (splits / tags / project / account) · `ee92bc9` ผูก / เอาออก / ย้าย รายการในอีเวนต์ (`DELETE /projects/:id/bills/:transaction_id`) · บิลไม่ต้องมีกระเป๋า · จ่ายหนี้เป็นบิล → 422 · DeletePT ไม่ 500 ตอนแถวถูกคัดลอก (v0.3.3 step 1) — live · backup `chubi_pocket-20261010-1434.dump.gz` · migrate "no change" · health ✓
+- **app** `33e28fc` ฟอร์มสร้างแบบเร็ว + detail ดู / แก้ redesign · แก้ splits หายจาก cache ตอน list refresh · AppTopBar titleSlot · filter sheet ใช้ชิปจาก kit + version `0.3.1-5` (commit เดียว → build **46**) · APK ส่ง `firsttester` แล้ว (Firebase 2046)
+- **prod `.env`:** `LATEST_APP_BUILD=46` · `MIN_APP_BUILD=0` คงเดิม (BE ใช้กับ build 45 ได้) · recreate app · `GET /api/v1/app/version` → latest 46 ✓ · `/api/v1/transactions` ไม่มี token → 401 (route + auth ปกติ, log ไม่มี error)
+- tag `v0.3.1-5`: app `33e28fc` · be `ee92bc9` · docs (commit นี้ — รวม doc ของ BE: api-document · spec 04 · spec 10 · v0.3.3 plan step 1 เสร็จ)
+- **owner ทดสอบ:** แถบอัปเดตบน build 45 → ติดตั้ง 46 · สร้างรายการแบบหาร แล้วดูว่า splits ยังอยู่หลัง refresh ลิสต์ · ผูก / เอาออก รายการจากอีเวนต์
+- ค้าง (DevOps): `/srv/backup/backup.sh` บน server ยังเป็นรุ่น 16 ก.ย. ไม่ตรงกับ `ppforge-infra` · สำเนา backup ในเครื่อง dev ล่าสุด 0825 (ยังไม่ได้รัน `pull-to-dev.sh` เพราะมัน restore ทับ DB dev)
+
+---
+
 ## 2026-10-10 — ส่งต่องาน UI ก่อนล้าง session (UI lead `d2` รวบรวมจาก ui · ราก · ปั้น · BE)
 
 > 0.3.1-4 **live แล้ว** (app `58d74a3` · be `d8f32c7` · migration 052 · APK build 45 · `LATEST_APP_BUILD=45` · `MIN_APP_BUILD=0`) — รายละเอียดใน entry "ปล่อย 0.3.1-4" ข้างล่าง · **owner ยังไม่ได้ลองบนเครื่องจริง**

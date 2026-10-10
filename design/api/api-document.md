@@ -656,7 +656,7 @@ Change username. **Rate-limited to once per 30 days per user** — username live
 
 *Pending — see [`../spec/04-transactions.md`](../spec/04-transactions.md).*
 
-Recent additions (2026-10-10): `GET /v1/transactions` `totals` · detail `split_count` / `splits` / `project` · `PUT /v1/transactions/:id/splits` (edit splits) · repayment rows deletable (debt follows) — spec 04 §3.2–3.4b. Overpaid debts + `POST /v1/personal-debts/split-changes/:id/apply` — spec 12 §3.9–3.10. `split_changed` — spec 13 §2.8.
+Recent additions (2026-10-10): `GET /v1/transactions` `totals` · detail `split_count` / `splits` / `project` · `PUT /v1/transactions/:id/splits` (edit splits) · `POST /v1/transactions` 201 for expense / income = the full detail incl. `splits` · repayment rows deletable (debt follows) — spec 04 §3.2–3.4b. Overpaid debts + `POST /v1/personal-debts/split-changes/:id/apply` — spec 12 §3.9–3.10. `split_changed` — spec 13 §2.8.
 
 ## 05 — Categories & Tags
 
@@ -730,12 +730,12 @@ The project ledger is decoupled from personal books. Splits are represented as c
   ```
   Children inherit `type/currency/date/note` from the parent — do not send them per child. Server validates: each split's member belongs to the project, no self-split (split member ≠ parent actor), Σ split amounts ≤ parent amount.
 - `PUT    /v1/projects/:id/project-transactions/:pt_id` — body fields all optional: `amount`, `date`, `note`, `splits`. When `splits` is non-null, all existing children are deleted and the new list is inserted (full replacement). Children cannot be edited directly; rejected with `400 PT_IS_CHILD` if `:pt_id` is a child.
-- `DELETE /v1/projects/:id/project-transactions/:pt_id` — deleting a parent FK-cascades children. Deleting a child removes that one split.
+- `DELETE /v1/projects/:id/project-transactions/:pt_id` — deleting a parent FK-cascades children. Deleting a child removes that one split. Personal rows linked to the deleted row(s) (the author's bill, members' copies) are unlinked first and stay as loose transactions (2026-10-10; this used to fail with 500 on CHECK `transactions_project_id_implies_source`).
 - `PUT    /v1/projects/:id/project-transactions/:pt_id/mark` — body `{"marked": bool}`. Toggles caller's `project_member_id` in the row's `marks` array. Idempotent. Independent of personal-book actions.
 
 There is **no `/claim` endpoint** — the resolve flow is client-side. The FE creates personal entries via the regular `POST /v1/transactions` (with `source_project_transaction_id` set for traceback) or `POST /v1/personal-debts`. The transactions module auto-derives `project_id` from `source_project_transaction_id` and validates caller is a project member.
 
-### Quick create *(planned — spec §4.24)*
+### Quick create / add / remove bills *(spec §4.24–4.25)*
 
 `POST /v1/projects/quick` — atomic: create project + auto-add members +
 board rows for every included bill, born auto-claimed. Settled debt state
@@ -747,15 +747,43 @@ Request:
 {
   "name": "แฟน, บี · 15 ก.ย. 2026",
   "new_transaction": { "…same body as POST /v1/transactions, splits[] allowed…": true },
-  "transaction_ids": ["uuid", "uuid"]
+  "transaction_ids": ["uuid", "uuid"],
+  "move": false
 }
 ```
 
 - `name` — required (FE composes the members+date default, editable)
-- `new_transaction` — required; processed through the normal personal
-  transaction create path (account balance moves, splits create debts)
-- `transaction_ids` — optional; each must belong to the caller and have
-  `project_id IS NULL`, else the whole call fails (atomic)
+- `new_transaction` — optional (2026-10-10); processed through the normal
+  personal transaction create path (account balance moves, splits create
+  debts). At least one of `new_transaction` / non-empty `transaction_ids`.
+- `transaction_ids` — optional; each must be the caller's own expense /
+  income, not a debt repayment, and have `project_id IS NULL` (or
+  `move`), else the whole call fails (atomic). Wallet-less bills are fine:
+  the board row's currency is the bill's wallet currency, else the
+  caller's user currency (a project has no currency of its own).
+- `move` — optional, default false: a listed bill already in **another**
+  project leaves it first (same rules as DELETE below), in the same DB
+  transaction. A bill already in the target project is always 409.
+
+`POST /v1/projects/:id/bills` — the same pull into an existing project:
+body `{new_transaction?, transaction_ids?, move?}` (no `name`). Caller must
+be an active non-viewer member; project must accept new rows.
+
+`DELETE /v1/projects/:id/bills/:transaction_id` → `204` — take the
+caller's own transaction out of the project; the transaction stays as a
+loose one. Only the transaction's author; no project lock / membership
+check (removal is always allowed).
+- The transaction is its board row's origin (caller recorded the row and is
+  its actor) → the board row + its split children are deleted and every
+  personal row linked to them (members' copies too) is unlinked;
+  `project_tx_changed` (`deleted`) goes to the row's linked stakeholders.
+- Otherwise (caller's copy of someone else's row) → only the caller's row
+  is unlinked; the board row stays.
+- The transaction's own splits stay; they only lose `project_id`. Members
+  auto-added to the project stay.
+
+Errors (`DELETE`): `404 TX_NOT_FOUND` (missing or not the caller's);
+`404 TX_NOT_IN_PROJECT`.
 
 Behavior: caller becomes `owner`; members = union of split counterparties
 across all included bills (linked contact → active linked member +
@@ -766,11 +794,14 @@ debts) and the personal row is linked back (`project_id` +
 `source_project_transaction_id`) — auto-claimed. Existing
 `personal_debts` from those bills gain `project_id` only.
 
-Response `201`: the created project (same shape as `POST /v1/projects`)
-plus `"linked_count": n` (board rows created).
+Response `201` (quick + bills): the project (same shape as `POST
+/v1/projects`) plus `"linked_count": n` (board rows created) and
+`"transaction_id"` — the new bill's id, **absent** when no
+`new_transaction` was sent.
 
-Errors: `400 VALIDATION_ERROR`; `404 TX_NOT_FOUND` (missing or not the
-caller's); `409 TX_ALREADY_IN_PROJECT`.
+Errors (quick + bills): `400 VALIDATION_ERROR` (incl. nothing to add, a
+transfer); `404 TX_NOT_FOUND` (missing or not the caller's); `409
+TX_ALREADY_IN_PROJECT`; `422 TX_NOT_BILLABLE` (a debt repayment).
 
 ### Summary
 
