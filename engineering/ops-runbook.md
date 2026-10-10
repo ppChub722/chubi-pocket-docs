@@ -37,7 +37,7 @@ ssh -i ~/.ssh/ppforge_vps Admin@160.238.13.137
 
 - ทุก container คุยกันผ่าน docker network ชื่อ **`proxy-net`**
 - **ดู secrets**: `sudo cat /srv/chubi/.env` (JWT_SECRET, รหัส DB) / `sudo cat /srv/postgres/.env` (รหัส superuser)
-- Firewall (UFW): เปิดแค่ 22, 80, 443 · fail2ban กัน brute-force SSH
+- Firewall (UFW): เปิดแค่ 22, 80, 443 · **ไม่มี fail2ban** (ตรวจ 2026-10-10: ไม่ได้ติดตั้ง — ที่จดไว้เดิมผิด) · SSH: key อย่างเดียว, `MaxAuthTries 3`
 
 ---
 
