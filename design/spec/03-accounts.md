@@ -81,8 +81,8 @@ Create a new account. If a non-zero opening balance is given, an "Opening Balanc
 | `description` | string | — | Up to 280 chars; one-line guidance ("Daily-spend account"). `null` clears. |
 | `note` | string | — | Up to 280 chars; free-form scratch notes ("Old emergency fund — don't touch"). `null` clears. |
 | `credit_limit` | number | ✅ (if credit type) | ≥ 0 |
-| `statement_date` | integer | — | 1–31 |
-| `payment_due_date` | integer | — | 1–31 |
+| `statement_date` | integer | — | 1–31; a day past the month's end means its last day, so `31` = "last day of the month" |
+| `payment_due_date` | integer | — | 1–31; same clamp (`31` = last day; the dashboard's card-due item uses Apr 30, Feb 28/29) |
 | `minimum_payment` | number | — | ≥ 0 |
 | `identifiers` | array | — | 0.3.1 — `[{kind, value, bank_code?}]`, the numbers this wallet is known by on bank slips ([spec 15 §5](15-slip-import.md)). `kind`: `bank_account` · `promptpay` · `card` · `other`. `value`: digits, `x` for hidden ones, separators dropped (`123-4-52780-6` → `1234527806`, `xxx-x-x2780-x` → `xxxxx2780x`), ≥ 4 digits, ≤ 32 chars. `bank_code`: 3 digits. Identical entries collapse; ≤ 10. On update: present → replaces the list (`[]` clears), absent → unchanged. Owner only. Bad entry → `400 INVALID_IDENTIFIER`. |
 

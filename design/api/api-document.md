@@ -656,7 +656,7 @@ Change username. **Rate-limited to once per 30 days per user** — username live
 
 *Pending — see [`../spec/04-transactions.md`](../spec/04-transactions.md).*
 
-Recent additions (2026-10-10): `GET /v1/transactions` `totals` · detail `split_count` / `splits` / `project` · `PUT /v1/transactions/:id/splits` (edit splits; rename / link a split without a contact in place, `422 SPLIT_IDENTITY_LOCKED` otherwise) · `POST /v1/transactions` 201 for expense / income = the full detail incl. `splits` · `my_share` + `can_split` / `can_edit_splits` / `can_join_event` on every row, reports on share basis (spec 04 §3.3, spec 12 §4.5) · repayment rows deletable (debt follows) — spec 04 §3.2–3.4b. Overpaid debts + `POST /v1/personal-debts/split-changes/:id/apply` — spec 12 §3.9–3.10. `split_changed` — spec 13 §2.8.
+Recent additions (2026-10-10): `GET /v1/transactions` `totals` · detail `split_count` / `splits` / `project` · `PUT /v1/transactions/:id/splits` (edit splits; change a saved split's person in place — rename, switch / link a contact, `"contact_id": null` back to a free name — unless its contact is linked to an app user: `422 SPLIT_IDENTITY_LOCKED`) · `POST /v1/transactions` 201 for expense / income = the full detail incl. `splits` · `my_share` + `can_split` / `can_edit_splits` / `can_join_event` on every row, reports on share basis (spec 04 §3.3, spec 12 §4.5) · repayment rows deletable (debt follows) — spec 04 §3.2–3.4b. Overpaid debts + `POST /v1/personal-debts/split-changes/:id/apply` — spec 12 §3.9–3.10. `split_changed` — spec 13 §2.8.
 
 ## 05 — Categories & Tags
 
@@ -848,7 +848,7 @@ splits; `move` carries them to the new board row.
 Planned surface (no new ledger endpoints — wallet rows are ordinary transactions):
 
 - `GET    /v1/accounts` — response gains `members[]` per account (active members only)
-- `POST   /v1/accounts/:id/members` — invite by email (project-invite pattern; pending until accepted; converting invite is warning-gated client-side)
+- `POST   /v1/accounts/:id/members` — invite a linked contact or an email (project-invite pattern; pending until accepted; converting invite is warning-gated client-side)
 - `DELETE /v1/accounts/:id/members/:member_id` — leave / remove (sets `left_at`; rows untouched, ex-member's rows lock read-only for them)
 - `POST   /v1/accounts/:id/transfer-ownership` — `{new_owner_user_id}`; required before an owner leaves a shared wallet
 - `PUT    /v1/accounts/:id/report-scope` — `{report_scope: none|own|all}` for the caller's own membership (ex-members capped at `own`)
@@ -896,7 +896,7 @@ transaction endpoints gain denormalized author + category rendering:
 
 Member management:
 
-- `POST /v1/accounts/:id/members` body `{"email": "..."}` → `201` pending member (notification-pattern invite, same as projects). Errors: `404 USER_NOT_FOUND`, `409 USER_ALREADY_MEMBER`, `403 NOT_MEMBER`
+- `POST /v1/accounts/:id/members` body `{"contact_id": "..."}` (one of my contacts with `linked_user_id`; 2026-10-11) **or** `{"email": "..."}` — exactly one → `201` pending member (notification-pattern invite, same as projects; the invitee gets `account_invite`). Errors: `400 VALIDATION_ERROR` (neither / both), `404 CONTACT_NOT_FOUND` (not my contact), `409 CONTACT_ARCHIVED`, `422 CONTACT_NOT_LINKED` (no app account), `404 USER_NOT_FOUND` (email), `409 USER_ALREADY_MEMBER` (member, pending invite, or myself), `403 NOT_MEMBER`
 - `DELETE /v1/accounts/:id/members/:member_id` → `200`; sets `left_at`. v1 rule: a member may remove **themselves** (leave); the `owner` may remove anyone. Owner leaving with other members present → `409 OWNER_MUST_TRANSFER`
 - `POST /v1/accounts/:id/transfer-ownership` body `{"new_owner_user_id": "..."}` (owner only, target must be active member) → `200`
 - `PUT /v1/accounts/:id/report-scope` body `{"report_scope": "none|own|all"}` → `200`; ex-members may call with `none|own` only (`400 SCOPE_NOT_ALLOWED`)

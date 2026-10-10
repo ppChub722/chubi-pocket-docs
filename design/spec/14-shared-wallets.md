@@ -190,7 +190,7 @@ blocking rule for this module.
 
 ```
 GET    /v1/accounts                        — gains members[] (active) per account
-POST   /v1/accounts/:id/members            — invite (triggers conversion warning client-side)
+POST   /v1/accounts/:id/members            — invite a linked contact or an email (triggers conversion warning client-side)
 DELETE /v1/accounts/:id/members/:member_id — leave / remove (sets left_at)
 POST   /v1/accounts/:id/transfer-ownership — required before an owner leaves a shared wallet
 PUT    /v1/accounts/:id/report-scope       — {report_scope} for the caller's own membership
@@ -238,6 +238,10 @@ out of expense reports; a dedicated type would just re-implement that.
 
 1. ~~Invite mechanics~~ — **resolved 2026-09-11**: notification pattern,
    same as project member invites. No dedicated `account_invites` table.
+   **2026-10-11:** the app invites by picking one of my contacts linked to
+   an app account (`contact_id`; the BE resolves the user); `email` is still
+   accepted. A contact without an app account can't be invited
+   (`422 CONTACT_NOT_LINKED`).
 2. ~~Scheduled transactions targeting a shared wallet~~ — **resolved
    2026-09-11**: always allowed; generated rows authored by the
    schedule's owner (see §1.2).

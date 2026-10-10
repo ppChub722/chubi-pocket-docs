@@ -322,11 +322,9 @@ Body = the **whole new list**: `{"splits": [{"debt_id": uuid, "owed_amount": n, 
 - no `debt_id` → adds a person;
 - a split left out → removed; `[]` removes all.
 
-**Changing a saved split's person (2026-10-10):** `person_name` / `contact_id` on a kept item — left out or equal to the current values = no change.
-- The split has **no contact** (`contact_id` null):
-  - a new `person_name` → renamed in place (same debt row, repayments kept, nobody notified);
-  - a `contact_id` (one of my contacts) → linked in place (same row, repayments kept; `person_name` defaults to the contact's `display_name`). If that contact has an app account, they get `split_created` for the split's current amount, exactly as for a new split.
-- The split **has a contact** (any contact, app account or not) → any change is `422 SPLIT_IDENTITY_LOCKED`; remove it and add a new one instead.
+**Changing a saved split's person (2026-10-10, narrowed 2026-10-11):** `person_name` / `contact_id` on a kept item — left out or equal to the current values = no change; `"contact_id": null` (the key present) drops the contact, back to a free name.
+- The split is a **free name, or its contact has no app account** (`linked_user_id` null) → the person changes in place: rename, switch to another of my contacts, link to a contact, or drop back to a free name. Same debt row, repayments kept, nobody notified. A new contact's `display_name` is the default name. If the new contact **has** an app account, they get `split_created` for the split's current amount, exactly as for a new split.
+- The split's contact **is linked to an app user** (they may hold a mirror) → any change is `422 SPLIT_IDENTITY_LOCKED`; remove it and add a new one instead.
 
 Rules:
 - Author only, expense / income only.
@@ -338,7 +336,7 @@ Rules:
   - `400 VALIDATION_ERROR` (unknown or duplicate `debt_id`, a new person without a name)
   - `400 CONTACT_NOT_FOUND`
   - `409 CONTACT_ARCHIVED`
-  - `422 SPLIT_IDENTITY_LOCKED` (changing the person of a split with a contact)
+  - `422 SPLIT_IDENTITY_LOCKED` (changing the person of a split whose contact is linked to an app user)
   - `400 SPLITS_EXCEED_SHARE` (an event bill: Σ > amount − the board's member splits, spec 10 §4.25)
   - `400 SYSTEM_TRANSACTION_IMMUTABLE` (a debt repayment or another system row)
 

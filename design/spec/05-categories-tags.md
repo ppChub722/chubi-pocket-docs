@@ -504,7 +504,7 @@ Phase 4+ adds a template picker at onboarding — choose "Default," "Student," "
 
 ### 4.14a Drag-to-reorder, single atomic save
 
-The Manage Categories screen has a long-press-to-reorder mode (§6). Reordering can move a row up/down among siblings **and** change its depth (e.g. promote a sub-category to a root). To keep the sibling-sort invariant intact during what's effectively a multi-row mutation, the client stages all changes locally then sends them as one `PATCH /v1/categories/reorder` (§3.13).
+The Manage Categories screen has a reorder mode, entered with ✏️ or a long-press on a row (the app's shared reorder kit, 2026-10-11): ⠿ handles that drag at once, with a sideways move setting the depth, or tap a row and use ← ↑ ↓ →. Reordering can move a row up/down among siblings **and** change its depth (e.g. promote a sub-category to a root). To keep the sibling-sort invariant intact during what's effectively a multi-row mutation, the client stages all changes locally then sends them as one `PATCH /v1/categories/reorder` (§3.13).
 
 Why not per-row PUTs:
 - A single drag-drop can shift `parent_id` *and* `sort_order` on multiple rows. Per-row PUTs would briefly produce a state where two siblings share a `sort_order`, or where a row's `parent_id` points at the previous-batch tree.
@@ -512,15 +512,13 @@ Why not per-row PUTs:
 
 `sort_order` is intentionally not exposed on `POST` / `PUT` — those endpoints are for create / metadata edits. All sibling reordering goes through §3.13.
 
-### 4.14b Color inheritance from L1 (client convention)
+### 4.14b Every level shows its own icon (client convention)
 
-The data model stores `color` per row, but the UI **displays** every row in a subtree using its L1 ancestor's color. Why: the user picks a single color for "Food" and expects "Food → Restaurants" and "Food → Restaurants → Tipping" to inherit it. Storing the L1 color on every descendant would scatter the source of truth and break when L1's color changes.
+Owner decision 2026-10-11 (replaces the earlier "colour inherited from L1" rule): **every category, at any level, displays its OWN `icon_code`, glyph and colours.** L2/L3 no longer take the L1's icon or colour anywhere in the app (lists, pickers, chips, transaction rows, budgets). The icon maker on an L2/L3 edits the full icon, glyph and colour, the same as on an L1.
 
-Backend stores whatever the client sends. The client either:
-- Sends the L1 color when creating L2/L3 rows (current Phase 1a app behavior), so the data is self-consistent if displayed standalone, **or**
-- Sends `null` and resolves the L1 color at render time.
+Only a row with no `icon_code` at all falls back to its L1 ancestor's icon when displayed.
 
-Both are valid; backend doesn't enforce.
+The backend stores whatever the client sends and enforces nothing here.
 
 ### 4.14c `include_in_report` defaults for seed categories
 
@@ -550,8 +548,9 @@ System categories have `is_system = true` but `name` is editable. Users might wa
 ## 6. Status
 
 - **Phase** — spec; Phase 1a backend partially landed (CRUD + system seed + starter seed). Reorder endpoint + new fields land with migration `000008`.
-- **Last updated** — 2026-04-29
-- **Version** — 0.2
+- **Last updated** — 2026-10-11
+- **Version** — 0.3
 - **Changelog**
+  - **0.3 (2026-10-11)** — §4.14b: every level shows its own icon (glyph + colour); the L1-inheritance rule is dropped (owner decision, QA S4).
   - **0.2 (2026-04-29)** — Added `sort_order`, `include_in_report`, `description`, `note` to `categories`; added `icon` to `tags`. Added `PATCH /v1/categories/reorder` (§3.13). Added §4.14a–c notes covering single-atomic-save, color inheritance, and `include_in_report` defaults.
   - **0.1 (2026-04-24)** — Initial draft (3-layer tree, system categories + seed, soft-delete with display-skip).

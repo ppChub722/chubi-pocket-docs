@@ -12,6 +12,35 @@
 
 ---
 
+## 2026-10-11 — 0.3.1-7 released (DevOps session `chubi-pocket-14`)
+
+> Brief from Lead (`4c`) with the owner's go. **No QA pass this release** (owner decision). **No migration** (prod stays at 052).
+
+**Pre-checks (run by DevOps, first time):**
+- BE: `go vet ./...` clean; `go test -count=1 ./...` passed 125 / failed 0 / skipped 0, with `TEST_DATABASE_URL` pointing at the local DB on :5433 (at 052).
+- App: `flutter analyze` found no issues; `flutter test` 312 / 312.
+
+- **be** `c62ac06`:
+  - wallet invite by linked contact
+  - split identity lock only for app-linked contacts
+  - categories are appended at the end
+  - `scripts/deploy.sh` "latest dump" line now shows only `*.dump.gz`
+  - Status: live, health ✓, migrate "no change". Backup `chubi_pocket-20261010-1948.dump.gz`.
+  - The first deploy attempt hit a transient SSH timeout before anything ran on the server; the retry was clean.
+- **app** `b4d9d52`:
+  - UI pass round 2: wallets list / detail / form, reorder-mode kit, splits (me row + auto, must balance), tx detail view, compact hero bar, pickers, AppChip, detail patterns gallery, contacts linked filter
+  - fixes: S1 / E2 / W1 / W2, -฿0.00, the cold-start crash guard
+  - version `0.3.1-7` (one commit → build **48**); APK sent to `firsttester` (Firebase 2048)
+- **prod `.env`:**
+  - `LATEST_APP_BUILD=48`; `MIN_APP_BUILD=0` unchanged (BE is additive for builds 46 / 47)
+  - backup copy `.env.bak-0.3.1-7`; app recreated
+  - `GET /api/v1/app/version` → latest 48 ✓
+  - unauthenticated `/api/v1/transactions` → 401; no errors in the app log
+- tag `v0.3.1-7`: app `b4d9d52` · be `c62ac06` · docs (this commit, with the spec updates: api-document, spec 03 / 04 / 05 / 14)
+- **Owner to test:** update banner on build 47 → install 48; wallet invite by contact; category / wallet reorder mode; splits me row + auto balance.
+
+---
+
 ## 2026-10-10 — 0.3.1-6 released (DevOps session `chubi-pocket-14`)
 
 > Brief from Lead (`4c`) with the owner's go. Pre-checks run by Lead: app analyze clean, flutter test 221/221; BE go vet clean, go test ./... ok on :5433. **No migration** (prod stays at 052).
