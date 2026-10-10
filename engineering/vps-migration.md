@@ -125,4 +125,4 @@ ppforge-infra/
 2. **ชื่อ subdomain ของแอป 2–3** (ถ้ารู้แล้ว)
 3. **offsite backup** — ตอนนี้ dump อยู่บนเครื่องเดียวกับ DB (เครื่องหาย = backup หาย) · เสนอ Cloudflare R2 หรือ Backblaze B2 (ฟรี/ถูกมากที่ขนาดเรา) ส่งทุกคืนหลัง dump
 4. **build image ที่ไหน** — บนเครื่อง prod (แบบเดิม ง่าย แต่กิน RAM ตอน deploy) หรือ build บนเครื่อง dev / GitHub Actions แล้วส่ง image ขึ้นไป (เครื่อง prod เบาลง เหมาะเมื่อมี 3 แอป)
-5. **repo `ppforge-infra`** — สร้างใหม่บน GitHub (private) ได้ไหม
+5. ~~repo `ppforge-infra`~~ ✅ owner อนุมัติ (2026-10-10) — ร่างอยู่ในเครื่องที่ `projects/ppforge-infra` (commit `ab26add`: bootstrap.sh · proxy · postgres + new-app-db.sh · backup.sh · apps/chubi · capture/) · รอ owner สร้าง repo เปล่าบน GitHub แล้ว push
