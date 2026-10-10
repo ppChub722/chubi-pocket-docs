@@ -288,6 +288,14 @@ Spending reports (transactions summary) subtract the SUM of open
 ฿4000 actually went out (cash truth) AND ฿2000 was their real cost
 (share truth). Both are correct, neither is fudged.
 
+**Implemented 2026-10-10** (one SQL fragment, `shared.ShareAmountExpr`):
+share = amount − the bill's split debts in its author's book (both
+directions — an income bill's `i_owe` splits too; open or repaid, a
+forgiven one doesn't come off) − for an event bill the other members' board
+splits (spec 10 §4.25). Floored at 0. Used by the transactions summary
+(→ dashboard), list `totals`, a wallet's income / expense summary and
+budgets' spent; exposed per row as `my_share` (spec 04 §3.3).
+
 ### 4.6 Auto-bump on transaction with `source_personal_debt_id`
 
 When a transaction with `source_personal_debt_id` lands, the BE looks

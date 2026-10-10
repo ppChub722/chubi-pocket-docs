@@ -308,12 +308,25 @@ Fields added 2026-10-10 (list rows carry them too unless noted):
 - `project` — `{id, name}` when `project_id` is set; key absent otherwise.
 - `created_at` / `updated_at` — RFC3339 timestamps (were always there).
 
+Fields added 2026-10-10, second round (list rows too):
+
+- `my_share` — expense / income only (absent on transfers): the author's share, what every report counts (spec 12 §4.5). `amount` − the bill's split debts that aren't forgiven − for an **event bill** (in an event at full amount, its author the board row's actor) also the other members' board splits. Floored at 0. `amount` itself stays the cash that moved.
+- `can_split` — the row can carry personal splits: expense / income, not a debt repayment or system row (opening balance / adjustment). Event bills too — their own splits are a layer on my share (spec 10 §4.25).
+- `can_edit_splits` — `can_split` and the caller is the author (`PUT /:id/splits`).
+- `can_join_event` — the caller may pull it into an event (`POST /v1/projects/:id/bills`, `/projects/quick`; `"move": true` when it already has `project_id`): the author, expense / income, not a repayment or system row, no split repaid or forgiven (an event bill's own splits don't move with it, so they never block).
+
 ### 3.4a `PUT /v1/transactions/:id/splits` — edit a bill's splits (2026-10-10)
 
-Body = the **whole new list**: `{"splits": [{"debt_id": uuid, "owed_amount": n} | {"person_name", "contact_id"?, "owed_amount"}]}`. Each item:
+Body = the **whole new list**: `{"splits": [{"debt_id": uuid, "owed_amount": n, "person_name"?, "contact_id"?} | {"person_name", "contact_id"?, "owed_amount"}]}`. Each item:
 - an existing `debt_id` → keeps it, re-amounted;
 - no `debt_id` → adds a person;
 - a split left out → removed; `[]` removes all.
+
+**Changing a saved split's person (2026-10-10):** `person_name` / `contact_id` on a kept item — left out or equal to the current values = no change.
+- The split has **no contact** (`contact_id` null):
+  - a new `person_name` → renamed in place (same debt row, repayments kept, nobody notified);
+  - a `contact_id` (one of my contacts) → linked in place (same row, repayments kept; `person_name` defaults to the contact's `display_name`). If that contact has an app account, they get `split_created` for the split's current amount, exactly as for a new split.
+- The split **has a contact** (any contact, app account or not) → any change is `422 SPLIT_IDENTITY_LOCKED`; remove it and add a new one instead.
 
 Rules:
 - Author only, expense / income only.
@@ -325,6 +338,9 @@ Rules:
   - `400 VALIDATION_ERROR` (unknown or duplicate `debt_id`, a new person without a name)
   - `400 CONTACT_NOT_FOUND`
   - `409 CONTACT_ARCHIVED`
+  - `422 SPLIT_IDENTITY_LOCKED` (changing the person of a split with a contact)
+  - `400 SPLITS_EXCEED_SHARE` (an event bill: Σ > amount − the board's member splits, spec 10 §4.25)
+  - `400 SYSTEM_TRANSACTION_IMMUTABLE` (a debt repayment or another system row)
 
 Response: the transaction detail with updated `splits`. Linked partners hear about it through `split_created` (added) / `split_changed` (re-amounted / removed), spec 13.
 

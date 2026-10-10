@@ -656,7 +656,7 @@ Change username. **Rate-limited to once per 30 days per user** — username live
 
 *Pending — see [`../spec/04-transactions.md`](../spec/04-transactions.md).*
 
-Recent additions (2026-10-10): `GET /v1/transactions` `totals` · detail `split_count` / `splits` / `project` · `PUT /v1/transactions/:id/splits` (edit splits) · `POST /v1/transactions` 201 for expense / income = the full detail incl. `splits` · repayment rows deletable (debt follows) — spec 04 §3.2–3.4b. Overpaid debts + `POST /v1/personal-debts/split-changes/:id/apply` — spec 12 §3.9–3.10. `split_changed` — spec 13 §2.8.
+Recent additions (2026-10-10): `GET /v1/transactions` `totals` · detail `split_count` / `splits` / `project` · `PUT /v1/transactions/:id/splits` (edit splits; rename / link a split without a contact in place, `422 SPLIT_IDENTITY_LOCKED` otherwise) · `POST /v1/transactions` 201 for expense / income = the full detail incl. `splits` · `my_share` + `can_split` / `can_edit_splits` / `can_join_event` on every row, reports on share basis (spec 04 §3.3, spec 12 §4.5) · repayment rows deletable (debt follows) — spec 04 §3.2–3.4b. Overpaid debts + `POST /v1/personal-debts/split-changes/:id/apply` — spec 12 §3.9–3.10. `split_changed` — spec 13 §2.8.
 
 ## 05 — Categories & Tags
 
@@ -791,8 +791,8 @@ across all included bills (linked contact → active linked member +
 members of any shared wallet a bill lives on. Every included bill (new +
 listed) gets a `project_transactions` parent (+ split children from its
 debts) and the personal row is linked back (`project_id` +
-`source_project_transaction_id`) — auto-claimed. Existing
-`personal_debts` from those bills gain `project_id` only.
+`source_project_transaction_id`) — auto-claimed. The bills' splits move
+onto the board (see below).
 
 Response `201` (quick + bills): the project (same shape as `POST
 /v1/projects`) plus `"linked_count": n` (board rows created) and
@@ -801,7 +801,16 @@ Response `201` (quick + bills): the project (same shape as `POST
 
 Errors (quick + bills): `400 VALIDATION_ERROR` (incl. nothing to add, a
 transfer); `404 TX_NOT_FOUND` (missing or not the caller's); `409
-TX_ALREADY_IN_PROJECT`; `422 TX_NOT_BILLABLE` (a debt repayment).
+TX_ALREADY_IN_PROJECT`; `422 TX_NOT_BILLABLE` (a debt repayment, or an
+opening balance / balance adjustment row); `422 TX_SPLIT_HAS_REPAYMENT` (a
+split on the bill was already repaid); `422 TX_SPLIT_CANCELLED` (a split
+was forgiven); `400 CONTACT_NOT_FOUND` (a new bill's split contact).
+
+Splits **move** onto the board (spec 10 §4.25): a listed bill's personal
+splits become the board row's member splits and leave the bill; a new
+bill's splits go straight onto the board. `DELETE …/bills/:transaction_id`
+(and the author deleting the board row) moves them back as personal
+splits; `move` carries them to the new board row.
 
 ### Summary
 

@@ -1104,9 +1104,10 @@ picker of past eligible transactions to pull in:
    transaction gets `project_id` + `source_project_transaction_id`, so
    the board row is born already resolved — the normal claim flow run
    backwards. No money moves; no account is touched.
-4. **Settled means settled.** Debts and repayments that already happened
+4. ~~**Settled means settled.** Debts and repayments that already happened
    are left exactly as they are — they only gain `project_id` for
-   traceability. Report/Resolve views compute from reality as usual.
+   traceability.~~ **Superseded 2026-10-10 (§4.25):** the bills' splits
+   move onto the board; a split already repaid or forgiven blocks the pull.
 
 **v1 scope-cut:** the FAB always creates a *new* project. Adding a later
 bill to an existing project uses the project page's own flow ("add to
@@ -1120,19 +1121,51 @@ event page later reuses the same list-shaped add):
 - **Add to an existing event** — `POST /v1/projects/:id/bills` with
   `transaction_ids` only. **New event from it** — `POST /v1/projects/quick`
   with `transaction_ids` only. Same pull as §4.24 (auto members, auto-claimed
-  board row, settled stays settled).
+  board row).
+- **The splits MOVE onto the board** (owner 2026-10-10,
+  [`project-as-separate-book.md`](../../engineering/project-as-separate-book.md)
+  — no debt lives in both books): the bill's personal splits become the
+  board row's member splits and leave the bill the usual way (a linked
+  partner gets `split_changed` removed, or their pending `split_created` is
+  superseded). A new bill's splits go straight onto the board and never
+  become personal debts. A split someone already repaid
+  (`422 TX_SPLIT_HAS_REPAYMENT`) or that was forgiven
+  (`422 TX_SPLIT_CANCELLED`) blocks the pull — that money already happened in
+  the personal book. The bill keeps its full cash amount; its share for
+  reports is the amount − the board's member splits (spec 12 §4.5).
+- **Splits on my share.** While it's in the event the bill can still get
+  personal splits of its own ("my 200 is mine; I can split it with someone
+  else, like any bill") — a separate layer on my share, not the event's
+  business: Σ ≤ amount − the board's member splits
+  (`400 SPLITS_EXCEED_SHARE`), and both layers come off `my_share`. They
+  stay on the bill when it moves to another event (only the board splits
+  travel); on removal the board splits come back next to them.
 - **Remove** — `DELETE /v1/projects/:id/bills/:transaction_id`. Always
   allowed, author only; the transaction itself is never deleted. If it is
   the board row's origin (I recorded the row and I'm its actor), the board
-  row and its splits go and every copy is unlinked (copies stay as plain
-  loose transactions in their owners' books); if it's my copy of someone
-  else's row, only my copy is unlinked. Its own splits stay (they lose
-  `project_id`); auto-added members stay.
-- **Move** = remove + add in one call: `"move": true` on either endpoint.
-- **Not eligible:** transfers, debt repayments (`source_personal_debt_id`).
+  row goes, every copy is unlinked (copies stay as plain loose
+  transactions in their owners' books) and **the row's member splits move
+  back onto the bill as personal splits** — a linked member through my
+  contact linked to them if I have one, else by the member's name; the usual
+  split rules follow (a linked contact gets `split_created`). If it's my copy
+  of someone else's row, only my copy is unlinked. Auto-added members stay.
+- **Deleting the board row** (`DELETE …/project-transactions/:pt_id`) does
+  the same when the bill's author deletes it; anyone else deleting it only
+  unlinks the bill — never writes another user's book.
+- **Move** = remove + add in one call: `"move": true` on either endpoint. The
+  member splits go straight to the new board row (not back through personal
+  debts).
+- **Not eligible:** transfers, debt repayments (`source_personal_debt_id`),
+  opening balance / balance adjustment rows (system categories).
   Wallet-less transactions are fine — a wallet exists only on my side, an
   event has none; the board row takes the wallet's currency, else the
   author's user currency.
+- **Copies are the member's share** (§2 "I spent"): a copy of a board row —
+  the auto copy (`auto_resolve_own_in_projects`), the
+  `project_tx_recorded_for_you` auto copy, or "add to my book" — is the
+  actor's amount − the other members' splits, or a split member's own split.
+  A row fully split to others has no share: no auto copy, and "add to my
+  book" is `400 NOTHING_TO_COPY`.
 
 ---
 
