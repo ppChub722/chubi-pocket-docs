@@ -12,6 +12,32 @@
 
 ---
 
+## 2026-10-10 — ปล่อย 0.3.1-3 (release = session `chubi-pocket-5f`)
+
+> owner สั่งผ่าน d2 + ยืนยันใน session นี้ · ก่อน commit: BE build/vet/test ผ่าน (กับ DB เครื่อง) · app analyze ผ่าน · test 138 ผ่าน · ไม่มี migration
+
+- **be** `980c24f` ด่านเวอร์ชันแอป (`GET /v1/app/version`, middleware 426 `APP_OUTDATED`, CORS `X-App-Build`) — งาน session `60` · live · backup `chubi_pocket-20261010-0825.dump.gz` · health ✓
+- **app** `d04afd0` ด่านเวอร์ชัน (ราก) + BrandLogo / splash ใหม่ / native launch screen (ui) + version `0.3.1-3` — commit เดียวรวม bump เพื่อให้ build = **44** · APK 0.3.1-3 build 44 ส่ง `firsttester` แล้ว
+- **prod `/srv/chubi/.env`** (backup เป็น `.env.bak-<เวลา>`): `MIN_APP_BUILD=0` (ด่านปิด) · `LATEST_APP_BUILD=44` · `APP_DOWNLOAD_URL` = ลิงก์ tester ของแอป (ไม่ผูก release → ชี้ build ล่าสุดเสมอ) · ข้อความ TH/EN ไม่ตั้ง · compose บน server ใช้ `env_file: .env` อยู่แล้ว ไม่ต้องแก้ · `up -d --force-recreate app`
+- ตรวจ: `GET /api/v1/app/version` → `min 0 · latest 44 · download_url` ✓ · `X-App-Build: 1` ผ่านด่าน (401 จาก auth ไม่ใช่ 426) ✓ · health 200 ✓
+- **ปล่อยรอบหน้า:** หลังอัปโหลด APK ใหม่ ต้องขยับ `LATEST_APP_BUILD` ใน `.env` ด้วย (+ recreate app) · จะบังคับอัปเดตเมื่อไหร่ = ตั้ง `MIN_APP_BUILD`
+- tag `v0.3.1-3`: app `d04afd0` · be `980c24f` · docs (commit นี้)
+- **owner ทดสอบ:** ติดตั้ง build 44 · splash ใหม่ (สว่าง/มืด) · ปุ่มดาวน์โหลดในหน้าอัปเดตเปิดลิงก์ Firebase
+- อื่น ๆ วันนี้: ค่าตั้งจริงของเครื่องเก่าเก็บลง repo `ppforge-infra` แล้ว (`capture/`) — ร่าง infra แก้ให้ตรงของจริง ([vps-migration.md](engineering/vps-migration.md))
+
+---
+
+## 2026-10-10 — FE: ด่านเวอร์ชันแอป (app version gate) (session "ราก" — ยังไม่ commit)
+
+> brief จาก UI lead `chubi-pocket-d2` (owner GO) · คู่กับ BE `chubi-pocket-60` (contract v1) · app analyze ผ่าน · test 138 ผ่าน · **ยังไม่ได้รันบนโทรศัพท์**
+
+- ทุก request ส่ง `X-App-Build: <buildNumber>` (package_info, ใน `ApiClient`) · 426 / `APP_OUTDATED` ที่ request ไหนก็ได้ → stream `onOutdated` → บล็อกทันที
+- `GET /app/version` ตอนเปิดแอป (splash รอ สูงสุด 5 วิ) + ทุกครั้งที่กลับเข้าแอป: build < `min_build` → `/update-required` หน้าบล็อก (`BrandLogo`, ข้อความจาก server ตามภาษา, ปุ่ม "ดาวน์โหลดเวอร์ชันใหม่" เปิด `download_url` ด้วย url_launcher, back = ปิดแอป) · build < `latest_build` → แถบ "มีเวอร์ชันใหม่" ปิดได้ (ไม่โผล่ซ้ำ 1 วัน) · เช็คไม่สำเร็จ (offline/5xx/timeout) → ให้เข้า (แต่ไม่ปลดบล็อกที่รู้อยู่แล้ว) · `/dev/*` ไม่โดนบล็อก
+- โค้ด: `lib/features/app_version/` (info · repository · cubit · หน้า · แถบ · `versionGateRedirect`) · `api_client.dart` · `app_router.dart` · `app.dart` · l10n `appUpdate*` · dependency ใหม่ `url_launcher` · gallery มี demo · test `test/features/app_version/app_version_gate_test.dart`
+- ใช้งานจริง: ตั้ง `MIN_APP_BUILD` / `LATEST_APP_BUILD` / `APP_DOWNLOAD_URL` ที่ BE (restart container) — **APK ที่มีด่านนี้ต้องออกไปก่อน** ค่อยตั้ง min (เครื่องเก่าไม่มีด่าน จะเจอแค่ 426 เป็น error ธรรมดา)
+
+---
+
 ## 2026-10-10 — ปล่อย 0.3.1-2 (release = session `chubi-pocket-5f`)
 
 > owner สั่งผ่าน d2 + ยืนยันใน session นี้ · ทุก session หยุดแก้ระหว่างปล่อย (d2 แจ้ง) · ก่อน commit: BE build/vet ผ่าน · test ผ่านทั้งชุดกับ DB ในเครื่อง (`TEST_DATABASE_URL`, local DB ที่ migration 51) · app analyze ผ่าน · test 121 ผ่าน · pub รับ `0.3.1-2`

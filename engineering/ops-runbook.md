@@ -94,6 +94,20 @@ cd /srv/chubi && sudo docker compose up -d app
 ```
 ปิดแล้วคนสมัครจะได้ "สำเร็จ" ปลอม ๆ แต่ login ไม่ได้ — คนนอกไม่รู้ว่าปิด
 
+### บังคับอัปเดตแอป (app version check, 0.3.1-3)
+แอปส่งเลข build ใน header `X-App-Build` · build ที่ต่ำกว่า `MIN_APP_BUILD` จะได้ `426 APP_OUTDATED` (พร้อมลิงก์ดาวน์โหลด) ทุก API ยกเว้น `GET /api/v1/app/version` · ไม่มี header (เว็บ, Postman, curl) = ผ่านเสมอ · ค่าถูกอ่านตอน start → แก้ `.env` แล้วต้อง `up -d app`
+```bash
+# ใส่ครั้งแรก (ถ้ายังไม่มีบรรทัดนี้ใน .env) — แก้เลขให้ตรง build ล่าสุด
+echo 'APP_DOWNLOAD_URL=<ลิงก์ tester ของ Firebase App Distribution>' | sudo tee -a /srv/chubi/.env
+echo 'LATEST_APP_BUILD=42' | sudo tee -a /srv/chubi/.env
+echo 'MIN_APP_BUILD=0'     | sudo tee -a /srv/chubi/.env
+# ภายหลัง: เปลี่ยนค่า
+sudo sed -i 's/^MIN_APP_BUILD=.*/MIN_APP_BUILD=42/' /srv/chubi/.env
+cd /srv/chubi && sudo docker compose up -d app
+curl -s https://chubipocket-api.ppforge.dev/api/v1/app/version     # ต้องเห็นค่าใหม่
+```
+**ลำดับตอนปล่อย:** deploy BE + อัป APK ขึ้น Firebase ก่อน → ค่อยขยับ `LATEST_APP_BUILD` / `MIN_APP_BUILD` เป็น build ใหม่ · ถ้าตั้ง `MIN_APP_BUILD` สูงกว่า build ที่โหลดได้ = ทุกคนเข้าแอปไม่ได้ · ถ้า `/srv/chubi/docker-compose.yml` ใส่ env แบบระบุทีละตัว (ไม่ใช้ `env_file: .env`) ต้องเพิ่ม 5 ตัวนี้ในนั้นด้วย (`MIN_APP_BUILD`, `LATEST_APP_BUILD`, `APP_DOWNLOAD_URL`, `APP_UPDATE_MESSAGE_TH`, `APP_UPDATE_MESSAGE_EN`)
+
 ### Build APK ให้แฟน (ที่เครื่อง dev ใน chubi-pocket-app)
 ```powershell
 fvm flutter build apk --release --split-per-abi --dart-define=API_BASE_URL=https://chubipocket-api.ppforge.dev/api/v1
@@ -181,6 +195,9 @@ sudo docker exec shared_postgres psql -U postgres -d chubi_pocket -c "
 | `LOG_LEVEL` | `debug` | closed beta — เปลี่ยนเป็น `info` ตอน wider beta |
 | `LOG_BODIES` | `true` | closed beta เท่านั้น — **ต้องปิดก่อน wider beta** |
 | `APP_ENV` | `production` | |
+| `MIN_APP_BUILD` | `0` (ปิด) | ตั้งตอน 0.3.1-3 — ขยับเมื่ออยากบังคับอัปเดต (§3 "บังคับอัปเดตแอป") |
+| `LATEST_APP_BUILD` | build ล่าสุดที่อัป Firebase | แอปที่เก่ากว่าจะเห็น "มีเวอร์ชันใหม่" |
+| `APP_DOWNLOAD_URL` | ลิงก์ tester Firebase | |
 
 ## 7. TODO ที่จดค้างไว้
 

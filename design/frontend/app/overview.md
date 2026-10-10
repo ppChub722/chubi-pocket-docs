@@ -179,6 +179,7 @@ Every page group is its own `StatefulShellBranch`, listed in `ShellTab` (`lib/ap
 - **Bottom nav**: only the 4 nav tabs light a slot; เพิ่มเติม lights only on the hub. Swipe moves along a `ShellRow` (tabs side by side on screen).
 - **Modules switched off** (`AppModules`): their routes redirect at the router (`offModuleRedirect`): a เพิ่มเติม card's page → `/more`, a top-bar page → `/`. The UI entry points (cards, chips) hide themselves.
 - **Edit mode**: back (system / ✕) = the Cancel button — drops the changes, no prompt (`EditModeMixin.handleBack`, owner 2026-10-10).
+- **App version gate** (owner 2026-10-10, BE contract v1): every request sends `X-App-Build`; `GET /app/version` on cold start (holds the splash, 5 s timeout) and on resume → build < `min_build` = `/update-required` (blocking: logo, message, download button; back exits the app) · build < `latest_build` = a dismissible "มีเวอร์ชันใหม่" strip (quiet for a day after closing) · a failed check lets the user in · a 426 `APP_OUTDATED` on any request blocks at once · `/dev/*` is exempt. Code: `lib/features/app_version/`.
 
 ## 5. State management
 

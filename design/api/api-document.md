@@ -184,6 +184,13 @@ All filters optional unless marked required in the endpoint's parameter table.
 
 JSON field names are **snake_case**, matching DB column names directly (e.g., `created_at`, `created_by_user_id`, `display_name`). No automatic camelCase transform at the API layer.
 
+### App version check (owner 2026-10-10, release 0.3.1-3)
+
+- The app sends its build number on every call: `X-App-Build: <int>` (CORS allows it).
+- `GET /v1/app/version` — public, never blocked → `200 {success, data: {min_build, latest_build, download_url, message_th?, message_en?}}`. `min_build` 0 = check off · `latest_build` 0 = not set · `download_url` "" when not set · `message_*` keys absent when not set.
+- Every other `/v1/*` route (public or protected): header present, an integer, and `< min_build` (with `min_build > 0`) → **`426 Upgrade Required`** `{success: false, error: {code: "APP_OUTDATED", message, details: {…same fields as /app/version…}}}`; the handler never runs. Header missing / empty / not an integer → passes (web, Postman, scripts). `/health` is outside `/v1` and never checked.
+- Server env (read at start): `MIN_APP_BUILD` (0), `LATEST_APP_BUILD` (0), `APP_DOWNLOAD_URL`, `APP_UPDATE_MESSAGE_TH` / `_EN`.
+
 ### name / description / note (owner standard 2026-10-10, migration 051)
 
 Every user-facing record carries the same text keys:
@@ -866,6 +873,7 @@ Error codes specific to shared wallets:
 ## Status
 
 - **Last updated** — 2026-10-10
+- **Version** — 0.6 (Conventions: app version check — `X-App-Build`, `GET /v1/app/version`, 426 `APP_OUTDATED`)
 - **Version** — 0.5 (Conventions: name / description / note standard — migration 051)
 - **Version** — 0.4 (§14 reworked to single-table model: dropped shared-transactions + contribute endpoints; added transfer-ownership + report-scope; documented authz changes on transactions endpoints)
 - **Version** — 0.3 (§10: planned `planned_amount` on project update + plan-vs-actual fields on summary)
