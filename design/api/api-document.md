@@ -184,6 +184,27 @@ All filters optional unless marked required in the endpoint's parameter table.
 
 JSON field names are **snake_case**, matching DB column names directly (e.g., `created_at`, `created_by_user_id`, `display_name`). No automatic camelCase transform at the API layer.
 
+### name / description / note (owner standard 2026-10-10, migration 051)
+
+Every user-facing record carries the same text keys:
+
+| Kind | Resources | Keys |
+|---|---|---|
+| Things | wallets, categories, tags, contacts (`display_name` is the name), budgets, saving goals, projects, scheduled transactions | `name` + `description` + `note` |
+| Records | transactions, pending drafts (`draft` JSON), project transactions, personal debts | `description` (the title — what it was for, ค่าอะไร) + `note` |
+
+Exempt: users, project members, wallet identifiers, notifications, import logs, payment providers.
+
+- **Limits** (characters, so Thai counts per letter): `name` 100 (tags 50), `description` 200, `note` 500. Over → `400 VALIDATION_ERROR`, on create and update.
+- **Create:** absent / `null` / `""` → stored as NULL. Values are trimmed; whitespace-only → NULL.
+- **Update (partial):** key absent → unchanged · `null` → clear · `""` → clear. No `clear_*` flags. `name` on things can't be cleared — except a budget's, which goes back to its category's name.
+- **Budgets:** `name` is optional on create (absent / blank → the category's name) and always present in responses. Migration 051 moved the old `description` labels into `name`; `description` is a real description now.
+- **Contacts:** `notes` was renamed to `note` (responses, create / update, and both link-request bodies).
+- **Action bodies:** settle debt `{account_id, amount, date, description, note}` — `description` absent → the debt's own description. Adjust balance `{new_balance, date, description, note}` — `description` absent → "Balance adjustment".
+- **Copies map description → description, note → note:** a project row's personal copy and its "update to match" suggestion (`personal_update: {amount, date, description, note}`); scheduled pay-now / generated transactions (`description` = the schedule's `name`, `note` = its note); split debts (both sides take the bill's description); slip drafts (`description` = payee — fee draft "ค่าธรรมเนียม · payee" —, `note` = the slip's memo).
+- **Notification payloads** carry `description` beside `note`: `split_created`, `project_tx_recorded_for_you`; `project_tx_changed` diffs may include a `description` key.
+- **Search:** `GET /v1/transactions?q=` matches `description` too.
+
 ### Phase markers
 
 Endpoints carry a phase marker indicating the earliest phase they ship in:
@@ -844,7 +865,8 @@ Error codes specific to shared wallets:
 
 ## Status
 
-- **Last updated** — 2026-09-11
+- **Last updated** — 2026-10-10
+- **Version** — 0.5 (Conventions: name / description / note standard — migration 051)
 - **Version** — 0.4 (§14 reworked to single-table model: dropped shared-transactions + contribute endpoints; added transfer-ownership + report-scope; documented authz changes on transactions endpoints)
 - **Version** — 0.3 (§10: planned `planned_amount` on project update + plan-vs-actual fields on summary)
 - **Version** — 0.2 (added §14 Shared Wallets planned surface)

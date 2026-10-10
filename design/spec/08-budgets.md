@@ -203,7 +203,7 @@ Get a single budget with full current-period breakdown (same shape as list item)
 
 Update budget fields. Partial.
 
-**Editable:** `category_id`, `amount`, `period`, `currency`, `description`, `note`, `status`.
+**Editable:** `category_id`, `amount`, `period`, `currency`, `name`, `description`, `note`, `status`. `name` null / "" → back to the category's name (migration 051; on create an absent / blank `name` is the category's name too).
 **Not editable:** `scope`, `project_id` (delete + recreate if wrong).
 
 Changing `category_id` (owner decision 2026-10-09): must be an expense-typed, non-system category owned by the budget's user (same rule as create, else `400 INVALID_CATEGORY`). Spent is computed live from transactions, so the new anchor's figures apply immediately; nothing is migrated.

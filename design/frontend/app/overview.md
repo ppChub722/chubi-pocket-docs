@@ -123,9 +123,9 @@ Adding a new theme = one entry in the registry. No screen changes required (ever
 | **Home** | `home_filled` | `/` | Account summary cards + recent transactions + outstanding debts (debt summary card) + quick-add FAB |
 | **Transactions** | `receipt_long` | `/transactions` | Full transaction list with filters; search; summary toggle |
 | **Accounts** | `account_balance_wallet` | `/accounts` | Accounts list; tap → account detail with its transactions |
-| **More** | `menu` | `/more` | Hub for Budgets, Saving Goals, Scheduled Transactions, Projects, Contacts, Settings |
+| **More** | `menu` | `/more` | Card hub: categories · tags │ contacts · projects · debts │ budgets · saving goals · scheduled — each card opens its own tab (4.5) |
 
-Home is the landing page. The FAB is present on Home + Transactions + Accounts; tapping it opens the quick-add transaction modal.
+Home is the landing page. The bottom nav and its centre `+` (quick-create sheet) show on every page except edit mode / whole-page forms. Pending (⏳), notifications (🔔) and settings (👤) are top-bar chips, each its own tab.
 
 ### 4.2 Web sidebar (Flutter web ≥ medium width)
 
@@ -133,44 +133,36 @@ On Flutter web above ~800 dp width, the bottom nav collapses into a left sidebar
 
 ### 4.3 Route table
 
-Using `go_router`. All routes are authenticated except `/auth/*`.
+Using `go_router` (`lib/core/router/app_router.dart`). All routes are authenticated except `/auth/*`; `/dev/*` is the debug hub. **One shell branch per `ShellTab`** (owner 2026-10-09/10 — see 4.5); paths are flat, and a detail route is a *sibling* of its list, not a child, so a page opened from another tab lands on its own.
 
 ```
-/                               → HomePage
-/transactions                   → TransactionsListPage
-/transactions/new               → TransactionFormPage (modal / full-screen)
-/transactions/:id               → TransactionDetailPage
-/transactions/:id/edit          → TransactionFormPage
-/accounts                       → AccountsListPage
-/accounts/new                   → AccountFormPage
-/accounts/:id                   → AccountDetailPage
-/accounts/:id/edit              → AccountFormPage
-/more                           → MoreHubPage
-/more/categories                → CategoriesPage
-/more/tags                      → TagsPage
-/more/contacts                  → ContactsPage
-/more/contacts/:id              → ContactDetailPage
-/more/projects                  → ProjectsListPage
-/more/projects/new              → ProjectFormPage
-/more/projects/:id              → ProjectDetailPage
-/more/projects/:id/members      → ProjectMembersPage
-/more/budgets                   → BudgetsListPage
-/more/budgets/overview          → BudgetOverviewPage
-/more/budgets/:id               → BudgetDetailPage
-/more/saving-goals              → SavingGoalsListPage
-/more/saving-goals/:id          → SavingGoalDetailPage
-/more/scheduled                 → ScheduledListPage
-/more/scheduled/:id             → ScheduledDetailPage
-/more/settings                  → SettingsPage
-/more/settings/profile          → ProfileEditPage
-/more/settings/password         → ChangePasswordPage
-/auth/login                     → LoginPage
-/auth/register                  → RegisterPage
-/invite/project/:code           → AcceptProjectInvitePage (deep link)
-/invite/contact/:code           → AcceptContactInvitePage (deep link)
+nav tabs
+  /                                 HomePage (dashboard)        · /browse?category|uncategorized&month
+  /transactions                     TransactionsListPage        · /transactions/:id
+  /accounts                         AccountsPage                · /accounts/new · /accounts/archived
+                                                                · /accounts/:id · :id/transactions · :id/edit · :id/members
+  /more                             MorePage (card hub)
+top-bar chips (⏳ 🔔 👤)
+  /pending                          PendingPage                 · /pending/new (jot several)
+  /notifications                    NotificationsInboxPage      · /notifications/settings
+  /settings                         SettingsPage                · /settings/profile · /settings/password
+                                                                · /settings/notifications (same page, settings' stack)
+เพิ่มเติม cards
+  /categories                       CategoriesPage              · /categories/new · /categories/:id
+  /tags                             TagsPage (inline edit)
+  /contacts                         ContactsPage                · /contacts/new · /contacts/:id · :id/edit
+  /projects                         ProjectsPage                · /projects/new · /projects/:id · :id/edit · :id/members
+  /personal-debts                   PersonalDebtsPage           · /personal-debts/new · /personal-debts/person · /personal-debts/:id
+  /budgets                          BudgetsListPage             · /budgets/new · /budgets/:id · :id/edit
+  /saving-goals                     SavingGoalsListPage         · /saving-goals/new · /saving-goals/:id · :id/edit
+  /scheduled-transactions           ScheduledTransactionsListPage · /scheduled-transactions/:id
+outside the shell
+  /auth/login · /auth/register · /dev/*
 ```
 
-Deep-link handling: invite URLs open directly into the accept page; if user is not logged in, they're redirected to login then back.
+Create / edit of a transaction or a scheduled entry is the quick-create sheet, not a route.
+
+Deep-link handling (planned — no invite routes yet): invite URLs open directly into the accept page; if user is not logged in, they're redirected to login then back.
 
 ### 4.4 Modal vs. full-page
 
@@ -178,9 +170,15 @@ Deep-link handling: invite URLs open directly into the accept page; if user is n
 - **Full pages:** list views, detail views, form pages with more than 3 fields
 - Long forms (transaction edit with splits) are full-page on mobile, centered dialog on web wide-screen
 
-### 4.5 Nested navigation
+### 4.5 Nested navigation — a tab per page group
 
-Within a tab, pages push onto a tab-local stack (Navigator 2.0 `StatefulShellRoute` in `go_router`). Switching tabs preserves each tab's stack. Deep links override tab routing when opened externally.
+Every page group is its own `StatefulShellBranch`, listed in `ShellTab` (`lib/app/shell/tab_nav.dart`): the 4 nav tabs, the 3 top-bar chip pages, and every เพิ่มเติม card. Each tab keeps its own stack; nothing is pushed onto a tab it doesn't belong to (owner 2026-10-09: the old "push More pages onto the current tab" + root-navigator overlay for settings / notifications stacked pages messily).
+
+- **Links into another tab** go through `openPage(context, location)` / `pageOpener(context)`: same tab → `push`; another tab → `go` to that tab, where the page lands alone. Works from sheets above the shell too (it reads the router state). A guard test (`test/app/shell/cross_tab_links_test.dart`) fails on a plain `push` / deep `go` into another tab's route.
+- **Back** (`MainShell`): pop within the tab; at a tab's root → the previous tab in a de-duplicated history → else a เพิ่มเติม card tab → the hub, any other tab → the dashboard → on the dashboard, "ปิดแอป?". The top bar's ← on a root goes through the same path (`ShellBackScope`).
+- **Bottom nav**: only the 4 nav tabs light a slot; เพิ่มเติม lights only on the hub. Swipe moves along a `ShellRow` (tabs side by side on screen).
+- **Modules switched off** (`AppModules`): their routes redirect at the router (`offModuleRedirect`): a เพิ่มเติม card's page → `/more`, a top-bar page → `/`. The UI entry points (cards, chips) hide themselves.
+- **Edit mode**: back (system / ✕) = the Cancel button — drops the changes, no prompt (`EditModeMixin.handleBack`, owner 2026-10-10).
 
 ## 5. State management
 

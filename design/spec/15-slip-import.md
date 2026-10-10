@@ -136,6 +136,7 @@ wallets' numbers known:
         "account_id": "<wallet 2780>",
         "transfer_to_account_id": "<wallet 0693>",
         "date": "2026-10-09",
+        "description": "นาย ภูมิพิชญ์ เอี๊ยบทวี",
         "note": "จองโรงแรม"
       },
       "source_ref": {
@@ -187,7 +188,7 @@ ref2).
   (`xxx-x-x2780-x` → `xxxxx2780x`). Bill Ref 1 is kept whole
   (`4784480005601503` — a credit card number).
 - `receiver.name`: the payee line — merchant / biller / person. Used for
-  the category and the note; **not** matched to contacts (owner: don't
+  the category and the draft's description; **not** matched to contacts (owner: don't
   care who the counterparty is).
 - `memo`: the text after `บันทึกช่วยจำ:` (absent when the slip has none).
   One line in every sample; a long memo may wrap — take lines up to the
@@ -286,7 +287,8 @@ optional):
 | `transfer_to_account_id` | transfers only |
 | `category_id` | §6 — absent when unknown; never on transfers |
 | `date` | `occurred_at` as **`YYYY-MM-DD`** (Bangkok) — transactions are date-only |
-| `note` | `memo` if the slip has one, else the payee (fee item: `ค่าธรรมเนียม · <payee>`) |
+| `description` | the payee — what it was for (fee item: `ค่าธรรมเนียม · <payee>`); absent when unread (name / description / note standard, 2026-10-10) |
+| `note` | `memo` — absent when the slip has none |
 
 `source_ref` keeps what the draft can't: the time (`occurred_at`), the
 slip's own ref + bank (dedupe, §9), payee + memo (category memory, §6),

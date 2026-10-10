@@ -12,6 +12,90 @@
 
 ---
 
+## 2026-10-10 — ปล่อย 0.3.1-2 (release = session `chubi-pocket-5f`)
+
+> owner สั่งผ่าน d2 + ยืนยันใน session นี้ · ทุก session หยุดแก้ระหว่างปล่อย (d2 แจ้ง) · ก่อน commit: BE build/vet ผ่าน · test ผ่านทั้งชุดกับ DB ในเครื่อง (`TEST_DATABASE_URL`, local DB ที่ migration 51) · app analyze ผ่าน · test 121 ผ่าน · pub รับ `0.3.1-2`
+
+### commit
+- **be:** `33d29c2` มาตรฐาน name / description / note + migration 51 (งาน session `60`)
+- **app:** `e12d831` งาน UX ของ d2 · ราก · ui · ปั้น (รวม commit เดียวเพราะไฟล์ทับกัน — ตามแนวเดิม) · `fcc7e52` version `0.3.1-2`
+- **docs:** entry ของ BE + ราก + entry นี้ · schema 0.13 · api-document 0.5 · spec 07/08/15 · ux-overhaul-plan · frontend overview
+
+### deploy
+- BE + APK ต้องขึ้นพร้อมกัน (contacts `notes` → `note` — แอปเก่าพังที่หน้าผู้ติดต่อ/งบ)
+- รอบแรกติด: VPS ติดต่อไม่ได้ (ssh timeout ตั้งแต่ขั้นอัปโหลด) — ไม่มีอะไรถูกแตะบน prod · VPS กลับมา 15:07
+- **BE ✅** commit `33d29c2` live · backup `chubi_pocket-20261010-0810.dump.gz` · **migration 51 ผ่าน** · health ✓
+- **APK** 0.3.1-2 **build 43** (`fcc7e52`) — build จาก working tree ตอนยังสะอาด (compile เสร็จก่อน session อื่นเริ่มแก้) · ส่ง Firebase `firsttester` ต่อท้าย deploy เดียวกัน
+- tag `v0.3.1-2`: app `fcc7e52` · be `33d29c2` · docs (commit นี้)
+- VPS ล่ม 2 รอบวันนี้ → owner ตัดสินใจย้ายเครื่อง: แผนร่างใน [engineering/vps-migration.md](engineering/vps-migration.md)
+
+---
+
+## 2026-10-10 — BE: มาตรฐาน name / description / note ทุกตาราง (migration 51) (ยังไม่ commit)
+
+> session BE 0.3.2 · owner สั่งผ่าน UI lead `chubi-pocket-d2` · FE ทำคู่กันที่ session `chubi-pocket-a4` (ส่ง contract v1 แล้ว) · **ได้รับอนุญาตแค่ local:** migrate DB เครื่อง + รัน test — ยังไม่ commit / push / migrate prod / deploy
+
+### กติกา (owner)
+- **ของ (things)** — กระเป๋า หมวด แท็ก ผู้ติดต่อ งบ เป้าออม โปรเจกต์ รายการประจำ: `name` + `description` + `note`
+- **รายการ (records)** — transactions, pending draft, project_transactions, personal_debts: `description` (= ค่าอะไร, หัวเรื่อง) + `note`
+- ยกเว้น: users, project_members, เลขบัญชีกระเป๋า, notifications, import_logs, payment_providers
+- ยาว: name 100 (แท็ก 50) · description 200 · note 500 ตัวอักษร (API) · แก้ไข: ไม่ส่ง key = คงเดิม · `null` หรือ `""` = ล้าง
+- คัดลอกข้ามรายการ: description → description, note → note เสมอ (เลิก `note ?? description`)
+
+### migration `000051_name_description_note` (up/down/up ผ่านบน DB เครื่อง)
+- + description: transactions, tags, contacts, personal_debts, saving_goals, scheduled_transactions · + note: tags, projects
+- contacts `notes` → `note` (breaking — FE ตาม)
+- budgets: + `name` NOT NULL ← ย้ายค่า `description` เดิม (เป็นชื่องบ) มาใส่ ถ้าว่างใช้ชื่อหมวด · `description` ล้างเป็น NULL แล้วเป็น TEXT
+
+### BE
+- `internal/shared/text.go`: `CleanText` (trim, ว่าง → NULL) · `DecodeTracked` (รู้ว่า body มี key ไหน) · `TextChange`
+- ทุก UpdateRequest ที่มี description/note รู้ว่า key ไหนถูกส่งมา (absent ≠ null) · `transactions.UpdateRequest.SetText` สำหรับโค้ดที่ copy
+- mapping: สำเนาโปรเจกต์ + "อัปเดตให้ตรง" · รายการประจำจ่ายเลย (description = ชื่อรายการประจำ) · split → หนี้ทั้งสองฝั่ง · ปิดหนี้ (ไม่ส่ง description → ของหนี้) · quick create · pending submit · ปรับยอด (default "Balance adjustment") · ยอดเริ่มต้น (description "Opening balance") · สลิป: description = ผู้รับ (ค่าธรรมเนียม: `ค่าธรรมเนียม · <ผู้รับ>`), note = บันทึกช่วยจำ
+- แจ้งเตือน: `split_created` / `project_tx_recorded_for_you` / `personal_update` มี `description` · diff ของ `project_tx_changed` มี `description`
+- ค้นหารายการ `q` ค้น description ด้วย
+- test ใหม่ `text_test.go` ใน 10 module (ใช้ DB จริงผ่าน `internal/platform/testdb`, ตั้ง `TEST_DATABASE_URL` → port **5433**): แก้ไม่ส่ง key = คงเดิม · null / "" = ล้าง · ค่าถูก trim + mapping (จ่ายเลย, ปิดหนี้, split, suggestion) · `go vet` + `go test ./...` ผ่านทั้งหมด (DB test ไม่ skip)
+
+### docs
+- `design/database/schema.md` 0.13 · `design/api/api-document.md` 0.5 (Conventions: name / description / note) · spec 07 (contacts note) · 08 (budget name) · 15 (สลิป description/note)
+
+### ค้าง
+- commit / push / migrate prod / deploy — รอ owner สั่ง
+- เมื่อ 0.3.2 LLM เริ่ม: JSON ร่างใช้ description = ค่าอะไรสั้น ๆ, note = ที่เหลือ
+
+---
+
+## 2026-10-10 — แท็บต่อหน้า · section/แถบ · ปุ่มติดล่าง · back = ยกเลิก · ตระกูล pill (session "ราก" — ส่วนใหญ่ยังไม่ commit)
+
+> session "ราก" (แชต "0.3.2") · รับ brief ผ่าน UI lead `chubi-pocket-d2` · app analyze ผ่าน · test 122 ผ่าน · **ยังไม่ได้รันบนโทรศัพท์** (owner รันเอง) · working tree เดียวกับ session ui (กำลัง sweep ชื่อ/คำอธิบาย/โน้ตทั้งแอป) + ปั้น (แอนิเมชัน)
+
+### 1. แท็บต่อหน้า — **commit แล้ว** (อยู่ใน app `6e0fd5a`)
+- ทุกกลุ่มหน้าเป็นแท็บของตัวเอง (`ShellTab` ใน `lib/app/shell/tab_nav.dart`): 4 ช่อง nav · ⏳🔔👤 (หน้าแรกไม่มี ←) · ทุกการ์ดในเพิ่มเติม (เปิดที่หน้าแรกเสมอ, มี ←) · ชั้น overlay + `overlay_nav.dart` เลิกแล้ว
+- ช่องเพิ่มเติมไฮไลต์เฉพาะหน้า hub · กดเพิ่มเติม = hub เสมอ
+- back ย้อนตามประวัติแท็บ (ไม่ซ้ำ) → ไม่มี: การ์ดเพิ่มเติม → hub, อื่น ๆ → แดชบอร์ด → "ปิดแอป?" · ← ที่หน้าแรกใช้ทางเดียวกัน (`ShellBackScope`)
+- ลิงก์ข้ามแท็บ = `openPage` / `pageOpener` (กระโดดไปแท็บเจ้าของหน้า, หน้ามาเดี่ยว ๆ) · route detail เป็นพี่น้องกับ list
+- docs: `product/phase2/ux-overhaul-plan.md` §2 + `design/frontend/app/overview.md` §4 อัปเดตแล้ว (entry นี้)
+
+### 2. Brief 1–3 จาก d2 — ยังไม่ commit
+- **section (#16/#17):** `SectionCard` วางเส้นคั่นระหว่างแถวเอง + `first` / `trailing` / `locked` / `dividers` · `SectionBand` แถบสีเต็มจอระหว่าง section (ทะลุ padding lg ของหน้า) · `DetailAddRow` · แปลง 13 หน้า (กระเป๋า หมวด ผู้ติดต่อ งบ เป้าออม รายการประจำ หนี้×2 รายการ โปรไฟล์ ตั้งค่า ตั้งค่าแจ้งเตือน สมัคร) · gallery + playground ใช้ของจริง · `test/shared/section_card_test.dart`
+- **ปุ่มติดล่างทับแถบ gesture:** `PinnedBar` ใน kit → footer quick create ×2, แถบ "ยืนยันที่เลือก", footer จดหลายรายการ · ตรวจแล้วที่เหลือ OK (`ModeActionBar`, `AppSheetScaffold`)
+- **back ในโหมดแก้ไข = ยกเลิก:** `EditModeMixin.handleBack` = `cancelEdit` ไม่ถาม · `leavePage` ย้ายเข้า mixin (pop / ไม่มีให้ pop → shell back) ลบ override 10 หน้า · reorder หมวด + เปลี่ยนรหัส: back = ปุ่มยกเลิก
+- แก้: ลบรายการที่เปิดเดี่ยวในแท็บแล้วค้างหน้าเดิม → ตอนนี้ย้อนตาม shell back
+
+### 3. Brief ล่าสุด — ยังไม่ commit (เฉพาะ kit / router / test / docs — ไม่แตะไฟล์ของ ui)
+- **ตระกูล pill** (`lib/shared/widgets/chips/pill.dart`): `PillSize` mini 18 · small 22 · medium 28 · large 36 · `StatusPill` (เพิ่ม `size`, API เดิม) · `LabelPill` ใหม่ (ไม่มีจุด, tone หรือสีเอง, outlined) · `ActionPill` (เพิ่ม `size` + `style: raised` แบบปุ่ม "ปรับยอด") · `TagPill` (`#ชื่อ` บนสีแท็ก + ไอคอน) · `PillOverflowRow` (n อันแรก + `+n`) · `TypeIndicator` ใช้ `LabelPill` แล้ว · `FilterDropdownChip`/`SortChip` ใช้ขนาด large ร่วมกัน · gallery: ขนาดทุกแบบ + **เทียบแถวรายการ: ข้อความ #แท็ก vs pill เล็ก สูงสุด 2 / 3** (owner เลือกบนโทรศัพท์) · `test/shared/pill_test.dart`
+  - **ยังไม่ย้ายหน้าไปใช้** (รอ ui เสร็จ) — pill เก่าที่ต้องย้าย: `ProjectStatusPill` (projects/widgets/project_common.dart) · `_TypePill` (categories/pages/category_detail_page.dart) · `_VariantPill` ×2 (scheduled_transactions/pages/scheduled_transaction_detail_page.dart, widgets/scheduled_card.dart) · `_TypeChip` + `_PillButton` (accounts/pages/account_detail_page.dart) · `_Chip` (accounts/pages/wallet_members_page.dart) · `TxTypeChip` + `_DatePill` (transactions/widgets/tx_hero_card.dart) · `TagChip` / `TagShortList` (tags/widgets/tag_chip.dart — ยังไม่ปรับขนาดให้ตรง เพราะอยู่นอก kit) · `TypeIndicator` ยังไม่ export ใน `ui.dart` (export แล้ว import ตรงใน category_detail_page กลายเป็นซ้ำ — ทำตอนย้าย)
+- **กันลิงก์ข้ามแท็บ:** `test/app/shell/cross_tab_links_test.dart` สแกน `lib/` — `push` route ของแท็บอื่น / `go` ลึกเข้าแท็บอื่น / เป้าที่ไม่ใช่ string (นอกรายการตรวจแล้ว) = ล้ม · ตอนนี้ผ่าน
+- **โมดูลที่ปิด (`AppModules`):** router redirect (`offModuleRedirect` ใน tab_nav.dart) — การ์ดเพิ่มเติม → `/more`, ⏳🔔 → `/` · ตั้งค่าแจ้งเตือนใต้ตั้งค่านับเป็นของแจ้งเตือน · `test/app/shell/off_module_redirect_test.dart` · ข้อจำกัด: `push` route ของโมดูลที่ปิดจากแท็บเดียวกันจะ push หน้าแดชบอร์ด/hub ซ้อน → ทางเข้าใน UI (การ์ดแดชบอร์ด, แถวในตั้งค่า) ต้องซ่อนเอง (รอ ui)
+
+### ค้าง / ต่อไป
+1. owner: ทดสอบบนโทรศัพท์ — แท็บ/back, section + แถบ, ปุ่มล่าง (มือถือมีแถบ gesture), back ในโหมดแก้ไข, gallery เทียบ pill แท็ก
+2. ตัดสินใจ: หน้าตั้งค่าแจ้งเตือน (แยก section ตามกลุ่ม, ย้ายสวิตช์ "เคลียร์รายการของฉันในโปรเจกต์" เข้ากลุ่มโปรเจกต์) · หนี้ตามคน · ประวัติรายการประจำ · แท็กบนแถวรายการ (ข้อความ vs pill)
+3. หลัง ui sweep เสร็จ: ย้ายหน้าไปใช้ pill ใหม่ · ซ่อนทางเข้าโมดูลที่ปิด · ลบ l10n `commonDiscard*` ที่ไม่ใช้แล้ว
+4. สลับแท็บไปเจอหน้า detail (ไม่ใช่หน้าแรก) ไม่มีแอนิเมชัน — ของ ปั้น
+5. commit: แยก commit ของ "ราก" ออกจากงาน ui (ไฟล์ทับกัน: หน้า detail, ตั้งค่า, quick create, รอยืนยัน)
+
+---
+
 ## 2026-10-10 — 0.3.1.1 (FE): เลขบัญชีในหน้ากระเป๋า · สวิตช์หมวดค่าธรรมเนียม — ปล่อยแล้ว
 
 > **ปล่อยแล้ว:** owner commit รวมกับงาน nav แท็บต่อหน้าของ session "ราก" เป็น app `6e0fd5a` · tag `v0.3.1.1` (app) · APK **0.3.1 build 41** ส่ง Firebase `firsttester` (owner เลือกคงชื่อ 0.3.1 + build ใหม่ — Flutter ไม่รับเลข 4 ส่วน `0.3.1.1`) · BE ไม่ได้ deploy (ไม่มีอะไรเปลี่ยน) · ก่อนปล่อย: analyze ผ่าน · test 91 ผ่าน (รวม `main_shell_test`)

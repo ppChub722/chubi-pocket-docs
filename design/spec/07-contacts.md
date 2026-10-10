@@ -108,7 +108,8 @@ Create a contact. Optionally absorb existing `person_name` strings in the same r
   "nickname": "Mommy",
   "email": "mom@example.com",
   "phone": "+66-123-456789",
-  "notes": "Always calls on Sundays",
+  "description": "Coworker from the Bangkok office",
+  "note": "Always calls on Sundays",
   "icon": "person-heart",
   "absorb_names": ["mom", "MoM", "Mommy"]
 }
@@ -120,7 +121,8 @@ Create a contact. Optionally absorb existing `person_name` strings in the same r
 | `nickname` | string | — | 1–100 chars; if set, preferred in UI |
 | `email` | string | — | Valid RFC 5322 |
 | `phone` | string | — | Free-form |
-| `notes` | string | — | — |
+| `description` | string | — | ≤ 200 chars (migration 051) |
+| `note` | string | — | ≤ 500 chars — was `notes` until migration 051 |
 | `icon` | string | — | Preset identifier |
 | `absorb_names` | array | — | Optional list of `person_name` strings to wire to this contact at create time (case-insensitive match on existing splits) |
 
@@ -184,7 +186,8 @@ List contacts owned by the user.
       "nickname": "Mommy",
       "email": "mom@example.com",
       "phone": "+66-...",
-      "notes": "...",
+      "description": "...",
+      "note": "...",
       "icon": "person-heart",
       "linked_user_id": "0190e5-user...",
       "linked_user": {
@@ -210,7 +213,7 @@ Get a single contact with computed fields (`split_count`, `outstanding_amount`, 
 
 Update contact fields. Partial.
 
-Editable: `display_name`, `nickname`, `email`, `phone`, `notes`, `icon`.
+Editable: `display_name`, `nickname`, `email`, `phone`, `description`, `note`, `icon`.
 Not editable: `linked_user_id` (use link / unlink endpoints), `status` (use archive / restore), `user_id`.
 
 **Errors:** `400 VALIDATION_ERROR`, `401`, `403`, `404`.
