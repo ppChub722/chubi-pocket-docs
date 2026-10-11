@@ -381,7 +381,8 @@ rules apply only on submit. Migration 000046 (`pending_transactions`).
 { "id": "uuid", "source": "manual", "kind": "create",
   "draft": { "type": "expense", "amount": 120, "account_id": "uuid", "category_id": "uuid",
              "date": "2026-10-08", "note": "…", "transfer_to_account_id": null,
-             "tag_ids": ["uuid"], "splits": [ { "person_name": "Aom", "contact_id": null, "owed_amount": 40 } ] },
+             "tag_ids": ["uuid"], "splits": [ { "person_name": "Aom", "contact_id": null, "owed_amount": 40 } ],
+             "project_id": "uuid" },
   "target_debt_id": null, "target_transaction_id": null,
   "source_ref": null, "last_error": { "code": "MISSING_TYPE", "message": "…" },
   "created_at": "…", "updated_at": "…" }
@@ -401,7 +402,25 @@ rules apply only on submit. Migration 000046 (`pending_transactions`).
   `MISSING_DATE`, `ACCOUNT_NOT_FOUND`, `CATEGORY_NOT_FOUND`, `CATEGORY_TYPE_MISMATCH`, `TRANSFER_SAME_ACCOUNT`,
   `TRANSFER_NEEDS_WALLETS`, `TRANSFER_CURRENCY_MISMATCH`, `SPLITS_ON_TRANSFER`, `CONTACT_NOT_FOUND`,
   `TAG_NOT_FOUND`, `DEBT_NOT_FOUND`, `DEBT_ALREADY_SETTLED`, `OVERPAYMENT`, `TRANSACTION_NOT_FOUND`,
-  `NOT_FOUND`, `SUBMIT_FAILED` (with the server message).
+  `NOT_FOUND`, `SUBMIT_FAILED` (with the server message). Added 2026-10-11 (events + splits):
+  `INVALID_SPLIT`, `SPLITS_EXCEED_AMOUNT`, `PROJECT_NOT_FOUND`, `PROJECT_NOT_ACTIVE`,
+  `PROJECT_LOCKED`, `PROJECT_NOT_MEMBER`, `PROJECT_READ_ONLY`, `TX_NOT_BILLABLE`.
+- **Event (`draft.project_id`, 2026-10-11; additive, same name as on transactions).** A nullable uuid; omitted
+  from the JSON when empty, like every other draft key. Create / update / list return it. It is **not checked
+  at save** (the event may be deleted or closed before the draft is confirmed); `kind: create` only — it is
+  ignored for `settle_debt` / `update_tx`. On submit, a draft with `project_id` goes through the same path as
+  `POST /projects/:id/bills` with a `new_transaction`, in the same DB transaction as the tags and removing the
+  draft: the caller must be an active, non-viewer member of an **active** event; the bill is a normal
+  transaction (wallet balance moves) linked to the event, its `splits` go onto the board (never into personal
+  debts), people are added to the event as in quick create, and linked users get `project_added`. Only expense /
+  income can be event bills. Any event failure is a `failed[]` entry + `last_error`, never a 5xx, and nothing
+  is written: event missing → `PROJECT_NOT_FOUND`; completed → `PROJECT_NOT_ACTIVE`; cancelled / archived →
+  `PROJECT_LOCKED`; not a member → `PROJECT_NOT_MEMBER`; viewer → `PROJECT_READ_ONLY`; transfer →
+  `TX_NOT_BILLABLE`. Fix it with `PUT` (clears `last_error`) and submit again.
+- **Splits on a draft** save as given — incomplete or unbalanced is fine. Submit validates like create: every
+  split needs a non-blank `person_name` (≤ 100) and `owed_amount` > 0 (`INVALID_SPLIT`), Σ splits ≤ amount
+  (`SPLITS_EXCEED_AMOUNT`; for an event bill the board check — splits may not pass the amount), unknown
+  contact → `CONTACT_NOT_FOUND`.
 - `kind`: `create` (new transaction) · `settle_debt` (a payment on `target_debt_id`, same rules as settle) ·
   `update_tx` (writes amount / date / note / category / wallet onto `target_transaction_id`). Only `create` can
   be made through the API today; the others are for notifications later.

@@ -1,3 +1,5 @@
+> **FROZEN 2026-10-11 — ไม่เขียนเพิ่มแล้ว.** สถานะปัจจุบันย้ายไป [`ai/STATUS.md`](ai/STATUS.md) · กติกา/การตัดสินใจ [`ai/decisions.md`](ai/decisions.md) · งานค้าง [`ai/backlog.md`](ai/backlog.md) · บันทึก release [`ai/releases/`](ai/releases/). ไฟล์นี้เก็บไว้เป็นประวัติ (infra how-to เก่า ๆ ยังอ้างอิงได้).
+
 # Current Work — สมุดปูมงาน (append-only)
 
 > **กติกาไฟล์นี้:** เขียนต่อท้ายเรื่อย ๆ **ไม่แก้ของเก่า** — entry ใหม่สุดอยู่**บนสุด** (ใต้หัวข้อนี้)

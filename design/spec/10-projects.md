@@ -1166,6 +1166,16 @@ event page later reuses the same list-shaped add):
   actor's amount − the other members' splits, or a split member's own split.
   A row fully split to others has no share: no auto copy, and "add to my
   book" is `400 NOTHING_TO_COPY`.
+- **A pending draft can carry an event** (2026-10-11): `draft.project_id` on
+  `POST/PUT /v1/pending-transactions` ([contract §14](../api/ux-overhaul-contract.md)).
+  Not checked at save; on confirm the draft takes the "new bill into an
+  existing event" path of `POST /v1/projects/:id/bills` (same rules: active,
+  non-viewer member of an active event; splits go onto the board) in the same
+  DB transaction as the tags and the draft's removal. A missing / closed /
+  locked event, a non-member, a viewer or a transfer fails that draft with a
+  `last_error` code (`PROJECT_NOT_FOUND`, `PROJECT_NOT_ACTIVE`,
+  `PROJECT_LOCKED`, `PROJECT_NOT_MEMBER`, `PROJECT_READ_ONLY`,
+  `TX_NOT_BILLABLE`) and writes nothing.
 
 ---
 

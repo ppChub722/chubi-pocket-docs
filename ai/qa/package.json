@@ -1,0 +1,9 @@
+{
+  "name": "chubi-pocket-qa",
+  "private": true,
+  "description": "Reusable QA scripts (playwright-core + system Chrome) for the chubi-pocket Flutter web app",
+  "type": "module",
+  "dependencies": {
+    "playwright-core": "^1.49.0"
+  }
+}

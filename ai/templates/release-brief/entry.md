@@ -1,0 +1,2 @@
+- **Release note:** <anything users will notice, intended changes in numbers, …>
+- **Owner to test:** update banner on the previous build → install the new one; <feature checks>

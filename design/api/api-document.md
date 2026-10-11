@@ -658,6 +658,8 @@ Change username. **Rate-limited to once per 30 days per user** — username live
 
 Recent additions (2026-10-10): `GET /v1/transactions` `totals` · detail `split_count` / `splits` / `project` · `PUT /v1/transactions/:id/splits` (edit splits; change a saved split's person in place — rename, switch / link a contact, `"contact_id": null` back to a free name — unless its contact is linked to an app user: `422 SPLIT_IDENTITY_LOCKED`) · `POST /v1/transactions` 201 for expense / income = the full detail incl. `splits` · `my_share` + `can_split` / `can_edit_splits` / `can_join_event` on every row, reports on share basis (spec 04 §3.3, spec 12 §4.5) · repayment rows deletable (debt follows) — spec 04 §3.2–3.4b. Overpaid debts + `POST /v1/personal-debts/split-changes/:id/apply` — spec 12 §3.9–3.10. `split_changed` — spec 13 §2.8.
 
+Recent additions (2026-10-11): pending drafts get `draft.project_id` (an event; checked on submit, confirm = the add-a-new-bill-to-an-event path; new submit error codes `PROJECT_*`, `TX_NOT_BILLABLE`, `INVALID_SPLIT`, `SPLITS_EXCEED_AMOUNT`) — [`ux-overhaul-contract.md` §14](ux-overhaul-contract.md), spec 10 §4.25.
+
 ## 05 — Categories & Tags
 
 *Pending — see [`../spec/05-categories-tags.md`](../spec/05-categories-tags.md).*
