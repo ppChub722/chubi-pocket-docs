@@ -14,7 +14,7 @@ _Last updated: 2026-10-13 late night by Lead (handoff before the team restart)._
 - Releases are tag-based: Lead commits, bumps, tags `v<version>` in be / app / docs and pushes; DevOps runs `chubi-pocket-be/scripts/release.sh <brief-dir>` from the tags (brief template: `ai/templates/release-brief/`). Local env: `scripts/local-deploy.sh --web` (only when the owner orders).
 
 ## In progress (handoff 2026-10-13 night — ALL team sessions are being restarted)
-- **Uncommitted in the app tree** (on top of the v0.3.1-9 tag `e8305e3`; ship with 0.3.1-10, commit when green):
+- **Committed + pushed as app `3a82aeb` (0.3.1-10 wip, on top of the v0.3.1-9 tag `e8305e3`); ships with 0.3.1-10:**
   - FE-A: counted shell chrome (bottom bar after a fast back) + TopScrim
   - FE-D: change password back to a page (entry under the username row)
   - FE-E: ListToolbar chips 28

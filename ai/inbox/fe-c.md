@@ -1,0 +1,17 @@
+## Handoff 2026-10-13 — FE-C (transactions · home · personal_debts)
+
+Pointers: this session's earlier reports are in `fe-debts.md` (debts rework PROPOSAL rev 2 + the API v2 adoption report); the 0.3.1-10 debts plan is the proposal there (signed person entries, one `POST /personal-debts/people/{key}/entries`, single-currency assumption still UNCONFIRMED, 5 owner questions open).
+
+**Unfinished**
+- Debts MODEL rework (0.3.1-10): not started; only today's model got the hub standards (templates, kit pieces). Build order: BE endpoints (fe-debts.md §3) → new data layer (people/person/entry cubits) → list, person page, entry detail, entry sheet (`PersonEntryFields`) → quick-create debt mode. `PersonalDebtsCubit` still holds ALL debts and `DebtPerson.group` is client-side.
+- Tx detail is `DraftForm` (one composite) inside `DetailPageBody.hero`: its tags/note are NOT in the template's `tags:`/`sections:` slots (same SectionCard pieces, looks the same); splitting `DraftForm` into slot-able parts was offered, not done.
+- Still on app-wide caches (not form-options): scheduled form, event-mode rows, pending page, the detail page's edit mode, the full tag picker; the `debtsCubit.load()` after deleting a repayment stays.
+- Router drill-down: `app_router.dart` passes only `category=<id>`; `TransactionsListPage` has `initialCategoryName/Type` (TODO(router), kit/router owner).
+- Not verified on a device: everything (owner runs the app). The hub smoke test of the WHOLE `test/hub` dir times out on another page (`domain/sheets-projects`) when several flutter runs contend: run single tests with `--plain-name`.
+
+**Gotchas (5)**
+1. Fields side by side: use `AppInput(size: AppInputSize.hero|title|regular)`; never centre one column against a taller one (the owner caught 3–12 px underline/label drift twice); `test/features/transactions/hero_alignment_test.dart` is a PIXEL test (TxHeroCard + EntryCard × TH/EN × scale 1.0/1.3 × 4 states): keep it green when touching the hero/entry card.
+2. Quick forms (quick create, pending add/แก้ร่าง) = compact style: `EntryCard` (type/date · description/amount · wallet row · category row, tags row BELOW) and `SplitEventSection(variant: compact)`; detail = `cardsInHero` pick cards in the hero + `variant: full`; `DraftForm` flags: `chipLayout` (pending collapsible rules), `chipRows` (quick create), `cardsInHero` (detail); `missing:` outlines rows of an incomplete draft.
+3. Form pickers come from ONE `GET /transactions/form-options` through a local `TxFormOptionsCubit` (created per sheet open; `maybeTxFormOptions(context)` falls back to the old cubits for pending/scheduled). After any write patch from the response (`AccountsCubit.patchBalances(account_balances)`, `TransactionsCubit.patchRow`), never `accounts.load()`.
+4. Sheets = presentational organism in `lib/ui` (`QuickCreateSheetShell`, `TxFilterSheet`, `EventTargetSheet`, `AccountPickerSheet`, `DescriptionPickerSheet`, `SettleSheet`) + thin wrapper in `features/` (cubits, l10n mapping, result handling); features import ONLY `ui/ui.dart`; raw-widget ratchet (`test/ui/raw_widgets_test.dart`) must stay 0 for my folders.
+5. Names: the app already has `CategoryRef`/`PersonRef`, so the v2 embedded refs are `EmbeddedCategory`/`EmbeddedPerson` (`transactions/domain/refs.dart`); `TxHeroCard` + `EntryCard` live in `lib/ui/domain/transactions/` (FE-A edits their AppInput geometry; keep per-field labels there).

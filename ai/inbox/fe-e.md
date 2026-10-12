@@ -1,0 +1,15 @@
+
+## Handoff 2026-10-13
+Role: FE-E (wallets, categories, tags, contacts, budgets, scheduled transactions, saving goals). Full history of reports: `ai/inbox/fe-plans.md` (the 0.3.1-10 PROPOSAL for budgets / scheduled / goals is its first entry).
+
+**Unfinished / open**
+- 0.3.1-10 redesigns of budgets / scheduled / goals NOT started (only today's behaviour on the hub kit + API v2 minimal fixes). The proposal asks BE for 11 things (page-ready list/detail per feature, `status` filters, `GET /:id`, history/upcoming embedded, archived-wallet rule, `required_monthly`, free capacity) and the owner 5 questions (create flow in FormSheet, past periods, goal on archived wallet, scheduled lifecycle, warn threshold): none answered yet. The percent decimals / date picker (`showAppDatePicker`) it needed are now in the kit.
+- Open owner/kit points: account overview note sits alone in its top box (accepted); wallet create is positive-only (adjust-balance covers negatives via `allowNegative`); wallets summary "shared pot" uses `totals.shared_balance`; raw `showDatePicker` remains in transactions/debts files (not mine).
+- Not verified on a device: every UI change this round was analyze/test-checked only (the owner reviews in the app / hub).
+
+**Gotchas**
+1. Every cubit's `load()` emits `loading` first: pass the template `loading:` only when the list is EMPTY (first load), or the skeleton replaces the list and kills pull-to-refresh (FE-B now also enforces it in the templates). Detail pages pass `DetailPageBody(onRefresh: <the one open call>)`, never a hand PullToRefresh.
+2. Thin FE: one call on open, patch from write responses (`AccountsCubit.patchBalances` for `account_balances`), no reloads after writes; wallet create maps credit/pay-later positive input to a NEGATIVE balance in `_openingBalance` (account_detail_page).
+3. Sheets = presentational organism in `lib/ui/domain/*` (plain params in, plain result out, no features/l10n imports; layering test) + thin wrapper in the feature that keeps the old function name; every new ui piece needs `ui.dart` export + a hub `covers` entry (hub_coverage test) and raw-widget hits only go down (`UPDATE_BASELINE=1 flutter test test/ui/raw_widgets_test.dart`).
+4. Detail pages: description lives in the hero (`HeroDescription`), heading-less groups merge into ONE top box (icons all-or-none, note via DetailStacked), tint via `iconCode.tintFor` (budget keeps its status colours), description/hero name labels come from the kit. ListToolbar puts filter/sort chips one size down (ChipSizeScope → chip 28) under the 40 search capsule; the chip row fades its right edge instead of clipping. Never re-add `MediaQuery.paddingOf(...).top` on list pages (templates clear the top bar).
+5. Flutter only via `/c/Users/poomp/fvm/versions/3.47.3/bin/flutter`; run the full suite at most once per change (it takes minutes and flaky edit_mode tests can fail under load: rerun them alone); sub-agents must not edit `ui.dart` / `hub_registry.dart` concurrently (collect export lines + HubPage entries and add them serially); shell `node -e` with backticks inside double quotes eats the backticked text.

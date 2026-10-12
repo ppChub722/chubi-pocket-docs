@@ -1,3 +1,2 @@
-*
-!README.md
-!.gitignore
+# Team inbox notes are tracked in git (owner 2026-10-13: needed when moving to another machine).
+# Never put secrets here.
