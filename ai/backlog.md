@@ -11,6 +11,15 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
 - Then the BE implements A/B/D/E/F/G and the FEs adopt them (thin FE); pages not reached yet only get minimal shape adaptation.
 - FE-only fixes (FE-B): wallet by id, patchBalance, badge double start, drill-down filter, lazy contacts, event picker cache.
 
+## Bugs reported by the owner (logged, not briefed)
+- **Bottom bar missing after a fast back** (2026-10-13, prod 0.3.1-9): pressing back quickly from an edit page that hides the bottom bar (via ShellChromeHider) to a main tab leaves the bottom bar hidden. Likely a race in the hide/show (the restore runs before the pop finishes, or the hide of the leaving page lands after the show). Owner: "ยังไม่แก้ รับเรื่องไว้ก่อน".
+- **Contact detail "doesn't open"** (2026-10-13, prod build 55). FE-D checked it: NOT a code bug. The VPS went offline again ~21:55, and the page sits on the skeleton for 10–25 s (connect 10 s + receive 15 s) before the error + retry shows. Fix proposal (Lead: do it in the template, all detail pages):
+  - any load failure, not only ApiException, → full-page error + retry (today a non-Api exception leaves the skeleton forever; contact_detail_page `_load` ~line 86)
+  - show the error / retry sooner (shorter detail-load timeout)
+  - add test/features/contacts/contact_detail_page_test.dart (prod-shaped JSON + a failing load); contacts has no page tests at all
+- **Change password back to a separate page** (2026-10-13): undo the collapsible section in Profile settings; the entry row "เปลี่ยนรหัสผ่าน ›" goes in a section right under the username row (decisions.md updated).
+- Seen in the same screenshot (not reported by the owner): on Profile settings, scrolled content shows through under the status bar at the top ("ชื่อที่แสดง" drawn behind the clock), and a filled email shows stacked (the one-row question is still open).
+
 ## Note for the scheduled / recurrence round (owner 2026-10-12)
 - Places using DayOfMonthGrid (scheduled tx, wallet statement/due day…) may need CUSTOM recurrence: every N weeks, several days a month (e.g. the 3rd and 27th), etc.
 - Consider borrowing the Google Calendar recurrence model (iCal RRULE: FREQ / INTERVAL / BYDAY / BYMONTHDAY) and its "custom repeat" UI.
@@ -18,6 +27,7 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
 ## 0.3.1-10: debts rework (after the API cleanup, owner 2026-10-12)
 - Debts UI gets finished ONCE in 0.3.1-10, together with the model rework (owner 2026-10-13). No more debts UI tweaks in 0.3.1-9: today's state is the hub-adopted minimal one; cancel sits in การจัดการ until the model removes it.
 - API item C (`/personal-debts/people` + `/people/:key`, paged, live names) built together with the new debt model.
+- The debts list builds its own search + chips outside ListToolbar (`personal_debts_page.dart:102`). Move it onto ListToolbar in the rework so it gets the 28 chips and the toolbar layout (FE-E 2026-10-13).
 - Bugs held for that round:
   - "อัปเดตตาม" URL (`personal_debts_repository.dart:99`)
   - scheduled detail "not found" (the scheduled round)

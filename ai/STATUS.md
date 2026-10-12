@@ -22,6 +22,7 @@ _Last updated: 2026-10-13 night by Lead._
 - 0.3.1-10 questions: events (8), budgets / scheduled / goals (5); debts answered (fe-debts.md rev 2).
 
 ## Next releases
+- **No more deploys to the Happy-Host VPS** (owner 2026-10-13 night). Work is local-only until 0.3.1-10, which deploys on the NEW VPS. Tonight's fixes (bottom bar after a fast back, change password page, fail-fast loads, toolbar chips 28) ship with 0.3.1-10.
 - 0.3.1-10: debts + events + budgets + scheduled + goals in parallel (1 FE per page group, FE-A/FE-B as supporters).
 
 ## Team (session names change; check ListAgents)

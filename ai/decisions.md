@@ -72,7 +72,7 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 
 ## UI
 - Picker selection = highlight, never ✓ (SelectCardGroup too). One picker shell with an optional compact search.
-- **Chips:** AppChip with 3 sizes, mini 20 / chip 28 / control **40** (control was 32; changed 2026-10-13: ONE control height of 40 for tappable chips, icon buttons, the search capsule, top-bar pills and dense inputs).
+- **Chips:** AppChip with 3 sizes, mini 20 / chip 28 / control **40** (control was 32; changed 2026-10-13: ONE control height of 40 for tappable chips, icon buttons, the search capsule, top-bar pills and dense inputs). Exception (owner 2026-10-13 night): the filter / sort chip row under a list's search uses chip 28, one size below the 40 search.
 - **Tint colour (owner 2026-10-13):**
   - heroes / tinted cards take the entity's ICON main colour (first bg slot, else glyph; gradient = first stop); border and glyph are contrast-clamped, text always onSurface; no custom icon → the semantic fallback
   - exceptions: the tx hero = type colour; budget over / near limit = danger / warning; Home / More tiles = fixed module colours Mini = tags + the wallet in tx / pending list rows, the pending source chip. Every chip moves to AppChip, no wrappers, old chip widgets deleted (2026-10-11).
@@ -137,7 +137,7 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - **Few options → popover:** ≤ ~5 short options with no search / description use ONE centralized popover / menu organism (filters, sort, row options, ⋯ menus); everything else is a sheet.
 - **Entity values in rows show as the entity's chip** (icon + colour); a nested category shows its path as chip › chip.
 - **Sheets are organisms:** every sheet is a kit organism (generic or domain) and appears on one hub "Sheets" page.
-- **Profile settings page** (owner 2026-10-13): a detail page on the contact template (hero tinted with the avatar colour → one box: display name, username 🔒, email, currency 🔒 → a collapsible "เปลี่ยนรหัสผ่าน" section, default closed, view mode only, fields styled like the detail-page note, its own button; no separate page). Change password + currency moved out of Settings; Settings keeps app settings only. Email is editable, unverified for now.
+- **Profile settings page** (owner 2026-10-13): a detail page on the contact template (hero tinted with the avatar colour → one box: display name, username 🔒, email, currency 🔒 ). Change password is a SEPARATE page again (owner 2026-10-13 night, replaces the collapsible section shipped in 0.3.1-9); its entry row "เปลี่ยนรหัสผ่าน ›" sits in a section right under the username row. Change password + currency moved out of Settings; Settings keeps app settings only. Email is editable, unverified for now.
 - **AppInput geometry comes from tokens, not from the value font** (owner 2026-10-13): the same size = the same height, the label token = the same label top, the underline at a fixed offset. Fields side by side line up by construction, with no per-page alignment code.
 - **Every visual widget lives in the kit, even if used once** (owner 2026-10-13). Pages only pick kit pieces and set parameters; feature code is state / API / navigation wiring only (no styling, colours, paddings or custom layout). A feature wrapper that just feeds a kit organism is fine.
     - note: stacked, indented value, no input frame in view, frame only in edit. This is on DETAIL pages; the quick forms (quick create, pending) keep the compact label-left note row
@@ -153,6 +153,14 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - Tx and pending lists share one row: line 1 = icon + title + wallet mini chip, amount right; line 2 = [source] · category · tags. Pending groups by day like the tx list.
 - Bulk delete in select toolbars = a red trash icon only, right-aligned (no "ลบ" text buttons).
 - Saving: a dim overlay + spinner while a save / delete / reorder call runs. Skeletons only on the first page load. Skeletons mirror the real layout: each template renders its own skeleton from the same slots / heights, built from kit `.skeleton` variants, and the template (not the page) enforces "first load only" (owner 2026-10-13).
+- Top scrim (owner 2026-10-13 night): every page gets a scrim behind the status bar + the floating top bar. It is the solid app background at the top, fading to transparent, so scrolled content never shows under the clock or behind the pills.
+- Offline mode (owner 2026-10-13 night):
+  - BE unreachable → one global offline state
+  - a persistent top banner with retry, and auto-retry against /health
+  - no-data pages error immediately
+  - save / submit disabled, typed input kept
+  - full-screen error only on a cold start
+  - back online → a short notice + the page reloads
 - Errors: a load failure with no data → full-page error + retry; a failed save / action → stay on the page with a snackbar or banner + retry (never lose edits).
 - Top-right shell icons highlight the current page, like the bottom bar tabs.
 - Wallet identifiers: plain digits, no formatting; the section says it exists only to match slips.
