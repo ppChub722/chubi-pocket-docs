@@ -13,7 +13,7 @@ _Last updated: 2026-10-13 late night by Lead (handoff before the team restart)._
 - Rules and owner decisions: `ai/decisions.md`. Discussed but not started: `ai/backlog.md`.
 - Releases are tag-based: Lead commits, bumps, tags `v<version>` in be / app / docs and pushes; DevOps runs `chubi-pocket-be/scripts/release.sh <brief-dir>` from the tags (brief template: `ai/templates/release-brief/`). Local env: `scripts/local-deploy.sh --web` (only when the owner orders).
 
-## In progress (2026-10-13 ~04:30) — 0.3.1-10 PREPARED (tagged + pushed), not deployed
+## In progress (2026-10-13 ~04:30) — 0.3.1-10 PREPARED (tagged + pushed), RELEASE ON HOLD: owner saw the local build, "UI แปลกมาก" → a UI review round comes first (owner sends screenshots; fixes at the kit / template root; re-tag after)
 - Tags v0.3.1-10: be f503d9c · app 4d838f1 (build 58, pubspec 0.3.1-10+10) · docs = this commit. Brief: chubi-pocket/release-briefs/0.3.1-10/ (EXPECT_MIGRATIONS 54–60, MIN_APP_BUILD 58).
 - Deploy target = the NEW VPS (engineering/new-vps-runbook.md; scripts read VPS_HOST). Happy-Host is retired but still serves 0.3.1-9 (health 200 on 2026-10-13 04:20).
 - Lead full run before tagging: flutter analyze 0 · flutter test all pass · go vet clean · go test 23 pkgs ok.

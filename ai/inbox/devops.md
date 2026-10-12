@@ -94,3 +94,10 @@ DONE · one visit to the old VPS (up 22:13 Thai), read-only except `backup.sh`; 
 - **Local DB = a restored prod dump** (migration 53, 4 users): restore = stop app, drop+recreate `chubi_pocket_db`, `pg_restore --no-owner`, `docker compose up -d` (runs migrate), check /health. Never wipe it unless Lead relays an owner order.
 - **Local builds only on an explicit "owner asks"** from Lead: `chubi-pocket-be/scripts/local-deploy.sh --web` (BE docker :8080 + web :5181 from the working trees). Reply `READY · BE commit +dirty · migration · health · web :5181 from app commit +dirty`.
 - No background jobs are running (the VPS watch loop finished). Open: nothing.
+
+## Local env up on 0.3.1-10 working trees (2026-10-13)
+- **Backup (pre-migration):** `chubi-pocket/backups/local/chubi_pocket-20261013-0421-pre-0.3.1-10.dump.gz` · 33,179 B · sha256 `04b88bf0cb2304df870010ff051eb711bc7e6e720e059339b8aa11d7abec7825` · `gzip -t` OK, PGDMP custom-format header. Not committed (outside the repos). DB was at migration 53, clean.
+- **Migrations:** `local-deploy.sh --web` (compose `migrate` ran `up`) applied 54 debt_person_ledger, 55 event_tags, 56 event_bill_link, 57 recurring, 58 wallet_track_balance, 59 budgets_v2, 60 goals_v2, each OK (<0.6 s). schema_migrations = 60, dirty f. No errors.
+- **Local BE:** be `a307437` +121 dirty · health 200 `{"status":"ok"}` · `/api/v1/openapi.json` info.version `0.3.1-10`.
+- **Web:** :5181 from app `3a82aeb` +288 dirty · HTTP 200.
+- Note: the DB is `chubi_pocket_db` (container `chubi_pocket_db`, :5433), not `chubi_pocket`. Prod / old VPS untouched. The migrations are breaking by design: rollback = restore the dump above (needs the owner's OK in this window).

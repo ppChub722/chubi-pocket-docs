@@ -139,3 +139,6 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
 
 ## Small open items (0.3.1-10)
 - Tapping a pending 🐷 saving draft confirms it directly; it should open an edit sheet first (fe-saving).
+
+## NEXT: 0.3.1-10 UI review round (owner 2026-10-13 04:30)
+- Owner on the local build: "UI แปลกมาก น่าจะต้องปรับอีกเยอะ". Release is on hold. Next session: owner sends screenshots per page → Lead discusses → fixes at the kit / template root (pixel tests) → re-tag v0.3.1-10 (move tags) → release on the NEW VPS.
