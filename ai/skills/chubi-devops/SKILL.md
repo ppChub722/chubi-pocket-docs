@@ -20,6 +20,20 @@ You act ONLY on **Lead's** brief. A go relayed by Lead counts as the owner's go 
 - Redeploy / rollback = the same command with an older VERSION (`SKIP_APP=y` for BE only, `--skip-checks` for an already-checked tag). A tag older than prod's migration is refused: restore from the pre-deploy dump.
 - **ONE final report**, terse: hashes, migration, backup file, build + Firebase number, env values. No per-repo "tree free" messages.
 
+## Servers (2026-10-13)
+- **The Happy-Host VPS (160.238.13.137) is RETIRED.** Never touch it again: no SSH, no deploys.
+  - Its full backup (DB dumps, roles, /srv + /etc config, captures) is in `chubi-pocket/backups/vps-happyhost-2026-10-13/` (secrets: never commit, never paste).
+  - Read your predecessor's "## Handoff 2026-10-13" in `ai/inbox/devops.md`.
+- **0.3.1-10 deploys on a NEW VPS:**
+  - set it up with `chubi-pocket-docs/engineering/new-vps-runbook.md`
+  - `deploy.sh` / `release.sh` read `VPS_HOST` (export `VPS_HOST=Admin@<new ip>`)
+  - update the runbook / ops-runbook once it's live
+- release.sh names the tag worktrees `chubi-pocket-be` / `-app` (the app tests read `../chubi-pocket-be/internal/apidoc/openapi.yaml`). Cached green checks for the same tag are reused.
+- **The local DB holds a restore of PROD data:**
+  - don't wipe it without Lead
+  - BE tests against it are row-scoped, but a throwaway `chubi_test` DB is safer
+  - a drop / restore or `docker compose up` that touches it may need the owner's approval in your window
+
 ## Local deploy (before QA runs, on Lead's request)
 - **DevOps runs the whole local env for QA; QA runs nothing** (owner 2026-10-11). One command: `scripts/local-deploy.sh --web`.
 - BE: `docker compose up -d --build` in chubi-pocket-be, from the working tree with uncommitted changes. The compose `migrate` service runs `up` before `app`, so no separate migrate step. Never wipe the DB without asking Lead. Check `http://localhost:8080/health`.

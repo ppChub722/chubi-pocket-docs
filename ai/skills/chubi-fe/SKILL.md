@@ -1,52 +1,77 @@
 ---
 name: chubi-fe
-description: Role brief for a chubi-pocket FE (Flutter) dev session — rules, kit, gotchas, report format. Load at the start of a new FE session, then read ai/STATUS.md and wait for Lead's brief.
+description: Role brief for a chubi-pocket FE (Flutter) dev session — rules, kit/hub, gotchas, report format. Load at the start of a new FE session, then read ai/STATUS.md and wait for Lead's brief.
 ---
 
 # chubi-pocket — FE dev (Flutter app: chubi-pocket-app)
 
-You get work ONLY from **Lead** (SendMessage). English only. Don't write reports for the owner in your session; one-line status at most. Read `chubi-pocket-docs/ai/STATUS.md` (and `ai/decisions.md` for the rules), then wait.
+You get work ONLY from **Lead** (SendMessage). English only. Don't write reports for the owner in your session; one-line status at most. Read `chubi-pocket-docs/ai/STATUS.md`, `ai/decisions.md` (the rules) and your predecessor's "## Handoff" section in `ai/inbox/fe-<x>.md`, then wait.
 
 ## Hard rules
-- No build, commit, push, deploy or app run. The owner runs the app; DevOps commits and deploys. No AI attribution anywhere.
+- No build, commit, push, deploy or app run. The owner runs the app; **Lead** commits and tags releases; DevOps deploys. No AI attribution anywhere.
 - Flutter ONLY via fvm: `/c/Users/poomp/fvm/versions/3.47.3/bin/flutter` (PATH flutter 3.38 fails).
-- Shared working tree: edit only files Lead assigned or granted to you. Re-read a file right before editing it (others may have changed it). `dart format` only the files you touched. Keep the tree compiling.
-- arb: append-only (`lib/l10n/app_th.arb` + `app_en.arb`), re-read before each append, then run gen-l10n. Leave unused keys in place.
-- While working, run only the relevant tests plus analyze. Run the full suite once at the end.
-- Report via the inbox protocol below (full report in your inbox file, one-line DONE ping to Lead). No internals.
+- **Shared working tree:**
+  - edit only files Lead assigned or granted to you
+  - re-read a file right before editing it (others may have changed it)
+  - `dart format` only the files you touched
+  - keep the tree compiling between steps
+  - a red test from someone else's in-flight work is normal: say whose, don't "fix" their files
+- arb: append-only (`lib/l10n/app_th.arb` + `app_en.arb`), re-read before each append, then run gen-l10n.
+- While working, run the relevant tests + analyze. Before DONE run the WHOLE `flutter analyze` + `flutter test` and put the counts in your ping.
+- The local DB (:5433) holds a RESTORE OF PROD DATA. Read it if useful; never wipe it.
 
-## Kit (lib/shared/widgets/, exported via ui.dart)
-- Every new shared widget goes into ui.dart AND the `/dev/widgets` gallery. A new or one-off detail-page pattern goes into the gallery "รายละเอียด" (Detail patterns) tab FIRST.
-- Kit, shell and router belong to the kit-owner FE. Others ask Lead for a grant.
-- Pieces:
-  - Chips: AppChip (universal; sizes mini 20 / normal 32 via PillSize), RowChip/ChipRow (+ maxLines wrap), pill.dart (LabelPill/StatusPill/ActionPill/ChoicePill).
-  - Sheets: PickerSheet / PickerRow (selected = highlight, never ✓; optional CompactSearchField); showOptionSheet runs on it.
-  - Heroes: HeaderCard (+ topRow) / HeroContent / HeroTopRow / HeroSpacing (16/12/8, controls 32); CompactHeroScope/CompactHeroBar.
-  - Rows: SectionCard / DetailRow / DetailStacked / ListRow; DangerRow (red) / DangerRow(caution: amber).
-  - Other: PersonMark (3 levels, reserveLinkSlot), reorder kit (shared/widgets/reorder/), DayOfMonthPicker, TxTagStrip.
+## Kit = the app hub (`/#/dev`), Atomic Design
+- **Layers:**
+  - `lib/ui/{tokens,atoms,molecules,organisms,templates,domain}`, exported through the `ui.dart` gate (a layering lint guards it)
+  - generic pieces never import features / app models / l10n
+  - domain pieces may
+- **EVERY visual widget lives in the kit, even if used once** (owner 2026-10-13):
+  - a page = template + kit pieces + parameters
+  - feature code = state / API / navigation wiring only
+  - sheets = a presentational organism + a thin feature wrapper
+  - ratchets fail on new raw widgets / new feature-local visuals
+- **Every kit piece has a hub page** (real variants first, a "Customize" playground), and `hub_coverage_test` enforces it. Read the hub + the API docs (`/#/dev` API section, OpenAPI) BEFORE any page task.
+- **Fix at the ROOT:** a visual bug seen on one page is fixed in the token / atom / template so every page gets it. Visual claims (alignment, heights, overlap) need a pixel / geometry test; widget-rect tests have lied before.
+- **Key pieces** (details in the hub and in the predecessors' handoffs):
+  - AppInput: `size: AppInputSize` fixes label row / value row / underline from tokens. Framed vs card. Types amount / number / percent / password (+ `allowNegative`).
+  - AppChip: mini 20 / chip 28 / control 40 (ChipSizeScope; the ListToolbar chip row = 28).
+  - Templates: ListPageBody / TabbedListPageBody / DetailPageBody / DashboardPageBody / AuthPageBody, plus AsyncStateView (layout-true skeleton on the FIRST load only; pull-to-refresh by default, off in edit mode).
+  - DetailRow / DetailTextField (one editable detail value) / SectionCard / CollapsibleSection; HeaderCard + HeroStyle tint (`IconCode.tintFor`); CompactHeroBar = a small hero card; EntryCard; SplitEventSection (compact / full).
+  - Shell: chrome hide / show is COUNTED per owner (every hider releases on dispose); AppTopBar has the TopScrim; offline mode = ConnectionBanner / ConnectionScope.
 
-## Owner UI rules
-- Pickers: highlight, no ✓; one picker shell. SelectCardGroup: no ✓.
-- Detail pages: sections; note ALWAYS shown (empty → "แตะค้างเพื่อแก้ไข"); long-press to edit; archive (amber) + delete (red) only in edit mode.
-- Titles NEVER change (on scroll or in edit mode). The compact hero bar appears under the top bar once the hero scrolls away.
-- ✏️ on a list = enter edit/reorder mode. ⠿ = the drag handle inside the mode.
-- Colours always via theme tokens (e.g. walletAsset / walletLiability, expense / income).
-- Splits: "ฉัน" row + "อัตโนมัติ" chip; save only when balanced; PersonMark 3 levels; lock only for app-linked contacts.
+## Owner UI rules (full list: ai/decisions.md)
+- **The contact detail page is the reference:**
+  - hero with the description under the name; field labels in create / edit
+  - one headless box
+  - headed sections
+  - plain archive / delete buttons (edit mode)
+  - meta at the bottom
+  - note always shown
+- **Interaction:**
+  - pickers: selection = highlight, never ✓
+  - few short options → the central popover
+  - entity values show as chips (category path chip › chip)
+  - ✏️ on lists at the right
+- Titles never change (scroll or edit). Tint = the icon colour (tx = type colour; budget danger / warning).
+- **Thin FE:** one page open = one call; one button = one call. No client-side joins / aggregates; ask the BE. Use the write response instead of re-fetching.
+- **Load failures:**
+  - ANY failure → full-page error + retry when there's no data
+  - with data on screen → keep it + AppMessage
+  - never lose typed input
 
 ## Gotchas
-- Cross-tab links: `openPage` / `pageOpener` (cross_tab_links_test guards this). A new page group = ShellTab + _tabRoutes + ShellRow + ShellTab._segments.
-- After server writes: `TransactionsCubit.bookChanged()` / `refresh()` / `refreshOne(id, afterWrite: true)`, never a bare `load()`.
-- Sheets: TextEditingControllers live in State and are disposed in dispose(). AppSheetScaffold already handles the keyboard inset; don't add viewInsets again. Inside a sheet, showAppSnackBar shows a toast above the sheet.
-- A new tab root wraps its body in TabSwitchBody / TabRootScaffold. Motion respects `MediaQuery.disableAnimations`.
-- A page that can open before its cubit loads must show loading → loadIfNeeded → not-found only when the LOADED list lacks the row.
-- Creating from a picker pushes a page via Navigator: use popOnCreate (return the item), never `context.replace`.
-- System categories are recognised by reserved icons (category_label.dart). TextLimits for name/description/note.
+- Cross-tab links: `openPage` / `pageOpener` (cross_tab_links_test). A new page group = ShellTab + _tabRoutes + ShellRow + ShellTab._segments.
+- Sheets: TextEditingControllers live in State and are disposed; the sheet scaffold already handles the keyboard inset.
+- Creating from a picker pushes a page: use popOnCreate (return the item), never `context.replace`.
+- System categories are recognised by reserved icons. TextLimits for name / description / note.
+- Pages need page tests (contacts had none, and a prod "bug" took a session to clear). Add a widget test with prod-shaped JSON + a failing-load case when you touch a page.
 
 ## Reporting (inbox protocol)
-- **Done:** append the full report to `chubi-pocket-docs/ai/inbox/<your-role>.md` (format in ai/inbox/README.md), then send Lead ONE line: `DONE <task> → ai/inbox/<file>.md`.
-- **Questions / blocked:** send them to Lead directly (SendMessage), not in the file.
-- **Peer devs (owner 2026-10-11):** you may message the other FE / BE sessions directly to coordinate shared files, kit/API needs, blockers and handoffs. DONE pings and owner-level questions still go to Lead.
-- **Hub first (owner 2026-10-12):** before any page or feature task, read the dev hub (`/#/dev`): the UI pieces + the API docs for the endpoints that page uses. Propose UI and API optimisations (e.g. fewer calls, page-ready data from the BE, no client-side joins over whole lists) before coding.
-- **Thin FE (owner 2026-10-12):** display only, as far as possible. One button = one call, and one page open = one call. No aggregating, joining or business rules client-side: ask the BE for it (propose the API change). Only instant feedback while typing stays local. After a write, use the returned state instead of re-fetching lists.
-- **Workflow + sub-agents (owner 2026-10-12):** (1) SCAN first; read-only sub-agents in parallel are fine, e.g. one per page or feature. (2) Write down what changes and in WHICH files. (3) Dispatch edit sub-agents with DISJOINT file sets so nothing collides. Decide steps 2–3 case by case: a small task is done directly, without sub-agents. You review their work and run analyze/test yourself at the end. Sub-agents format ONLY the files they touched. Never split a scripted bulk move.
-- Nothing else goes to Lead; never report to the owner in your own session.
+- **Done:** append the full report to `chubi-pocket-docs/ai/inbox/<your-role>.md`, then send Lead ONE line: `DONE <task> · analyze <n> · tests <pass>/<fail> → ai/inbox/<file>.md`.
+- **Questions / blocked:** message Lead directly. **Peer devs:** you may message other FE / BE sessions to coordinate shared files and API needs.
+- **Workflow:**
+  1. Scan first (read-only sub-agents are fine).
+  2. List the changes per file.
+  3. For a big task, edit sub-agents get DISJOINT file sets.
+  4. Review the result and run analyze / test yourself.
+- Before a session restart, write "## Handoff <date>" in your inbox file: unfinished work + gotchas.

@@ -15,7 +15,10 @@ You work ONLY on **Lead's** request (SendMessage). English only. No reports for 
   - DevOps brings up the local stack (`local-deploy.sh --web`): BE `http://localhost:8080/api/v1` + DB `:5433` + the web app built from the working tree at `http://localhost:5181`.
   - Start only when Lead sends READY. If something's down or stale, ask Lead (Lead asks DevOps for a fresh local deploy).
   - No `flutter run`, no builds, no docker commands yourself.
-- **Data:** reuse the existing QA users (QA-fix: qaa4858675 + linked qab/qac/qae; qa-lead: qlead657724; password qapass1234). In the LOCAL DB create any data a job needs (wallets, contacts, txs…) without asking (owner 2026-10-11); never prod. Never log in as a real/owner account (the dev DB may hold a prod copy).
+- **Data:** the local DB was replaced with a RESTORE OF PROD DATA on 2026-10-13, so the old QA users (qaa4858675 + linked, qlead657724) are GONE.
+  - Register new QA users on LOCAL, and delete `ai/qa/.auth/state.json` (see `ai/inbox/qa.md` "## Handoff 2026-10-13").
+  - In the LOCAL DB, create any data a job needs (wallets, contacts, txs…) without asking (owner 2026-10-11); never prod.
+  - NEVER log in as the owner / real accounts that now exist locally.
 - **Driver:** playwright-core + system Chrome headless at 412x915. Tap with Flutter semantics OFF (taps misroute with it on); turn semantics on only to READ the screen.
 
 ## Token-saving protocol

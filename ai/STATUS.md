@@ -1,6 +1,6 @@
 # STATUS — read this first (rewritten, not appended)
 
-_Last updated: 2026-10-13 night by Lead._
+_Last updated: 2026-10-13 late night by Lead (handoff before the team restart)._
 
 ## Live (prod)
 - **0.3.1-9** (2026-10-13 night): app `e8305e3` (build 55, Firebase 2055) · be `5b7722e` · docs `9c328bd` · migration **053** · `LATEST_APP_BUILD=55` · `MIN_APP_BUILD=55` (forced update) · tags v0.3.1-9. Pre-deploy backup `chubi_pocket-20261012-1408.dump.gz`.
@@ -13,8 +13,17 @@ _Last updated: 2026-10-13 night by Lead._
 - Rules and owner decisions: `ai/decisions.md`. Discussed but not started: `ai/backlog.md`.
 - Releases are tag-based: Lead commits, bumps, tags `v<version>` in be / app / docs and pushes; DevOps runs `chubi-pocket-be/scripts/release.sh <brief-dir>` from the tags (brief template: `ai/templates/release-brief/`). Local env: `scripts/local-deploy.sh --web` (only when the owner orders).
 
-## In progress
-- Nothing in flight. Local env: BE :8080 + web :5181 (build 55) on a DB restored from the prod dump (QA users are gone; recreate locally when QA is needed).
+## In progress (handoff 2026-10-13 night — ALL team sessions are being restarted)
+- **Uncommitted in the app tree** (on top of the v0.3.1-9 tag `e8305e3`; ship with 0.3.1-10, commit when green):
+  - FE-A: counted shell chrome (bottom bar after a fast back) + TopScrim
+  - FE-D: change password back to a page (entry under the username row)
+  - FE-E: ListToolbar chips 28
+  - FE-B: fail-fast loads + contact page tests + OFFLINE MODE (ConnectionBanner / ConnectionScope)
+  The last one was still IN FLIGHT at handoff: read `ai/inbox/fe-b.md` "## Handoff 2026-10-13" before touching it, then run the whole analyze / test.
+- Every role wrote "## Handoff 2026-10-13" (state + gotchas) in its `ai/inbox/<role>.md`. Role skills are updated.
+- Local env: BE :8080 + web :5181 (build 55), with the DB restored from prod (users 4 / accounts 6 / tx 12). The QA users are gone; recreate them locally when QA is needed.
+- Old VPS (Happy-Host) RETIRED, full backup in `chubi-pocket/backups/vps-happyhost-2026-10-13/` (secrets). New server: `engineering/new-vps-runbook.md`; scripts read `VPS_HOST`.
+- The owner is "น้อง": call them น้อง, speak as a caring พี่ (see the chubi-lead skill).
 
 ## Waiting on the owner
 - Feature-widget audit (`ai/inbox/fe-a.md`): A≈18 · B≈111 · C≈25, ~29 dev-days. Lead proposed a ratchet test now + the moves in 0.3.1-10 (with the page reworks); waiting for the owner.
@@ -26,7 +35,7 @@ _Last updated: 2026-10-13 night by Lead._
 - 0.3.1-10: debts + events + budgets + scheduled + goals in parallel (1 FE per page group, FE-A/FE-B as supporters).
 
 ## Team (session names change; check ListAgents)
-- Open now: Lead `chubi-pocket-99` · FE-A `-81` (kit owner) · FE-B `-a0` · FE-C `-1a` (debts) · FE-D `-02` (events) · FE-E `-61` (budgets / scheduled / goals) · BE `-bc` · QA `-59` (qa-lead) · DevOps `-e3`.
+- Until the restart (2026-10-13): Lead `chubi-pocket-99` · FE-A `-81` (kit / shell owner) · FE-B `-a0` (templates) · FE-C `-1a` (tx / debts) · FE-D `-02` (settings / profile / events) · FE-E `-61` (wallets / categories / tags / contacts / budgets / scheduled / goals) · BE `-bc` · QA `-59` · DevOps `-e3`. New sessions: roll call and map them to these roles.
 - Local env: docker BE `localhost:8080` + DB `:5433` (restored from prod 2026-10-13; the old QA users are gone).
 
 ## Old log
