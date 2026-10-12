@@ -13,11 +13,12 @@ _Last updated: 2026-10-13 late night by Lead (handoff before the team restart)._
 - Rules and owner decisions: `ai/decisions.md`. Discussed but not started: `ai/backlog.md`.
 - Releases are tag-based: Lead commits, bumps, tags `v<version>` in be / app / docs and pushes; DevOps runs `chubi-pocket-be/scripts/release.sh <brief-dir>` from the tags (brief template: `ai/templates/release-brief/`). Local env: `scripts/local-deploy.sh --web` (only when the owner orders).
 
-## In progress (2026-10-13 ~04:20) — ALL 0.3.1-10 WORK DONE, GREEN, uncommitted
-- Done: debts · events (link-by-prompt, 3-choice delete, event tags) · recurring (+ ออม type) · wallets track_balance · budgets v2 · saving goals v2 (saving tx) · More page (4 sections) · 0.3.1-9 leftovers · quick-create presets / mode colours. Migrations 054–060.
-- Lead full run: flutter analyze 0 issues · flutter test 887/0 (after 2 small fixes) · go vet clean · go test 23 pkgs ok (chubi_test DB).
-- Next (owner's go): back up the local DB → migrations 054–060 → local build → owner tests once (smoke first) → commit + tags → release 0.3.1-10 on the NEW VPS.
-- Known small open item: tapping a pending 🐷 saving draft confirms it directly (no edit sheet yet).
+## In progress (2026-10-13 ~04:30) — 0.3.1-10 PREPARED (tagged + pushed), not deployed
+- Tags v0.3.1-10: be f503d9c · app 4d838f1 (build 58, pubspec 0.3.1-10+10) · docs = this commit. Brief: chubi-pocket/release-briefs/0.3.1-10/ (EXPECT_MIGRATIONS 54–60, MIN_APP_BUILD 58).
+- Deploy target = the NEW VPS (engineering/new-vps-runbook.md; scripts read VPS_HOST). Happy-Host is retired but still serves 0.3.1-9 (health 200 on 2026-10-13 04:20).
+- Lead full run before tagging: flutter analyze 0 · flutter test all pass · go vet clean · go test 23 pkgs ok.
+- DevOps: local backup + migrations 054–060 + local build in progress (owner to smoke-test at :5181).
+- Small open item: tapping a pending 🐷 saving draft confirms directly (no edit sheet).
 - Later (backlog): module dashboards, dashboard "แผนเดือนนี้", events E1 / E2 / E5, budget rollover + quick-create budget chip.
 
 ## Earlier handoff (2026-10-13 — team restarted)
