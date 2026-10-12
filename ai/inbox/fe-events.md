@@ -144,3 +144,114 @@ deviations / open:
 - Events agent ran dart format on the whole projects dir (format churn possible in untouched files).
 
 - 2026-10-12 follow-up: More cards restored (debts owed/owe, budgets %, scheduled due in 14d) from the extended /me/counts; pending submit already patches wallets from account_balances.
+
+## 2026-10-12 — FE-EVENT: events proposal rev 2 (owner answers applied; only the changes)
+Based on ai/decisions.md "Event tags" + "Pulling a personal tx in". Everything not listed here stands as in the Phase 0 proposal.
+
+**On hold (owner): E1 settlement · E2 members as a tab · E5 resolve amount.**
+- The resolve tab ("coming soon"), the resolve sheet (incl. the share-only switch) and the separate members page `/projects/:id/members` stay as they are, adapted only to the new API.
+- Dropped from the plan for now: §1d member picker rework, §1e resolve sheet redesign, A6 atomic resolve, A8 member candidates (except "bad input → 400"), A9 settlement, PersonRow on the members page.
+
+**Changed by the owner's answers**
+- E3 — the event **type is dropped** (form, hero chip, list meta, search). In its place:
+  - the EVENT gets many **personal tags** (my own tag set, private to each member): a tag row under the hero (detail-page standard), edited with the existing TagPickerSheet; the list filters by tag.
+  - BILLS use **event-scoped tags** (one set per event, shared by all members, real entities with icon / colour, usable only inside that event). Today's free-text `tags: [String]` on board rows becomes tag refs.
+  - tapping a bill's tag chip → a popover: "+ เพิ่มเข้าแท็กของฉัน" (hidden when I already have a personal tag with that name) · "ดูบิลที่ติดแท็กนี้" (the รายการ tab filtered by it).
+  - สรุป "แยกตามแท็ก" (top 5, BE-sorted) gets a "นำเข้าทั้งหมด" action (imports every event tag I don't have yet).
+- E4 — the ~33 arb values โปรเจกต์ → อีเวนต์ change in place (keys unchanged); the route stays `/projects`.
+- E6 — optional start / end dates in the form; **no currency field** (single user currency; Q3 / A5 currency part dropped).
+- E7 — drop "รายการล่าสุด" (recent 3) from สรุป; keep top-5 tags.
+- **Pulled-in tx keeps a link** (bill ← personal tx): on the bill, a row "รายการต้นทาง … ›" → tx detail, shown ONLY to the tx owner; the money fields (amount / date / payer / wallet) show a 🔗 hint "แก้แล้วเปลี่ยนทั้งสองฝั่ง"; tags / description / note were copied once and are independent. The tx-detail side ("อยู่ในอีเวนต์ … ›") is fe-core's file.
+
+**Tabs today stay:** สรุป · รายการ (+ เคลียร์ยอด when completed / archived, unchanged).
+
+**API asks, rev 2** (replaces A1–A10; for Lead / BE)
+- **A1** `GET /projects?status&q&tag_id[]&sort&page&per_page`: rows carry `tags` (MY personal tags on the event, embedded TagRef with icon / colour), `my_net`, `total_expense`, `planned_amount`, `members_count`, `start_date` / `end_date`, `is_locked`; no `type`; pagination block.
+- **A2** `GET /projects/:id/detail` = one call: project (+ `my_member_id`, flags `is_owner` / `can_add_bill` / `can_edit` / `can_manage_members`, my personal `tags`), summary (totals, plan trio, my_position, `by_tag` top 5 as event TagRefs with amount + share + `mine`), members[] (still needed by quick create's payer / split pickers), event tags[], board first page.
+- **A3** board rows: nested `children[]`; embedded `transaction_member`; `tags` = event TagRefs `{id, name, icon_code, mine}`; `source_tx` `{id, description}` ONLY when the caller owns the linked personal tx (null otherwise); `linked: bool` (money fields shared with a personal tx); `my_share`; `locked`; server filters `type` / `mine` / `q` / `tag_id` / `sort`; paging.
+- **A4** every event write returns a patch `{row?, summary, project?, members?, tags?, account_balances?}`, no refetch (row create / update / delete, mark, bills add / remove, status, member add / update / remove, leave, transfer).
+- **A5** `POST /projects` accepts `planned_amount`, `start_date`, `end_date`, `tag_ids` (my personal tags), `icon_code`, description / note in ONE call (validate end ≥ start); `type` removed; currency = the user's currency, set by the server.
+- **A11 (new) event tags:** `GET/POST/PUT/DELETE /projects/:id/tags` (name, icon_code), bills take `tag_ids`; `POST /projects/:id/tags/import {tag_ids?}` (empty = all I don't have) → creates personal tags by name, returns the updated event tags (`mine` flags). Resolve / claim auto-attaches same-name personal tags (decisions.md); the "create these tags?" prompt flow can come later.
+- **A12 (new) my tags on an event:** `PUT /projects/:id/my-tags {tag_ids}` (per member, private) — or `tag_ids` on `PUT /projects/:id` if BE prefers; returns the project row.
+- **A10** OpenAPI for all of the above (`x-used-by`); the hub API page reads it.
+- A7 (bill candidates for multi-select add) stays as a later ask; not in this round.
+
+**Kit asks to fe-core (hub first, owner review):** EventCard (list row: icon, name, my tags as mini chips, status chip, meta line members · date range, plan ProgressRow, my net) · EventBillRow (+ child row; tick, payer PersonMark, event-tag mini chips that are tappable, amount, 🔗 linked hint) · PositionRow (paid / share / net — kept for my position + who paid) · a tag-chip popover (or confirm OptionMenuAnchor with action items is the piece) · a "linked field" hint (🔗 + caption on DetailRow) · a source-link DetailRow ("รายการต้นทาง … ›"). ListPageBody paging already exists (`onLoadMore` / `hasMore` / `loadingMore`). Multi-select PickerSheet and PersonRow are NOT needed this round (A7 / members on hold).
+
+**Build order:** arb sweep + type removal + dates (no BE needed) → list on ListPageBody + paging (today's API pages already) → detail on one repository call (adapter over today's 4 GETs until A2 lands, flagged) → patch-from-response as each A4 write lands → event tags + personal tags + source link (A11 / A12 / A3) once BE's spec lands → tests.
+Constraints kept: quick create (transactions) reads `ProjectView` / `ProjectTxTree` / `ProjectMember`, and the hub "Others" page demos `ProjectTxTreeTile` — their APIs stay compatible (or move together with fe-core).
+
+## 2026-10-13 — FE-EVENT: events rework on the Events spec (DONE, not run against a live BE)
+DONE · `flutter analyze` 0 issues · full `flutter test` 701 pass / 3 fail (none in projects code: 2 hub ratchets need fe-core's page_flows lines, sent; 1 = event_pick_test `txCanJoinEvent`, transactions/tx_rules.dart in-flight elsewhere) · projects tests 14/14.
+**The BE handlers don't exist yet** (be: debts first, then events). Everything is coded against openapi.yaml tag "Events", so the event pages fail on the local BE until be ships them (detail = 404 → error + retry page).
+
+**Files (all lib/features/projects/** + tests + arb):**
+- domain/project.dart: rewritten for the spec.
+  - `Project` = API `Event`: flags is_owner / can_add_bill / can_edit / can_manage_members, `readOnly` (= is_locked), my tags (EmbeddedTag), totals, my_net. `type` is gone.
+  - `ProjectMember` = EventMember (`name`, `is_me`).
+  - `ProjectTransaction` = BoardRow / BoardSplit, kept FLAT (`flatten`: a bill, then its splits inheriting type / date): `tagRefs` (BoardTag: id / name / icon / mine / count), `linked`, `sourceTx`, `myMark`, `myShare`, `locked`.
+  - `ProjectSummary` = EventSummary (positions, by_tag with the tag ref + my share).
+  - new: `ProjectDetail` (EventDetail), `EventPatch`, `ProjectPage`, `ProjectSort`.
+- data/projects_repository.dart: `list(q, tagIds, sort, page)`, `detail` (GET /detail), `create` → ProjectDetail (plan / dates / tag_ids in ONE POST), `update` → EventPatch (null clears dates / plan; `tag_ids` = my tags).
+  - Every write returns `EventPatch`: board create / update / delete / mark, member add / role / remove, transfer.
+  - Event tags: `eventTags`, `listTags` (names), `createEventTag`, `importTags`. Board listing: filters + sort + paging.
+  - Removed: `summary`, `requestLink`.
+  - Kept source-compatible for other features: removeBill (void), copyToPersonal (String), quickCreate / addBills → QuickCreateResult (+ `.patch`).
+- cubit/projects_cubit.dart: server-side status / q / tag / sort + paging (`loadMore`); `patch(project)` / `remove(id)` keep the list fresh from event-page writes (no reload on return).
+- pages:
+  - projects_page: EventCard hairline rows (my tags, my net, plan progress, dates); debounced server search; status menu; my-tags filter (TagPickerSheet, count badge); 3 sorts; paging.
+  - project_form_page: type removed; optional start / end dates (bounded pickers, clearable); my tags row; one POST.
+  - project_detail_page: ONE call on open; my-tags strip under the hero (one PUT); dates in the top box (view + edit, clearable).
+    - Every write applies its EventPatch (info save, status, tick, delete bill, invite, quick-create add / edit via fe-core's new `onEventSaved`) and also patches the list cubit + wallet balances. No 4-GET refetch anywhere.
+  - project_members_page (on hold, adapted only): writes apply the patch instead of reloading.
+- widgets:
+  - project_tx_tiles: board rows on EventBillRow / EventBillChildRow (tick, payer PersonMark level, event-tag chips with icons, 🔗 linked).
+    - Tag chip popover (OptionMenuAnchor): "+ เพิ่มเข้าแท็กของฉัน" (hidden when mine) and "ดูบิลที่ติดแท็กนี้".
+    - Action sheet: "รายการต้นทาง ›" (only when the BE sends source_tx, i.e. for the tx owner) → openPage(/transactions/:id); the edit action shows the linked hint.
+    - Locked rows are inert.
+  - project_tx_list_tab: unfiltered = the page's board + paging; any filter / sort / search / tag → server `listBoardRows`, paged, kept in step with page patches.
+  - project_dashboard_tab (สรุป): who paid + top-5 tags from the BE summary on PositionRow (no client aggregates); "รายการล่าสุด" dropped (E7); "นำเข้าทั้งหมด" (import every event tag I don't have); a tag row → รายการ filtered by it.
+  - project_common: ProjectView gains `apply(EventPatch)`, `withMore`, `withEventTags`, `eventTags`, `tagIdsFor` / `eventTag` (the quick-create bridge), paging; currency = the user's (no 'THB' fallback unless unknown); `projectDateRange` / `projectDay`.
+  - resolve_sheet: debts via `createEntry` (fe-debt asked; POST /personal-debts is retired). add_member_sheet returns (name, patch).
+- arb (append + in-place):
+  - E4: 33 th / 35 en values โปรเจกต์ → อีเวนต์, keys unchanged, `{project}` placeholders kept.
+  - New keys: eventStartDateLabel, eventEndDateLabel, eventDatesInvalid, eventDateNone, eventTagShowBills, eventTagAddToMine, eventTagsImportAll, eventTagFilter, eventSourceTx, eventLinkedHint, eventTagsImported. gen-l10n run.
+- tests (new):
+  - test/features/projects/event_fixtures.dart (spec-shaped JSON)
+  - event_model_test.dart (7: parsing, flatten, patch apply / insert / remove, tagIdsFor, mine flags, currency)
+  - event_pages_test.dart (7: list = 1 call + EventCard + server search + error / retry; detail = 1 call, error / retry, malformed body → error, a tick = 1 call with the patch applied)
+
+**Done by others for this round:** fe-core built EventCard / EventBillRow / EventBillChildRow / PositionRow (hub domain/events) and changed quick create (tag_ids, createEventTag, `onEventSaved`). Waiting on fe-core: page_flows.dart lines (sent) + api_unused_baseline for the 3 endpoints no page calls yet.
+
+**Open / follow-ups:**
+- Unverified on a device and against a real BE (the handlers aren't written). Expect small shape fixes when be ships them.
+- TagsCubit has no patch-in: after an import I call `tags.load()` once (an extra GET); the tags owner could add `upsertAll(created)`.
+- Members page (on hold): opens with 2 calls (getProject + listProjectMembers). Event-tag editing (rename / icon / delete) has no UI yet: the endpoints are unused.
+- Resolve sheet / tab unchanged in behaviour (E1 / E5 on hold); it still writes POST /transactions + PUT mark (2 calls).
+- The สรุป by_tag `mine` flags refresh only on the next open after an import (the board / rows update at once).
+- Hub "Others" page still demos `ProjectTxTreeTile` (works; fe-core can switch it to EventBillRow).
+
+### Addendum 2026-10-13 (after fe-core's tx-detail link)
+- `/projects/:id?bill=<id>` (tx detail "อยู่ในอีเวนต์ … ›"): the event page reads `bill` (GoRouterState; also `ProjectDetailPage(initialBillId:)`), opens on รายการ (pager initial page) and scrolls that bill into view once. No highlight: that needs a kit flag on EventBillRow (asked fe-core).
+- The linked-money wording is now the shared `txLinkedMoneyHint` (the edit action's subtitle). The kit LinkedFieldHint belongs in quick create's event-bill edit (fe-core's file); bills have no detail page.
+- BE dropped A8 (member-candidates / contact_ids): `addMember(contactIds)` removed.
+- fe-core applied the events page_flows block; their full suite is green (analyze 0 · 711 pass). Mine now: analyze 0 · projects tests 15/15 (+1 for `?bill=`).
+- (BE events implemented in the BE tree, not running locally until a build is ordered.) Their event error codes now show plain Thai through `presentation/event_errors.dart` `eventErrorText` (PROJECT_LOCKED, FORBIDDEN_ROLE, BILL_MONEY_LINKED, TAG_NAME_TAKEN, TAG_NOT_FOUND, INVALID_DATE_RANGE, NO_SHARE_TO_COPY, OWNER_CANNOT_LEAVE). 7 new arb keys `eventErr*` (th + en). Every events snackbar uses it.
+- Bill edit / delete now follow the BE row lock (`BoardRow.locked`: viewer / inactive member / cancelled / archived). Ticking still follows the event status.
+- analyze 0 · projects tests 17/17 (+2 error-mapping tests).
+- `?bill=` target now passes fe-core's `EventBillRow(highlighted:)` (brief tint); the edit-action subtitle uses the bill-side `eventBillLinkedMoneyHint` (my `eventLinkedHint` key is now unused, left in place since the arb is append-only); `SPLITS_EXCEED_AMOUNT` → `txSplitExceeds`. analyze 0 · projects tests 17/17.
+
+## 2026-10-13 — FE-EVENT: linked money by prompt + 3-choice event delete (Lead brief, owner 2026-10-13)
+DONE (my side) · analyze 0 · full suite 718 pass / 1 fail (hub_coverage: `OccurrenceState`, `OccurrenceStateChip`, `StatusChip`, `StatusKind` have no hub page, another session's new kit pieces) · projects tests 21/21.
+- **Delete event:** kit `showChoiceDialog`:
+  - with linked txs: ยังก่อน (primary) · ยืนยัน ไม่ลบรายการ · ยืนยันและลบ [x] รายการ (destructive), x = `Event.linked_tx_count`
+  - without linked txs: ยังก่อน · ยืนยันลบ
+  - `ProjectsRepository.delete(id, deleteLinkedTxs:)` sends `delete_linked_txs=true` as a QUERY param. This is provisional: I'll match BE's spec when it lands.
+  - After deleting the txs: `TransactionsCubit.bookChanged()`.
+  - New arb: eventDeleteBody, eventDeleteKeepTxs, eventDeleteWithTxs, eventDeleteConfirm, eventDeleteNotYet.
+  - Tests: 3 choices shown; "ยืนยันและลบ" → txs=true; "ไม่ลบรายการ" → txs=false; "ยังก่อน" → no call. Router-based harness, since the page leaves after a delete.
+- **Linked money:**
+  - The bill action sheet no longer shows the "edits change both" hint; the 🔗 on the row stays. Test added.
+  - The 3-choice SAVE prompt lives in quick create (event-bill edit) and tx detail (my linked tx edit): fe-core's files. I briefed fe-core: prompt only when the linked tx is mine (`sourceTx != null`); they should also drop their LinkedFieldHint wording.
+  - `also_update_link` on `updateTransaction`: I'll add it the moment BE's spec lands.
+- (spec landed) `updateTransaction(alsoUpdateLink:)` → body `also_update_link` (fe-core wires the save prompt in quick create / tx detail). `delete_linked_txs` is a query param, as sent. Delete now reads `EventDeleteResult.account_balances` and patches the wallets (test checks it). BILL_MONEY_LINKED is gone from the spec, and its mapping is removed (`eventErrMoneyLinked` key left unused, append-only arb). analyze 0 · projects tests 21/21.

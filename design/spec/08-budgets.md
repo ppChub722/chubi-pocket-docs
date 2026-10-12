@@ -1,5 +1,63 @@
 # 08 — Budgets
 
+> **0.3.1-10 — Budgets v2 (migration 059, owner mockup `design/mockups/budget-v2.html`, 2026-10-13).** Section 0 replaces everything below (kept for history: one category, fixed periods, user / project scope, `/budgets/overview` are gone). Shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`, tag **Budgets**.
+
+## 0. Budgets v2
+
+### 0.1 A named personal tracker
+- `name`, `description`, `note`, `icon_code`, a base `amount` per period, `warn_pct` (default 80; null = ไม่เตือน).
+- **Scope** (free; budgets may overlap): `all` (every expense), or any mix of categories (each with or without its sub-categories), tag NAMES and wallets. A row counts when it matches ANY of them.
+- **Time**:
+  - recurring ("งบระยะยาว"): `rule {freq daily|weekly|monthly|yearly, interval}` from `start_date` (a month period starts on the start's day, clamped), end `none | date | count`;
+  - one range: `start_date` → `end.date`, or open (`end.kind none`) until ปิดงบ.
+- **State** (derived): `upcoming` (starts after today) · `active` · `ended` (closed with ปิดงบ, or past its end) · `archived` (เก็บถาวร: hidden, restorable). The list chips: กำลังใช้งาน = upcoming + active; จบแล้ว = ended; archived on its own.
+
+### 0.2 What counts (expense side, my share; owner 2026-10-13)
+| Source | Counts as | What |
+|---|---|---|
+| `normal` | used | my expense transactions (`my_share`, report scope), not a debt entry's wallet side, not a system / non-report category |
+| `recurring` | used | the same, when the transaction is linked to a recurring item (the row carries `recurring` n/N) |
+| `event` | used | my share of an event bill (payer: amount − every split; else my splits; events not cancelled), ONCE: the transaction a bill was made from, or a copy of my share, is not counted again |
+| `upcoming` | expected | recurring items not made yet, dated in the current period (open-ended: the next 30 days) |
+| `pending` | expected | pending drafts dated in the current period |
+
+- An event bill takes the category / wallet / tags of my transaction behind it when there is one. A tag name also matches the bill's event tags and my tags on the event.
+- Expected is the current period only: it is in the forecast, never in %, remaining or status.
+
+### 0.3 Periods (instances)
+- Every period that has started is stored with its own `amount` and `note`. A new one begins on read. Later periods follow the setup.
+- `PUT /budgets/:id/periods/:period_id` sets one period ("เฉพาะรอบนี้": `overridden`; `amount: null` = back to the base).
+- `PUT /budgets/:id {apply}` (the prompt "ใช้การตั้งค่าใหม่กับรอบไหน"):
+  - `following` (default): the current period and later. Past periods keep their amounts and dates. A rule change runs the new rule from the current period's start.
+  - `all`: every period. A rule sent with `all` rebuilds the periods from the start.
+  - Overridden periods keep their amount either way.
+
+### 0.4 Status, forecast
+- `pct` = used / amount, rounded, not clamped.
+- Status, in order: `over` (used > amount) → `warn` (used ≥ warn_pct %) → `pace` (current period: the forecast goes over) → `ok`. Tone: danger / warning / neutral.
+- Forecast (current, active periods):
+  - avg_daily = used / elapsed days, today included
+  - forecast_end = avg_daily × days in the period + expected
+  - forecast_over_date = the first day where used + expected + avg_daily × (days after today) passes the amount
+  - daily_allowance = ⌊(amount − used − expected) / days left, today included⌋
+  - remaining_after_expected
+- Open-ended: avg_monthly (= avg_daily × 30), forecast_over_date (no pace chip), this_month.
+- Recurring: history_avg = the average used of up to 6 periods before.
+
+### 0.5 API
+- `GET /budgets?status=active|ended|archived&sort=risk|name|newest` → each budget at its current period + the hero / chip counts.
+- `GET /budgets/:id?period_id` → the page in one call: forecast, by_source, by_category (used, share of used), the 6 newest periods, the first 20 items (expected first).
+- Paging: `GET /budgets/:id/periods`, `GET /budgets/:id/items?period_id&source`.
+- `POST /budgets`, `PUT /budgets/:id`, `PUT /budgets/:id/periods/:period_id`, `POST /budgets/:id/close | archive | restore`: each returns the page. `DELETE` → `{id}`.
+- Errors: 400 VALIDATION_ERROR / INVALID_RULE / INVALID_CATEGORY / ACCOUNT_NOT_FOUND, 404 NOT_FOUND, 409 INVALID_TRANSITION.
+- Home `/dashboard` budgets tile and `/me/counts` `budgets_summary` keep their shapes, summed over active budgets' current periods.
+- Currency is no longer sent: amounts are in the user's currency.
+
+### 0.6 Migration 059
+Personal v1 budgets become recurring budgets on their category (+ sub-categories), with the same period (anchored on the start of the period they were created in). Event-scope budgets are dropped. Deleting a category takes it out of a budget's scope; `Category.budget_count` = budgets tracking it.
+
+---
+
 Per-category spending limits with a recurrence period. Advisory (not blocking) — the app warns you when you exceed, but never rejects a transaction.
 
 Supports two scopes in Phase 1c:

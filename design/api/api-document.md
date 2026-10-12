@@ -650,13 +650,15 @@ Change username. **Rate-limited to once per 30 days per user** — username live
 
 ## 03 — Accounts
 
-*Pending — see [`../spec/03-accounts.md`](../spec/03-accounts.md).*
+Recent additions (2026-10-13, 0.3.1-10, migration 058): `Account.track_balance` (create / `PUT` take it; `PUT {track_balance: true, current_balance}` turns it back on in one call), `AccountList.totals.untracked_count`, 409 `BALANCE_NOT_TRACKED` on adjust-balance; untracked wallets are left out of every total and the dashboard net worth — [`../spec/03-accounts.md`](../spec/03-accounts.md) (0.3.1-10 note). **Source of truth for shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`.**
 
 ## 04 — Transactions
 
 *Pending — see [`../spec/04-transactions.md`](../spec/04-transactions.md).*
 
 Recent additions (2026-10-10): `GET /v1/transactions` `totals` · detail `split_count` / `splits` / `project` · `PUT /v1/transactions/:id/splits` (edit splits; change a saved split's person in place — rename, switch / link a contact, `"contact_id": null` back to a free name — a linked person is swapped by remove + add, new `debt_id`, 2026-10-12) · `POST /v1/transactions` 201 for expense / income = the full detail incl. `splits` · `my_share` + `can_split` / `can_edit_splits` / `can_join_event` on every row, reports on share basis (spec 04 §3.3, spec 12 §4.5) · repayment rows deletable (debt follows) — spec 04 §3.2–3.4b. Overpaid debts + `POST /v1/personal-debts/split-changes/:id/apply` — spec 12 §3.9–3.10. `split_changed` — spec 13 §2.8.
+
+Recent additions (2026-10-13, 0.3.1-10): rows carry `counterparty` (a debt entry's wallet side, one record with the entry: edits / deletes reach the entry, writes return `person_balance`; replaces `is_repayment` / `source_personal_debt_id`) and `event_bill` (the event bill the row is in; `linked` = money shared with the bill); `Split` drops `settled_amount` / `status`, gains `key` / `paid`, direction paid | received; list filters `can_join_event`, `counterparty_key` — spec 12 §0, spec 10 §0.4. Also (recurring, migration 057): a future-dated create / an edit to a future date makes / moves an upcoming recurring item (`rows: []` + `upcoming`; 400 `FUTURE_DATE_NOT_ALLOWED`), rows carry `recurring_item`, `PUT` takes `also_update_link` (event bill + recurring item), `DELETE ?also_delete_link=true` (result `recurring_item_id`, `bill_id`); `scheduled_transaction_id` removed — spec 04 §2.6, spec 11 §7. **Source of truth for shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`.**
 
 Recent additions (2026-10-11): pending drafts get `draft.project_id` (an event; checked on submit, confirm = the add-a-new-bill-to-an-event path; new submit error codes `PROJECT_*`, `TX_NOT_BILLABLE`, `INVALID_SPLIT`, `SPLITS_EXCEED_AMOUNT`) — [`ux-overhaul-contract.md` §14](ux-overhaul-contract.md), spec 10 §4.25.
 **API v2 (0.3.1-9, 2026-10-12): the source of truth is `chubi-pocket-be/internal/apidoc/openapi.yaml` (served at `GET /api/v1/openapi.json`); behaviour notes in [`api-v2-notes.md`](api-v2-notes.md).** Reached pages' endpoints are in their target shapes (embedded refs, live person names, bare bodies, `account_balances` on every money-moving write, `GET /transactions/form-options`, `GET /me/counts`, `GET /notifications/unread-count`, bulk `POST /pending-transactions/discard`, `PUT /transactions/:id/tags`, `POST /accounts/:id/restore`); where this document or the per-module specs disagree, the yaml wins. Currency is user-level and locked.
@@ -675,13 +677,15 @@ Recent additions (2026-10-11): pending drafts get `draft.project_id` (an event; 
 
 ## 08 — Budgets
 
-*Pending — see [`../spec/08-budgets.md`](../spec/08-budgets.md).*
+Recent additions (2026-10-13, 0.3.1-10, migration 059): Budgets v2 — named trackers with a free scope (all / categories / tag names / wallets), recurring periods or one range, period instances, used vs expected by source. `GET|POST /v1/budgets`, `GET|PUT|DELETE /v1/budgets/:id`, `GET /v1/budgets/:id/periods`, `PUT /v1/budgets/:id/periods/:period_id`, `GET /v1/budgets/:id/items`, `POST /v1/budgets/:id/{close,archive,restore}`; `/v1/budgets/overview`, scope user / project and `currency` removed — [`../spec/08-budgets.md`](../spec/08-budgets.md) §0. **Source of truth for shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`.**
 
 ## 09 — Saving Goals
 
-*Pending — see [`../spec/09-saving-goals.md`](../spec/09-saving-goals.md).*
+Recent additions (2026-10-13, 0.3.1-10, migration 060): Saving goals v2 — a savings NOTEBOOK. `POST /v1/saving-entries` (save / withdraw / move, one row per wallet, largest-first splits), `GET /v1/saving-entries`, `PUT|DELETE /v1/saving-entries/:id`, `GET /v1/saving-goals/spare`, `POST /v1/saving-goals/:id/close`; goals lose `linked_account_id` / `allocation_pct` (and `/v1/accounts/:id/saving-allocations`, ALLOCATION_EXCEEDED); `Account.savings`; pending kind `saving`; recurring type `saving`; Home / More savings = SavingTotals — [`../spec/09-saving-goals.md`](../spec/09-saving-goals.md) §0. **Source of truth for shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`.**
 
 ## 10 — Projects
+
+Recent additions (2026-10-13, 0.3.1-10): page-ready `Event` rows (no `type`, my tags, totals, flags), `GET /v1/projects/:id/detail` (one call), the board with nested splits / event tags / `linked` / `source_tx`, event tags CRUD + `POST /v1/projects/:id/tags/import`, my tags via `PUT /v1/projects/:id {tag_ids}`, every write returns `EventPatch`, a pulled bill's money is linked BY PROMPT (`also_update_link`; another member's edit notifies the tx owner, `409 BILL_MONEY_LINKED` dropped), `DELETE /v1/projects/:id?delete_linked_txs=true` → `EventDeleteResult`, `Event.linked_tx_count` — spec 10 §0. **Source of truth for shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`.** The sections below describe the pre-0.3.1-10 shapes.
 
 Post-migration 27 endpoint surface (project as a separate book — see [`../plans/project-as-separate-book.md`](../plans/project-as-separate-book.md)).
 
@@ -832,17 +836,17 @@ splits; `move` carries them to the new board row.
 - `SELF_SPLIT` — split member equals parent actor
 - `SPLITS_EXCEED_PARENT` — Σ splits > parent amount
 
-## 11 — Scheduled Transactions
+## 11 — Recurring (replaces Scheduled Transactions)
 
-*Pending — see [`../spec/11-scheduled-transactions.md`](../spec/11-scheduled-transactions.md).*
+Recent additions (2026-10-13, 0.3.1-10, migration 057): `/v1/scheduled-transactions/*` removed. New: `GET|POST /v1/recurring`, `GET|PUT|DELETE /v1/recurring/:id` (`?delete_linked_txs`), `GET /v1/recurring/:id/items?tab=produced|upcoming`, `POST /v1/recurring/:id/{pause,resume,archive,restore,extend}`, `GET|POST /v1/recurring-items`, `POST /v1/recurring-items/batch`, `GET|PUT|DELETE /v1/recurring-items/:id` (`?delete_linked_tx`), `POST /v1/recurring-items/:id/{create,archive,restore}`. The due check runs inside the boot reads and makes pending drafts (`source` recurring | upcoming) + notifications `recurring_due` / `recurring_ending`; `GET /v1/me/counts` → `counts.recurring` — [`../spec/11-scheduled-transactions.md`](../spec/11-scheduled-transactions.md). **Source of truth for shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`.**
 
 ## 12 — Personal Debts
 
-*Pending — see [`../spec/12-personal-debts.md`](../spec/12-personal-debts.md).*
+Recent additions (2026-10-13, 0.3.1-10): the person ledger — `GET /v1/personal-debts/people`, `GET /v1/personal-debts/people/:key`, `GET|POST /v1/personal-debts/people/:key/entries`, `GET|PUT|DELETE /v1/personal-debts/:id`; entries paid | received, a paid label, an optional wallet transaction (one record); `GET|POST /v1/personal-debts`, `/cancel`, `/settle` and `split_paid` retired — [`../spec/12-personal-debts.md`](../spec/12-personal-debts.md) §0. **Source of truth for shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`.**
 
 ## 13 — Notifications
 
-*Pending — see [`../spec/13-notifications.md`](../spec/13-notifications.md).*
+Recent additions (2026-10-13, 0.3.1-10): types `recurring_due` (grouped, `{count}`, `/pending`) and `recurring_ending` (`{recurring_id, name, left}`, `/recurring/{id}`); `GET /v1/notifications` and `/unread-count` run the recurring due check first — [`../spec/13-notifications.md`](../spec/13-notifications.md) §2.9–2.10.
 
 ## 14 — Shared Wallets
 

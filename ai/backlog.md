@@ -133,3 +133,9 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
 - Offsite backup copy runs in release.sh; the prod QA account was declined.
 - Migration squash + reset/seed scripts (deferred).
 - VPS migration plan exists (`engineering/vps-migration.md`); bring it up only when the owner asks.
+
+## Dashboard: "แผนเดือนนี้" (owner 2026-10-13: a dashboard sub-feature, later)
+- Expected income (recurring) − recurring bills − goal contributions − category budgets = free to spend, plus a daily allowance. Built on Recurring.
+
+## Small open items (0.3.1-10)
+- Tapping a pending 🐷 saving draft confirms it directly; it should open an edit sheet first (fe-saving).

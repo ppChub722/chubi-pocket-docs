@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Budgets v2 mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Sweet light theme (lib/ui/tokens/app/theme/themes/sweet_theme.dart) */
+:root{
+  --primary:#FF8FB1; --primary-c:#FFD6E0; --on-primary-c:#4A1029;
+  --bg:#FFF7FA; --surface:#FFFFFF; --sv:#FCEEF2; --on:#2B1A21; --muted:#6B5258;
+  --outline:#E8C9D2; --soft:#F5E0E7;
+  --income:#22C55E; --expense:#E11D63; --warning:#F59E0B; --danger:#E11D63; --info:#A855F7;
+  --planning:#A855F7; --asset:#0284C7; --liab:#EA580C;
+  /* spacing / radius tokens */
+  --xs:4px; --sm:8px; --md:12px; --lg:16px; --xl:20px; --xxl:24px;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:20px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#EFE6EA;color:var(--on);font-family:'IBM Plex Sans Thai',system-ui,sans-serif;font-size:16px;line-height:1.45}
+.page-title{max-width:1700px;margin:24px auto 8px;padding:0 16px;font-size:14px;color:var(--muted)}
+.page-title b{color:var(--on);font-size:18px;margin-right:8px}
+.frames{display:flex;flex-wrap:wrap;gap:32px;justify-content:center;padding:16px 16px 64px;align-items:flex-start}
+.frame{display:flex;flex-direction:column;gap:8px;width:390px;max-width:100%}
+.frame-label{font-size:13px;font-weight:600;color:var(--muted);padding-left:6px}
+.frame-label span{display:inline-block;background:var(--on);color:#fff;border-radius:999px;padding:0 8px;margin-right:6px}
+.phone{width:390px;max-width:100%;background:var(--bg);border-radius:36px;border:1px solid var(--outline);overflow:hidden;box-shadow:0 8px 30px rgba(74,16,41,.10);position:relative}
+.status{height:40px;display:flex;justify-content:space-between;align-items:center;padding:0 26px;font-size:13px;font-weight:600}
+.topbar{display:flex;align-items:center;gap:var(--md);padding:4px var(--lg) var(--sm)}
+.pill-btn{width:40px;height:40px;border-radius:999px;background:var(--surface);border:1px solid var(--soft);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--on);flex:none;box-shadow:0 1px 3px rgba(74,16,41,.06)}
+.topbar .t{font-size:18px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.content{padding:0 var(--lg) var(--xxl)}
+/* text roles */
+.display{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
+.title{font-size:16px;font-weight:600}
+.section{font-size:14px;font-weight:600;color:var(--primary)}
+.label{font-size:16px;font-weight:700}
+.caption{font-size:12px;color:var(--muted)}
+.money{font-weight:700;font-variant-numeric:tabular-nums}
+.warn-t{color:var(--warning)} .danger-t{color:var(--danger)} .ok-t{color:var(--income)}
+/* chips: mini 20 / chip 28 / control 40 */
+.chip{display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 10px;border-radius:999px;border:1px solid var(--outline);font-size:13px;font-weight:500;color:var(--on);background:transparent;white-space:nowrap}
+.chip.mini{height:20px;padding:0 7px;font-size:11px}
+.chip.ctl{height:40px;padding:0 14px;font-size:14px}
+.chip.sel{background:rgba(255,143,177,.14);border-color:var(--primary);color:var(--on-primary-c)}
+.chip.warn{background:rgba(245,158,11,.14);border-color:rgba(245,158,11,.6);color:#8A5A00}
+.chip.danger{background:rgba(225,29,99,.12);border-color:rgba(225,29,99,.55);color:var(--danger)}
+.chip.ok{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.5);color:#15803D}
+.chip.info{background:rgba(168,85,247,.12);border-color:rgba(168,85,247,.5);color:#7E22CE}
+.chip.muted{background:var(--sv);border-color:var(--soft);color:var(--muted)}
+.chip.add{border-style:dashed;color:var(--muted)}
+.count{display:inline-flex;min-width:18px;height:18px;border-radius:999px;background:var(--sv);font-size:11px;align-items:center;justify-content:center;padding:0 5px;color:var(--muted)}
+.chiprow{display:flex;gap:var(--sm);flex-wrap:wrap;align-items:center}
+/* icon tile */
+.ico{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex:none}
+.ico.sm{width:32px;height:32px;border-radius:10px;font-size:16px}
+.ico.lg{width:52px;height:52px;border-radius:16px;font-size:26px}
+/* progress: used solid + expected lighter (striped) */
+.bar{height:8px;border-radius:8px;background:var(--sv);display:flex;overflow:hidden}
+.bar .u{height:100%}
+.bar .e{height:100%;opacity:.45;background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.55) 0 3px,transparent 3px 6px)}
+.bar.thick{height:10px}
+.bar-legend{display:flex;justify-content:space-between;gap:var(--sm);margin-top:var(--xs);font-size:12px;color:var(--muted)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:3px;margin-right:4px;vertical-align:middle}
+/* hero */
+.hero{border-radius:var(--r-xl);border:1.5px solid var(--accent);padding:var(--lg);background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 16%,var(--surface)) 0%,var(--surface) 70%);margin-bottom:var(--md)}
+.hero-top{display:flex;gap:var(--sm);align-items:center;margin-bottom:var(--md)}
+.hero-top .sp{flex:1}
+.hero-main{display:flex;gap:var(--md);align-items:center}
+.hero-main .txt{flex:1;min-width:0}
+.hero-desc{font-size:13px;color:var(--muted);margin-top:2px}
+.hero-foot{margin-top:var(--lg)}
+.edit-ico{width:32px;height:32px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:var(--surface);border:1px solid var(--soft);font-size:14px}
+/* boxes / sections */
+.box{background:var(--surface);border-radius:var(--r-lg);border:1px solid var(--soft);overflow:hidden}
+.row{display:flex;align-items:center;gap:var(--md);padding:12px var(--lg);min-height:48px}
+.row + .row,.row + .stack,.stack + .row,.stack + .stack{border-top:1px solid var(--soft)}
+.row .l{flex:1;min-width:0}
+.row .v{text-align:right}
+.row .chev{color:var(--outline);font-size:18px}
+.stack{padding:12px var(--lg)}
+.stack .k{font-size:13px;color:var(--muted);margin-bottom:6px}
+.sec{margin-top:var(--xl)}
+.sec-h{padding:0 var(--xs) var(--sm)}
+.sec-h .caption{margin-top:2px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:var(--sm)}
+.tile{background:var(--surface);border:1px solid var(--soft);border-radius:var(--r-md);padding:10px 12px}
+.tile .caption{margin-bottom:2px}
+.tile .money{font-size:18px}
+.tile.warn{border-color:rgba(245,158,11,.5);background:rgba(245,158,11,.06)}
+.tile.danger{border-color:rgba(225,29,99,.4);background:rgba(225,29,99,.05)}
+/* list rows (hairline) */
+.list{background:var(--surface);border-radius:var(--r-lg);border:1px solid var(--soft)}
+.prow{display:block;padding:14px var(--lg);color:inherit;text-decoration:none}
+.prow + .prow{border-top:1px solid var(--soft)}
+.prow-h{display:flex;gap:var(--md);align-items:center;margin-bottom:10px}
+.prow-h .txt{flex:1;min-width:0}
+.prow-h .title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow-n{display:flex;justify-content:space-between;align-items:baseline;margin-top:6px;font-size:13px}
+.prow-n .pct{font-weight:700;font-variant-numeric:tabular-nums}
+/* tx rows */
+.day{padding:10px var(--lg) 4px;font-size:12px;color:var(--muted);font-weight:600;background:var(--surface)}
+.tx{display:flex;gap:var(--md);padding:10px var(--lg);align-items:center;background:var(--surface)}
+.tx + .tx{border-top:1px solid var(--soft)}
+.tx .txt{flex:1;min-width:0}
+.tx .l1{display:flex;gap:6px;align-items:center}
+.tx .l1 .n{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx .l2{font-size:12px;color:var(--muted);display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:2px}
+.tx .amt{font-weight:700;font-variant-numeric:tabular-nums;color:var(--expense);white-space:nowrap}
+.tx.exp .amt{color:var(--muted);font-weight:600}
+.src{font-size:10px;font-weight:600;border-radius:999px;padding:1px 6px;line-height:16px}
+.src.n{background:var(--sv);color:var(--muted)}
+.src.ev{background:rgba(168,85,247,.12);color:#7E22CE}
+.src.rc{background:rgba(2,132,199,.10);color:var(--asset)}
+.src.pd{background:rgba(245,158,11,.14);color:#8A5A00}
+/* breakdown rows */
+.brk{padding:10px var(--lg)}
+.brk + .brk{border-top:1px solid var(--soft)}
+.brk-h{display:flex;justify-content:space-between;align-items:center;gap:var(--sm);margin-bottom:6px;font-size:14px}
+.brk-h .nm{display:flex;align-items:center;gap:8px;min-width:0}
+.bar.mini{height:6px}
+/* tabs */
+.tabs{display:flex;border-bottom:1px solid var(--soft);margin:0 calc(-1 * var(--lg)) var(--md);padding:0 var(--lg)}
+.tabs a{flex:1;text-align:center;padding:10px 0;font-size:15px;font-weight:600;color:var(--muted);text-decoration:none;border-bottom:3px solid transparent}
+.tabs a.on{color:var(--on);border-color:var(--primary)}
+/* inputs (edit mode) */
+.field{padding:10px var(--lg)}
+.field + .field,.field + .row,.row + .field{border-top:1px solid var(--soft)}
+.field .k{font-size:13px;color:var(--muted);margin-bottom:4px}
+.uline{border-bottom:1.5px solid var(--outline);padding:4px 0;min-height:32px;display:flex;align-items:center;justify-content:space-between}
+.uline.big{font-size:28px;font-weight:700;border-color:var(--primary)}
+.uline .ph{color:#C9AEB6}
+.seg{display:flex;background:var(--sv);border-radius:999px;padding:3px;gap:2px}
+.seg span{flex:1;text-align:center;height:34px;line-height:34px;border-radius:999px;font-size:13px;font-weight:500;color:var(--muted)}
+.seg span.on{background:var(--surface);color:var(--on);box-shadow:0 1px 3px rgba(74,16,41,.12);font-weight:600}
+.switch{width:44px;height:26px;border-radius:999px;background:var(--outline);position:relative;flex:none}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.switch.on{background:var(--primary)}
+.switch.on::after{left:21px}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--outline);border-radius:999px;height:40px}
+.stepper b{width:40px;text-align:center;color:var(--muted);font-weight:500}
+.stepper i{font-style:normal;min-width:64px;text-align:center;font-weight:600}
+/* buttons */
+.btn{height:44px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px;border:1px solid var(--outline);background:var(--surface);color:var(--on)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.amber{color:#B45309;border-color:rgba(245,158,11,.6)}
+.btn.red{color:var(--danger);border-color:rgba(225,29,99,.5)}
+.btns{display:flex;flex-direction:column;gap:var(--sm);margin-top:var(--xl)}
+.actionbar{position:sticky;bottom:0;display:flex;gap:var(--sm);padding:var(--md) var(--lg) 22px;background:linear-gradient(to top,var(--bg) 70%,rgba(255,247,250,0));}
+.actionbar .btn{flex:1}
+.meta{text-align:center;font-size:11px;color:var(--muted);margin-top:var(--xl)}
+.navbar{display:flex;justify-content:space-around;align-items:center;height:64px;background:var(--surface);border-top:1px solid var(--soft);font-size:11px;color:var(--muted)}
+.navbar div{display:flex;flex-direction:column;align-items:center;gap:2px}
+.navbar .plus{width:52px;height:52px;border-radius:18px;background:var(--expense);color:#fff;font-size:28px;display:flex;align-items:center;justify-content:center;margin-top:-18px;box-shadow:0 4px 12px rgba(225,29,99,.35)}
+.navbar .on{color:var(--primary);font-weight:600}
+.addtile{border:1.5px dashed var(--outline);border-radius:var(--r-lg);height:52px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-weight:500;margin-top:var(--md)}
+.hint{font-size:12px;color:var(--muted);padding:0 var(--lg) 10px}
+/* dialog */
+.scrim{position:absolute;inset:0;background:rgba(43,26,33,.38);display:flex;align-items:center;justify-content:center;padding:24px}
+.dialog{background:var(--surface);border-radius:24px;padding:22px 20px 16px;width:100%}
+.dialog .title{font-size:18px;margin-bottom:6px}
+.dialog .opts{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.fade{opacity:.55;filter:saturate(.6)}
+a.jump{color:inherit;text-decoration:none}
+</style>
+</head>
+<body>
+
+<div class="page-title"><b>งบประมาณ v2</b> mockup · ข้อมูลสมมุติ · วันนี้ = พฤ. 8 ต.ค. 2026 · แถบ: <span class="dot" style="background:var(--planning)"></span>ใช้แล้ว <span class="dot" style="background:var(--planning);opacity:.45"></span>คาดว่าจะใช้</div>
+
+<div class="frames">
+
+<!-- ═════════════ 1. LIST ═════════════ -->
+<div class="frame" id="f1">
+  <div class="frame-label"><span>1</span>รายการงบ</div>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span>●●● 🔋</span></div>
+    <div class="topbar"><div class="pill-btn">‹</div><div class="t">งบประมาณ</div></div>
+    <div class="content">
+
+      <!-- header with totals -->
+      <div class="hero" style="--accent:var(--planning)">
+        <div class="caption">รอบปัจจุบันของทุกงบ · ณ 8 ต.ค.</div>
+        <div class="tiles" style="margin-top:10px">
+          <div class="tile"><div class="caption">กำลังใช้งาน</div><div class="money">6 งบ</div></div>
+          <div class="tile danger"><div class="caption">เกินงบ</div><div class="money danger-t">1</div></div>
+          <div class="tile warn"><div class="caption">ใกล้เต็ม</div><div class="money warn-t">1</div></div>
+          <div class="tile warn"><div class="caption">ตามเพซจะเกิน</div><div class="money warn-t">3</div></div>
+        </div>
+      </div>
+
+      <!-- toolbar chips -->
+      <div class="chiprow" style="margin:4px 0 12px">
+        <span class="chip sel">กำลังใช้งาน <span class="count">6</span></span>
+        <span class="chip">จบแล้ว <span class="count">3</span></span>
+        <span style="flex:1"></span>
+        <span class="chip">เรียง: ใกล้เกินก่อน ▾</span>
+      </div>
+
+      <div class="list">
+        <!-- over -->
+        <a class="prow">
+          <div class="prow-h">
+            <div class="ico" style="background:rgba(225,29,99,.12)">🛍️</div>
+            <div class="txt"><div class="title">ช้อปปิ้งออนไลน์</div><div class="caption">🔁 รายเดือน · 1–31 ต.ค. · บัตร KTC</div></div>
+            <span class="chip mini danger">เกินงบ</span>
+          </div>
+          <div class="bar"><div class="u" style="width:100%;background:var(--danger)"></div></div>
+          <div class="prow-n"><span>ใช้ <b class="money">฿4,860</b> จาก ฿4,000 · <span class="danger-t">เกิน ฿860</span></span><span class="pct danger-t">122%</span></div>
+        </a>
+        <!-- warn -->
+        <a class="prow">
+          <div class="prow-h">
+            <div class="ico" style="background:rgba(245,158,11,.14)">☕</div>
+            <div class="txt"><div class="title">กาแฟ &amp; ขนม</div><div class="caption">🔁 รายสัปดาห์ · 5–11 ต.ค. · เหลือ 4 วัน</div></div>
+            <span class="chip mini warn">ใกล้เต็ม</span>
+          </div>
+          <div class="bar"><div class="u" style="width:86%;background:var(--warning)"></div><div class="e" style="width:7%;background:var(--warning)"></div></div>
+          <div class="prow-n"><span>ใช้ <b class="money">฿430</b> จาก ฿500 · คาด +฿35</span><span class="pct warn-t">86%</span></div>
+        </a>
+        <!-- recurring, pace warning -->
+        <a class="prow jump" href="#f2">
+          <div class="prow-h">
+            <div class="ico" style="background:rgba(249,115,22,.14)">🍜</div>
+            <div class="txt"><div class="title">อาหาร</div><div class="caption">🔁 รายเดือน · 1–31 ต.ค. · เหลือ 24 วัน</div></div>
+            <span class="chip mini">ตามเพซจะเกิน 19 ต.ค.</span>
+          </div>
+          <div class="bar"><div class="u" style="width:39%;background:#F97316"></div><div class="e" style="width:9%;background:#F97316"></div></div>
+          <div class="prow-n"><span>ใช้ <b class="money">฿3,120</b> จาก ฿8,000 · คาด +฿720</span><span class="pct">39%</span></div>
+        </a>
+        <!-- one-off -->
+        <a class="prow jump" href="#f4">
+          <div class="prow-h">
+            <div class="ico" style="background:rgba(2,132,199,.12)">🏔️</div>
+            <div class="txt"><div class="title">ทริปเชียงใหม่</div><div class="caption">1–10 ต.ค. · เหลือ 3 วัน</div></div>
+            <span class="chip mini">ตามเพซจะเกิน ~฿650</span>
+          </div>
+          <div class="bar"><div class="u" style="width:77%;background:var(--asset)"></div><div class="e" style="width:2.5%;background:var(--asset)"></div></div>
+          <div class="prow-n"><span>ใช้ <b class="money">฿9,240</b> จาก ฿12,000 · คาด +฿300</span><span class="pct">77%</span></div>
+        </a>
+        <!-- open-ended -->
+        <a class="prow jump" href="#f5">
+          <div class="prow-h">
+            <div class="ico" style="background:rgba(34,197,94,.12)">🏠</div>
+            <div class="txt"><div class="title">รีโนเวทบ้าน</div><div class="caption">ตั้งแต่ 1 ส.ค. · ไม่มีกำหนดจบ</div></div>
+          </div>
+          <div class="bar"><div class="u" style="width:64%;background:var(--income)"></div><div class="e" style="width:8.5%;background:var(--income)"></div></div>
+          <div class="prow-n"><span>ใช้ <b class="money">฿64,300</b> จาก ฿100,000 · คาด +฿8,500</span><span class="pct">64%</span></div>
+        </a>
+        <!-- everything -->
+        <a class="prow">
+          <div class="prow-h">
+            <div class="ico" style="background:rgba(168,85,247,.12)">💰</div>
+            <div class="txt"><div class="title">ใช้จ่ายทั้งเดือน</div><div class="caption">🔁 รายเดือน · 1–31 ต.ค. · ทุกรายจ่าย</div></div>
+            <span class="chip mini">ตามเพซจะเกิน 28 ต.ค.</span>
+          </div>
+          <div class="bar"><div class="u" style="width:62%;background:var(--planning)"></div><div class="e" style="width:10%;background:var(--planning)"></div></div>
+          <div class="prow-n"><span>ใช้ <b class="money">฿21,540</b> จาก ฿35,000 · คาด +฿3,400</span><span class="pct">62%</span></div>
+        </a>
+      </div>
+      <div class="addtile">+ เพิ่มงบ</div>
+    </div>
+    <div class="navbar"><div>🏠<span>หน้าแรก</span></div><div>📋<span>รายการ</span></div><div class="plus">+</div><div>👛<span>กระเป๋า</span></div><div class="on">☰<span>เพิ่มเติม</span></div></div>
+  </div>
+</div>
+
+<!-- ═════════════ 2. RECURRING — tab รอบงบ ═════════════ -->
+<div class="frame" id="f2">
+  <div class="frame-label"><span>2</span>งบระยะยาว · แท็บ รอบงบ</div>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span>●●● 🔋</span></div>
+    <div class="topbar"><div class="pill-btn">‹</div><div class="t">อาหาร</div></div>
+    <div class="content">
+      <div class="hero" style="--accent:#F97316">
+        <div class="hero-top"><span class="chip">🔁 รายเดือน</span><span class="chip">1–31 ต.ค. · รอบนี้</span><span class="sp"></span><span class="edit-ico">✏️</span></div>
+        <div class="hero-main">
+          <div class="ico lg" style="background:rgba(249,115,22,.14)">🍜</div>
+          <div class="txt"><div class="title" style="font-size:20px">อาหาร</div><div class="hero-desc">กินนอกบ้าน + เดลิเวอรี่ ไม่รวมกับข้าวที่ทำเอง</div></div>
+        </div>
+        <div class="hero-foot">
+          <div class="caption">ใช้ไปแล้ว</div>
+          <div class="display" style="color:#C2410C">฿3,120</div>
+          <div class="caption" style="margin-bottom:8px">จาก ฿8,000 · เหลือ ฿4,880</div>
+          <div class="bar thick"><div class="u" style="width:39%;background:#F97316"></div><div class="e" style="width:9%;background:#F97316"></div></div>
+          <div class="bar-legend"><span><span class="dot" style="background:#F97316"></span>ใช้แล้ว 39%</span><span><span class="dot" style="background:#F97316;opacity:.45"></span>คาดว่าจะใช้ +฿720</span></div>
+        </div>
+      </div>
+
+      <div class="tabs"><a class="on" href="#f2">รอบงบ</a><a href="#f3">ตั้งค่า</a></div>
+
+      <!-- dashboard -->
+      <div class="sec-h"><div class="section">ภาพรวมรอบนี้</div><div class="caption">วันที่ 8 จาก 31 วัน</div></div>
+      <div class="tiles">
+        <div class="tile"><div class="caption">ใช้ได้อีกวันละ</div><div class="money">฿165</div><div class="caption">หลังหักที่คาดไว้</div></div>
+        <div class="tile warn"><div class="caption">ตามเพซนี้จะเกินวันที่</div><div class="money warn-t">19 ต.ค.</div><div class="caption">เฉลี่ยวันละ ฿390</div></div>
+        <div class="tile"><div class="caption">คาดสิ้นรอบ</div><div class="money">฿12,990</div><div class="caption warn-t">เกิน ฿4,990</div></div>
+        <div class="tile"><div class="caption">เฉลี่ย 6 รอบก่อน</div><div class="money">฿7,530</div><div class="caption">ต่อรอบ</div></div>
+      </div>
+
+      <div class="sec"><div class="sec-h"><div class="section">แยกตามที่มา</div></div>
+        <div class="box">
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="src n">ปกติ</span>18 รายการ</span><b class="money">฿2,460</b></div><div class="bar mini"><div class="u" style="width:31%;background:#F97316"></div></div></div>
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="src ev">อีเวนต์</span>2 รายการ</span><b class="money">฿660</b></div><div class="bar mini"><div class="u" style="width:8%;background:#F97316"></div></div></div>
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="src rc">รายการประจำ · ล่วงหน้า</span>1 รายการ</span><span class="money" style="color:var(--muted)">+฿450</span></div><div class="bar mini"><div class="e" style="width:5.6%;background:#F97316"></div></div></div>
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="src pd">รอยืนยัน</span>2 รายการ</span><span class="money" style="color:var(--muted)">+฿270</span></div><div class="bar mini"><div class="e" style="width:3.4%;background:#F97316"></div></div></div>
+        </div>
+      </div>
+
+      <div class="sec"><div class="sec-h"><div class="section">แยกตามหมวดย่อย</div></div>
+        <div class="box">
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="ico sm" style="background:rgba(249,115,22,.14)">🍽️</span>ร้านอาหาร</span><b class="money">฿1,680</b></div><div class="bar mini"><div class="u" style="width:54%;background:#F97316"></div></div></div>
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="ico sm" style="background:rgba(249,115,22,.14)">🛵</span>เดลิเวอรี่</span><b class="money">฿920</b></div><div class="bar mini"><div class="u" style="width:29%;background:#F97316"></div></div></div>
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="ico sm" style="background:rgba(249,115,22,.14)">🧋</span>คาเฟ่</span><b class="money">฿520</b></div><div class="bar mini"><div class="u" style="width:17%;background:#F97316"></div></div></div>
+        </div>
+      </div>
+
+      <!-- periods -->
+      <div class="sec"><div class="sec-h"><div class="section">รอบงบ</div><div class="caption">แตะรอบเพื่อดูหรือแก้เฉพาะรอบนั้น</div></div>
+        <div class="list">
+          <div class="prow"><div class="prow-h" style="margin-bottom:8px"><div class="txt"><div class="title">ต.ค. 2026</div></div><span class="chip mini sel">รอบนี้</span></div>
+            <div class="bar mini"><div class="u" style="width:39%;background:#F97316"></div><div class="e" style="width:9%;background:#F97316"></div></div>
+            <div class="prow-n"><span>฿3,120 จาก ฿8,000 · คาด +฿720</span><span class="pct">39%</span></div></div>
+          <div class="prow"><div class="prow-h" style="margin-bottom:8px"><div class="txt"><div class="title">ก.ย. 2026</div></div><span class="chip mini danger">เกินงบ</span></div>
+            <div class="bar mini"><div class="u" style="width:100%;background:var(--danger)"></div></div>
+            <div class="prow-n"><span>฿8,460 จาก ฿8,000</span><span class="pct danger-t">106%</span></div></div>
+          <div class="prow"><div class="prow-h" style="margin-bottom:8px"><div class="txt"><div class="title">ส.ค. 2026</div><div class="caption">เดือนเที่ยวญี่ปุ่น เพิ่มงบรอบนี้</div></div><span class="chip mini info">✏️ เฉพาะรอบนี้</span></div>
+            <div class="bar mini"><div class="u" style="width:76%;background:#F97316"></div></div>
+            <div class="prow-n"><span>฿9,120 จาก <b>฿12,000</b> <s class="caption">฿8,000</s></span><span class="pct">76%</span></div></div>
+          <div class="prow"><div class="prow-h" style="margin-bottom:8px"><div class="txt"><div class="title">ก.ค. 2026</div></div><span class="chip mini warn">ใกล้เต็ม</span></div>
+            <div class="bar mini"><div class="u" style="width:87%;background:var(--warning)"></div></div>
+            <div class="prow-n"><span>฿6,980 จาก ฿8,000</span><span class="pct warn-t">87%</span></div></div>
+          <div class="prow"><div class="prow-h" style="margin-bottom:8px"><div class="txt"><div class="title">มิ.ย. 2026</div></div></div>
+            <div class="bar mini"><div class="u" style="width:68%;background:#F97316"></div></div>
+            <div class="prow-n"><span>฿5,410 จาก ฿8,000</span><span class="pct">68%</span></div></div>
+          <div class="row" style="border-top:1px solid var(--soft)"><div class="l caption">ดูรอบก่อนหน้าทั้งหมด</div><span class="chev">›</span></div>
+        </div>
+      </div>
+
+      <!-- counted tx -->
+      <div class="sec"><div class="sec-h"><div class="section">รายการในรอบนี้</div><div class="caption">ทุกอย่างที่นับเข้างบนี้ พร้อมที่มา</div></div>
+        <div class="list" style="overflow:hidden">
+          <div class="day">ล่วงหน้า</div>
+          <div class="tx exp"><div class="ico sm" style="background:rgba(2,132,199,.10)">🍱</div><div class="txt"><div class="l1"><span class="n">ข้าวกลางวันบริษัท</span><span class="chip mini">KBank</span></div><div class="l2"><span class="src rc">🔁 15 ต.ค.</span>· ร้านอาหาร</div></div><div class="amt">฿450</div></div>
+          <div class="day">พฤ. 8 ต.ค.</div>
+          <div class="tx exp"><div class="ico sm" style="background:rgba(245,158,11,.14)">🛵</div><div class="txt"><div class="l1"><span class="n">Grab Food</span><span class="chip mini">KTC</span></div><div class="l2"><span class="src pd">รอยืนยัน</span>· เดลิเวอรี่</div></div><div class="amt">฿245</div></div>
+          <div class="tx"><div class="ico sm" style="background:rgba(249,115,22,.14)">🍗</div><div class="txt"><div class="l1"><span class="n">ข้าวมันไก่</span><span class="chip mini">เงินสด</span></div><div class="l2"><span class="src n">ปกติ</span>· ร้านอาหาร</div></div><div class="amt">฿60</div></div>
+          <div class="day">พ. 7 ต.ค.</div>
+          <div class="tx"><div class="ico sm" style="background:rgba(168,85,247,.12)">🎂</div><div class="txt"><div class="l1"><span class="n">ชาบูวันเกิดมุก</span><span class="chip mini">KBank</span></div><div class="l2"><span class="src ev">อีเวนต์ วันเกิดมุก</span>· ร้านอาหาร · #เพื่อน</div></div><div class="amt">฿480</div></div>
+          <div class="tx"><div class="ico sm" style="background:rgba(168,85,247,.12)">🍕</div><div class="txt"><div class="l1"><span class="n">พิซซ่าหลังเลิกงาน</span></div><div class="l2"><span class="src ev">อีเวนต์ วันเกิดมุก</span>· ร้านอาหาร</div></div><div class="amt">฿180</div></div>
+          <div class="tx"><div class="ico sm" style="background:rgba(249,115,22,.14)">🛵</div><div class="txt"><div class="l1"><span class="n">LINE MAN</span><span class="chip mini">KTC</span></div><div class="l2"><span class="src n">ปกติ</span>· เดลิเวอรี่</div></div><div class="amt">฿189</div></div>
+          <div class="day">อ. 6 ต.ค.</div>
+          <div class="tx"><div class="ico sm" style="background:rgba(249,115,22,.14)">🧋</div><div class="txt"><div class="l1"><span class="n">Café Amazon</span><span class="chip mini">TrueMoney</span></div><div class="l2"><span class="src n">ปกติ</span>· คาเฟ่</div></div><div class="amt">฿85</div></div>
+          <div class="row" style="border-top:1px solid var(--soft)"><div class="l caption">ดูอีก 15 รายการ</div><span class="chev">›</span></div>
+        </div>
+      </div>
+      <div class="meta">สร้าง 2 พ.ค. 2026 · แก้ไขล่าสุด 1 ต.ค. 2026</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═════════════ 3. RECURRING — tab ตั้งค่า (edit) ═════════════ -->
+<div class="frame" id="f3">
+  <div class="frame-label"><span>3</span>งบระยะยาว · แท็บ ตั้งค่า (แก้ไข)</div>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span>●●● 🔋</span></div>
+    <div class="topbar"><div class="pill-btn">‹</div><div class="t">อาหาร</div><div class="pill-btn">↶</div></div>
+    <div class="content">
+      <div class="hero" style="--accent:#F97316">
+        <div class="hero-top"><span class="chip">🔁 รายเดือน</span><span class="sp"></span></div>
+        <div class="hero-main">
+          <div class="ico lg" style="background:rgba(249,115,22,.14)">🍜</div>
+          <div class="txt">
+            <div class="caption">ชื่อ</div><div class="uline"><span class="title">อาหาร</span></div>
+            <div class="caption" style="margin-top:6px">คำอธิบาย</div><div class="uline" style="min-height:26px"><span style="font-size:13px">กินนอกบ้าน + เดลิเวอรี่ ไม่รวมกับข้าวที่ทำเอง</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabs"><a href="#f2">รอบงบ</a><a class="on" href="#f3">ตั้งค่า</a></div>
+
+      <div class="box">
+        <div class="field"><div class="k">งบต่อรอบ (ตั้งต้น)</div><div class="uline big"><span>฿8,000</span></div></div>
+        <div class="row"><div class="l"><div class="label" style="font-size:15px">งบระยะยาว</div><div class="caption">ตั้งงบซ้ำทุกรอบ แต่ละรอบแก้ได้แยกกัน</div></div><div class="switch on"></div></div>
+      </div>
+
+      <div class="sec"><div class="sec-h"><div class="section">นับอะไรบ้าง</div><div class="caption">งบซ้อนกันได้ แต่ละงบนับตามที่ตั้งไว้</div></div>
+        <div class="box">
+          <div class="row"><div class="l">ทุกรายจ่าย</div><div class="switch"></div></div>
+          <div class="row"><div class="l">หมวดหมู่</div><div class="v chiprow" style="justify-content:flex-end"><span class="chip" style="border-color:rgba(249,115,22,.5);background:rgba(249,115,22,.10)">🍜 อาหาร <span class="caption">+ย่อย</span></span><span class="chip" style="border-color:rgba(2,132,199,.4);background:rgba(2,132,199,.08)">🥤 เครื่องดื่ม</span></div><span class="chev">›</span></div>
+          <div class="row"><div class="l">แท็ก</div><div class="v caption">ไม่ได้เลือก</div><span class="chev">›</span></div>
+          <div class="row"><div class="l">กระเป๋า</div><div class="v caption">ไม่ได้เลือก</div><span class="chev">›</span></div>
+          <div class="hint" style="padding-top:6px">นับรายการที่ตรงข้อใดข้อหนึ่ง</div>
+        </div>
+      </div>
+
+      <div class="sec"><div class="sec-h"><div class="section">รอบ</div><div class="caption">ตัวเลือกเดียวกับรายการประจำ</div></div>
+        <div class="box">
+          <div class="stack"><div class="k">ความถี่</div><div class="chiprow"><span class="chip">วัน</span><span class="chip">สัปดาห์</span><span class="chip sel">เดือน</span><span class="chip">ปี</span><span class="chip">กำหนดเอง</span></div></div>
+          <div class="row"><div class="l">ทุก</div><div class="stepper"><b>−</b><i>1 เดือน</i><b>+</b></div></div>
+          <div class="row"><div class="l">เริ่มรอบวันที่</div><div class="v"><span class="chip">1 ของเดือน</span></div><span class="chev">›</span></div>
+          <div class="row"><div class="l">เริ่มนับตั้งแต่</div><div class="v">1 พ.ค. 2026</div><span class="chev">›</span></div>
+          <div class="stack"><div class="k">สิ้นสุด</div><div class="seg"><span class="on">ไม่มี</span><span>วันที่</span><span>จำนวนรอบ</span></div></div>
+        </div>
+      </div>
+
+      <div class="sec"><div class="sec-h"><div class="section">การเตือน</div></div>
+        <div class="box">
+          <div class="stack"><div class="k">เตือนเมื่อใช้ถึง</div><div class="chiprow"><span class="chip">70%</span><span class="chip sel">80%</span><span class="chip">90%</span><span class="chip">ไม่เตือน</span></div><div class="caption" style="margin-top:6px">เกิน 100% = เกินงบ เสมอ</div></div>
+        </div>
+      </div>
+
+      <div class="sec"><div class="box"><div class="stack"><div class="k">โน้ต</div><div style="border:1px solid var(--outline);border-radius:12px;padding:8px 12px;font-size:14px;min-height:56px">เดือนไหนมีทริป ให้เพิ่มงบเฉพาะรอบนั้น</div></div></div></div>
+
+      <div class="btns"><div class="btn amber">เก็บถาวร</div><div class="btn red">ลบงบนี้</div></div>
+      <div class="meta">สร้าง 2 พ.ค. 2026 · แก้ไขล่าสุด 1 ต.ค. 2026</div>
+    </div>
+    <div class="actionbar"><div class="btn">ยกเลิก</div><div class="btn primary">บันทึก</div></div>
+  </div>
+</div>
+
+<!-- ═════════════ 3b. SAVE PROMPT ═════════════ -->
+<div class="frame" id="f3b">
+  <div class="frame-label"><span>3b</span>กดบันทึกตั้งค่า</div>
+  <div class="phone" style="height:520px">
+    <div class="fade">
+      <div class="status"><span>9:41</span><span>●●● 🔋</span></div>
+      <div class="topbar"><div class="pill-btn">‹</div><div class="t">อาหาร</div></div>
+      <div class="content"><div class="box"><div class="field"><div class="k">งบต่อรอบ (ตั้งต้น)</div><div class="uline big"><span>฿9,000</span></div></div></div></div>
+    </div>
+    <div class="scrim">
+      <div class="dialog">
+        <div class="title">ใช้การตั้งค่าใหม่กับรอบไหน</div>
+        <div class="caption">งบต่อรอบ ฿8,000 → ฿9,000</div>
+        <div class="opts">
+          <div class="btn primary">รอบนี้และถัดไป</div>
+          <div class="btn">ทุกรอบ (รวมรอบที่ผ่านมา)</div>
+          <div class="btn" style="border:none;color:var(--muted)">ยังก่อน</div>
+        </div>
+        <div class="caption" style="margin-top:10px;text-align:center">รอบที่แก้ "เฉพาะรอบนี้" ไว้ จะไม่ถูกเปลี่ยน</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═════════════ 4. ONE-OFF ═════════════ -->
+<div class="frame" id="f4">
+  <div class="frame-label"><span>4</span>งบครั้งเดียว (ช่วงวันที่)</div>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span>●●● 🔋</span></div>
+    <div class="topbar"><div class="pill-btn">‹</div><div class="t">ทริปเชียงใหม่</div></div>
+    <div class="content">
+      <div class="hero" style="--accent:var(--asset)">
+        <div class="hero-top"><span class="chip">📅 1–10 ต.ค.</span><span class="chip">เหลือ 3 วัน</span><span class="sp"></span><span class="edit-ico">✏️</span></div>
+        <div class="hero-main">
+          <div class="ico lg" style="background:rgba(2,132,199,.12)">🏔️</div>
+          <div class="txt"><div class="title" style="font-size:20px">ทริปเชียงใหม่</div><div class="hero-desc">ไปกับแก๊งมหาลัย 4 คน</div></div>
+        </div>
+        <div class="hero-foot">
+          <div class="caption">ใช้ไปแล้ว</div>
+          <div class="display" style="color:#0369A1">฿9,240</div>
+          <div class="caption" style="margin-bottom:8px">จาก ฿12,000 · เหลือ ฿2,760</div>
+          <div class="bar thick"><div class="u" style="width:77%;background:var(--asset)"></div><div class="e" style="width:9%;background:var(--asset)"></div></div>
+          <div class="bar-legend"><span><span class="dot" style="background:var(--asset)"></span>ใช้แล้ว 77%</span><span><span class="dot" style="background:var(--asset);opacity:.45"></span>คาดว่าจะใช้ +฿300</span></div>
+        </div>
+      </div>
+
+      <div class="box">
+        <div class="row"><div class="l">นับจาก</div><div class="v"><span class="chip" style="border-color:rgba(2,132,199,.4);background:rgba(2,132,199,.08)"># เชียงใหม่</span></div><span class="chev">›</span></div>
+        <div class="row"><div class="l">ช่วงวันที่</div><div class="v">1 – 10 ต.ค. 2026</div><span class="chev">›</span></div>
+        <div class="row"><div class="l">เตือนเมื่อใช้ถึง</div><div class="v">80%</div><span class="chev">›</span></div>
+        <div class="stack"><div class="k">โน้ต</div><div style="font-size:14px">ค่าที่พักจองล่วงหน้าแล้ว ฿3,600</div></div>
+      </div>
+      <div class="hint" style="padding:6px 4px 0">แท็ก # เชียงใหม่ นับบิลในอีเวนต์ที่มีแท็กชื่อเดียวกันด้วย</div>
+
+      <div class="sec"><div class="sec-h"><div class="section">ภาพรวม</div><div class="caption">วันที่ 8 จาก 10 วัน</div></div>
+        <div class="tiles">
+          <div class="tile"><div class="caption">ใช้ได้อีกวันละ</div><div class="money">฿553</div><div class="caption">หลังหักที่คาดไว้</div></div>
+          <div class="tile warn"><div class="caption">ตามเพซนี้จะเกิน</div><div class="money warn-t">~฿650</div><div class="caption">คาดจบที่ ฿12,650</div></div>
+        </div>
+      </div>
+
+      <div class="sec"><div class="sec-h"><div class="section">แยกตามที่มา</div></div>
+        <div class="box">
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="src n">ปกติ</span>11 รายการ</span><b class="money">฿6,140</b></div><div class="bar mini"><div class="u" style="width:51%;background:var(--asset)"></div></div></div>
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="src ev">อีเวนต์</span>6 รายการ</span><b class="money">฿3,100</b></div><div class="bar mini"><div class="u" style="width:26%;background:var(--asset)"></div></div></div>
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="src pd">รอยืนยัน</span>1 รายการ</span><span class="money" style="color:var(--muted)">+฿300</span></div><div class="bar mini"><div class="e" style="width:2.5%;background:var(--asset)"></div></div></div>
+        </div>
+      </div>
+
+      <div class="sec"><div class="sec-h"><div class="section">แยกตามหมวดหมู่</div></div>
+        <div class="box">
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="ico sm" style="background:rgba(168,85,247,.12)">🏨</span>ที่พัก</span><b class="money">฿3,600</b></div><div class="bar mini"><div class="u" style="width:39%;background:var(--asset)"></div></div></div>
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="ico sm" style="background:rgba(249,115,22,.14)">🍜</span>อาหาร</span><b class="money">฿2,840</b></div><div class="bar mini"><div class="u" style="width:31%;background:var(--asset)"></div></div></div>
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="ico sm" style="background:rgba(2,132,199,.10)">🚐</span>เดินทาง</span><b class="money">฿2,100</b></div><div class="bar mini"><div class="u" style="width:23%;background:var(--asset)"></div></div></div>
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="ico sm" style="background:rgba(236,72,153,.12)">🎁</span>ของฝาก</span><b class="money">฿700</b></div><div class="bar mini"><div class="u" style="width:7%;background:var(--asset)"></div></div></div>
+        </div>
+      </div>
+
+      <div class="sec"><div class="sec-h"><div class="section">รายการ</div></div>
+        <div class="list" style="overflow:hidden">
+          <div class="day">พฤ. 8 ต.ค.</div>
+          <div class="tx"><div class="ico sm" style="background:rgba(168,85,247,.12)">🍲</div><div class="txt"><div class="l1"><span class="n">ขันโตก (ส่วนของฉัน)</span></div><div class="l2"><span class="src ev">อีเวนต์ เชียงใหม่ 66</span>· อาหาร</div></div><div class="amt">฿550</div></div>
+          <div class="tx"><div class="ico sm" style="background:rgba(2,132,199,.10)">🚐</div><div class="txt"><div class="l1"><span class="n">รถแดงไปดอยสุเทพ</span><span class="chip mini">เงินสด</span></div><div class="l2"><span class="src n">ปกติ</span>· เดินทาง · # เชียงใหม่</div></div><div class="amt">฿120</div></div>
+          <div class="day">พ. 7 ต.ค.</div>
+          <div class="tx"><div class="ico sm" style="background:rgba(168,85,247,.12)">🏨</div><div class="txt"><div class="l1"><span class="n">ที่พักนิมมาน (หาร 4)</span><span class="chip mini">KBank</span></div><div class="l2"><span class="src ev">อีเวนต์ เชียงใหม่ 66</span>· ที่พัก</div></div><div class="amt">฿3,600</div></div>
+          <div class="row" style="border-top:1px solid var(--soft)"><div class="l caption">ดูอีก 15 รายการ</div><span class="chev">›</span></div>
+        </div>
+      </div>
+      <div class="meta">สร้าง 20 ก.ย. 2026 · แก้ไขล่าสุด 5 ต.ค. 2026</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═════════════ 5. OPEN-ENDED ═════════════ -->
+<div class="frame" id="f5">
+  <div class="frame-label"><span>5</span>งบไม่มีกำหนดจบ</div>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span>●●● 🔋</span></div>
+    <div class="topbar"><div class="pill-btn">‹</div><div class="t">รีโนเวทบ้าน</div></div>
+    <div class="content">
+      <div class="hero" style="--accent:var(--income)">
+        <div class="hero-top"><span class="chip">∞ ไม่มีกำหนดจบ</span><span class="chip">ตั้งแต่ 1 ส.ค.</span><span class="sp"></span><span class="edit-ico">✏️</span></div>
+        <div class="hero-main">
+          <div class="ico lg" style="background:rgba(34,197,94,.12)">🏠</div>
+          <div class="txt"><div class="title" style="font-size:20px">รีโนเวทบ้าน</div><div class="hero-desc">ห้องครัว + ห้องน้ำชั้นล่าง</div></div>
+        </div>
+        <div class="hero-foot">
+          <div class="caption">ใช้ไปแล้ว</div>
+          <div class="display" style="color:#15803D">฿64,300</div>
+          <div class="caption" style="margin-bottom:8px">จาก ฿100,000 · เหลือ ฿35,700</div>
+          <div class="bar thick"><div class="u" style="width:64.3%;background:var(--income)"></div><div class="e" style="width:8.5%;background:var(--income)"></div></div>
+          <div class="bar-legend"><span><span class="dot" style="background:var(--income)"></span>ใช้แล้ว 64%</span><span><span class="dot" style="background:var(--income);opacity:.45"></span>คาดว่าจะใช้ +฿8,500</span></div>
+        </div>
+      </div>
+
+      <div class="box">
+        <div class="row"><div class="l">นับจาก</div><div class="v chiprow" style="justify-content:flex-end"><span class="chip" style="border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.08)">🔧 ซ่อมแซมบ้าน</span><span class="chip"># รีโนเวท</span></div><span class="chev">›</span></div>
+        <div class="row"><div class="l">เริ่ม</div><div class="v">1 ส.ค. 2026</div><span class="chev">›</span></div>
+        <div class="row"><div class="l">เตือนเมื่อใช้ถึง</div><div class="v">90%</div><span class="chev">›</span></div>
+        <div class="stack"><div class="k">โน้ต</div><div style="font-size:14px">ช่างวิชัย จ่ายเป็นงวด 4 งวด</div></div>
+      </div>
+
+      <div class="sec"><div class="sec-h"><div class="section">ภาพรวม</div><div class="caption">2 เดือน 8 วัน</div></div>
+        <div class="tiles">
+          <div class="tile"><div class="caption">เฉลี่ยเดือนละ</div><div class="money">฿28,600</div></div>
+          <div class="tile warn"><div class="caption">ตามเพซนี้จะครบงบ</div><div class="money warn-t">กลาง พ.ย.</div></div>
+          <div class="tile"><div class="caption">เหลือหลังที่คาดไว้</div><div class="money">฿27,200</div></div>
+          <div class="tile"><div class="caption">เดือนนี้</div><div class="money">฿4,850</div></div>
+        </div>
+      </div>
+
+      <div class="sec"><div class="sec-h"><div class="section">แยกตามที่มา</div></div>
+        <div class="box">
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="src n">ปกติ</span>14 รายการ</span><b class="money">฿47,300</b></div><div class="bar mini"><div class="u" style="width:47%;background:var(--income)"></div></div></div>
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="src rc">รายการประจำ · จ่ายแล้ว</span>งวด 1–2/4</span><b class="money">฿17,000</b></div><div class="bar mini"><div class="u" style="width:17%;background:var(--income)"></div></div></div>
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="src rc">รายการประจำ · ล่วงหน้า</span>งวด 3/4 · 25 ต.ค.</span><span class="money" style="color:var(--muted)">+฿8,500</span></div><div class="bar mini"><div class="e" style="width:8.5%;background:var(--income)"></div></div></div>
+        </div>
+      </div>
+
+      <div class="sec"><div class="sec-h"><div class="section">รายการ</div></div>
+        <div class="list" style="overflow:hidden">
+          <div class="day">ล่วงหน้า</div>
+          <div class="tx exp"><div class="ico sm" style="background:rgba(2,132,199,.10)">👷</div><div class="txt"><div class="l1"><span class="n">ค่าช่างวิชัย</span><span class="chip mini">KBank</span></div><div class="l2"><span class="src rc">🔁 งวด 3/4 · 25 ต.ค.</span>· ซ่อมแซมบ้าน</div></div><div class="amt">฿8,500</div></div>
+          <div class="day">จ. 5 ต.ค.</div>
+          <div class="tx"><div class="ico sm" style="background:rgba(34,197,94,.12)">🚰</div><div class="txt"><div class="l1"><span class="n">ก๊อกน้ำ + ฝักบัว HomePro</span><span class="chip mini">KTC</span></div><div class="l2"><span class="src n">ปกติ</span>· ซ่อมแซมบ้าน · # รีโนเวท</div></div><div class="amt">฿4,850</div></div>
+          <div class="row" style="border-top:1px solid var(--soft)"><div class="l caption">ดูอีก 15 รายการ</div><span class="chev">›</span></div>
+        </div>
+      </div>
+
+      <div class="btns"><div class="btn">ปิดงบ</div></div>
+      <div class="caption" style="text-align:center;margin-top:6px">หยุดนับตั้งแต่วันนี้ ย้ายไปอยู่ใน "จบแล้ว"</div>
+      <div class="meta">สร้าง 1 ส.ค. 2026 · แก้ไขล่าสุด 5 ต.ค. 2026</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═════════════ 6. CREATE ═════════════ -->
+<div class="frame" id="f6">
+  <div class="frame-label"><span>6</span>สร้างงบ</div>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span>●●● 🔋</span></div>
+    <div class="topbar"><div class="pill-btn">‹</div><div class="t">งบใหม่</div></div>
+    <div class="content">
+      <div class="hero" style="--accent:var(--info)">
+        <div class="hero-main">
+          <div class="ico lg" style="background:rgba(168,85,247,.12);border:1.5px dashed rgba(168,85,247,.5)">🎁</div>
+          <div class="txt">
+            <div class="caption">ชื่อ</div><div class="uline"><span class="title">ของขวัญปีใหม่</span></div>
+            <div class="caption" style="margin-top:6px">คำอธิบาย</div><div class="uline" style="min-height:26px"><span class="ph" style="font-size:13px">งบนี้ไว้ทำอะไร?</span></div>
+          </div>
+        </div>
+        <div class="hero-foot">
+          <div class="caption">งบ</div>
+          <div class="uline big"><span>฿5,000</span></div>
+        </div>
+      </div>
+
+      <div class="sec" style="margin-top:4px"><div class="sec-h"><div class="section">นับอะไรบ้าง</div></div>
+        <div class="box">
+          <div class="row"><div class="l">ทุกรายจ่าย</div><div class="switch"></div></div>
+          <div class="row"><div class="l">หมวดหมู่</div><div class="v caption">ไม่ได้เลือก</div><span class="chev">›</span></div>
+          <div class="row"><div class="l">แท็ก</div><div class="v chiprow" style="justify-content:flex-end"><span class="chip" style="border-color:rgba(236,72,153,.45);background:rgba(236,72,153,.08)"># ปีใหม่</span></div><span class="chev">›</span></div>
+          <div class="row"><div class="l">กระเป๋า</div><div class="v caption">ไม่ได้เลือก</div><span class="chev">›</span></div>
+          <div class="hint" style="padding-top:6px">นับบิลในอีเวนต์ที่มีแท็กชื่อเดียวกันด้วย</div>
+        </div>
+      </div>
+
+      <div class="sec"><div class="sec-h"><div class="section">ช่วงเวลา</div></div>
+        <div class="box">
+          <div class="row"><div class="l"><div class="label" style="font-size:15px">งบระยะยาว</div><div class="caption">ตั้งงบซ้ำทุกรอบ</div></div><div class="switch"></div></div>
+          <div class="stack"><div class="seg"><span class="on">ช่วงวันที่</span><span>ไม่มีกำหนดจบ</span></div></div>
+          <div class="row"><div class="l">เริ่ม</div><div class="v">1 ธ.ค. 2026</div><span class="chev">›</span></div>
+          <div class="row"><div class="l">สิ้นสุด</div><div class="v">31 ธ.ค. 2026</div><span class="chev">›</span></div>
+        </div>
+      </div>
+
+      <div class="sec"><div class="sec-h"><div class="section">การเตือน</div></div>
+        <div class="box"><div class="stack"><div class="k">เตือนเมื่อใช้ถึง</div><div class="chiprow"><span class="chip">70%</span><span class="chip sel">80%</span><span class="chip">90%</span><span class="chip">ไม่เตือน</span></div></div></div>
+      </div>
+
+      <div class="sec"><div class="box"><div class="stack"><div class="k">โน้ต</div><div style="border:1px solid var(--outline);border-radius:12px;padding:8px 12px;font-size:14px;min-height:56px;color:#C9AEB6">เพิ่มโน้ต…</div></div></div></div>
+    </div>
+    <div class="actionbar"><div class="btn">ยกเลิก</div><div class="btn primary">บันทึก</div></div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

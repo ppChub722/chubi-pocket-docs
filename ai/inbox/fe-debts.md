@@ -208,3 +208,65 @@ DONE · analyze: No issues · `flutter test`: 412 passed (full suite, once at th
 - Dashboard drill-down: `app_router.dart` passes only `category=<id>`; the list page falls back to the first row's category name. TODO(router): pass `initialCategoryName` / `initialCategoryType` (kit owner).
 - Transfer tags on an incoming row: the form takes tags from the row it opened; correct only if BE returns the same tags on both rows (please confirm with BE).
 - `dart format` was run over `lib/features/transactions/presentation` (format-only changes in a few files I did not otherwise touch).
+
+---
+
+## 2026-10-12 — FE-DEBT: Debts rework (0.3.1-10), rev 3 (owner answers 2026-10-12 applied)
+PROPOSAL DELTA · only what changed vs rev 2. Everything not listed here stands.
+
+**Model**
+- An entry has a FIXED direction, **Paid / Received** (th จ่าย / รับ), like expense / income. Amount is always positive. No signed typing, no state-driven labels ("ให้ยืม / รับคืน / จ่ายคืน" are gone).
+- Paid = I paid them (net +amount, "they owe me" side); Received = they paid me (net −amount). Net > 0 = ติดคุณ, < 0 = คุณติด, 0 = หายกัน.
+- A wallet is optional (ไม่ผูก = ledger only). Tags only when a wallet is picked; they belong to the wallet tx.
+
+**Pages: what I own (lib/features/personal_debts/**)**
+- People list `/personal-debts`: unchanged from rev 2 §1.1, except the AddTile goes away; the centre + already opens debt mode (fe-core preset).
+- Person page `/personal-debts/people/:key`: hero (PersonMark, name, NetBalance) and ONE button **"+ บันทึกรายการ"** (fixed label), which opens quick create in debt mode preset to this person. The tabs "รายการหนี้" / "ประวัติการจ่าย" are as in rev 2; LedgerRow shows direction + amount, never a sign.
+- Data layer: page-scoped cubits (`DebtPeopleCubit`, `DebtPersonCubit`) + repository; `PersonalDebtsCubit`, `DebtPerson.group`, `DebtTile`, the settle / cancel code, the debt form page and the debt detail page are deleted.
+
+**Moved to fe-core (not mine any more)**
+- §1.3 entry detail → the TRANSACTION DETAIL PAGE in debt mode (type → Paid / Received, category → person, wallet may be ไม่ผูก). A LedgerRow tap opens it.
+- §1.4 entry sheet + §1.5 → QUICK CREATE in DEBT MODE: mode chips on top, Paid / Received, a person chip row in place of category, a wallet row with ไม่ผูก, tags only with a wallet, the compact note, collapsible "mark entries paid", and the result line under the amount ("หลังบันทึก: แม่ติดคุณ 200").
+- Delete: a confirm modal names the debt + the wallet tx (the balance comes back), then deletes both; split-sourced entries name the debt only.
+
+**API (§3) changes for BE**
+- #3 entries item: `amount` positive + `direction: paid|received` (replaces the signed amount); filter `direction=paid|received`.
+- #4 `POST …/entries`: `{direction, amount>0, account_id?, date?, description?, note?, tag_ids?, mark_paid_ids?[]}` (tags only with `account_id`). Also return `{result_net}`, or let the FE compute the preview line locally (instant feedback rule) from `person_balance.net` ± amount.
+- #1 people list: add `side=owed_to_me|i_owe` (the summary-box filter, server side).
+- Unchanged: #2, #5 (but entry detail = tx detail, so `GET /personal-debts/{id}` must give that page everything it needs in debt mode), #6, #7, #8.
+
+**Q1–Q5 status:** Q1 yes (one record type); Q2 delete both (owner); Q3 open; Q4 superseded (fixed Paid / Received toggle); Q5 single currency (user-level, locked).
+- Q3 answered (Lead): hidden = net 0 AND every entry labelled paid; "ทั้งหมด" shows them; net ≠ 0 is never hidden (BE rule behind `all`). The preview line under the amount is local (person_balance.net ± amount).
+
+---
+
+## 2026-10-13 — FE-DEBT: Debts rework step 2 (data layer + people list + person page)
+DONE (pages + data layer; cleanup waits on fe-core) · analyze: 0 errors / 0 warnings in my files (7 issues left, all in fe-event's in-flight projects files) · full `flutter test`: 686 pass / 3 fail (hub flow ratchets, see below) · nothing built / committed · not run against the BE (handlers not live yet).
+
+**Data layer (matches openapi.yaml, tag Debts)**
+- `domain/debt_ledger.dart`: PersonBalance (= DebtPerson), DebtTotals, DebtPeoplePage, DebtEntry (+ source / transaction), DebtEntriesPage, DebtPersonDetail, DebtEntryDetail, DebtEntryWriteResult, DebtEntryDeleteResult, DebtSplitChangeResult, DebtEntryQuery / DebtEntrySort, NetSide, `debtPersonKey`, `debtDateWire`. `debt_direction.dart` (DebtEntryDirection paid / received) and `debt_link.dart` (DebtLink, for `Transaction.counterparty`; no import of the ledger file, so no cycle).
+- `data/personal_debts_repository.dart`: listPeople · person · entries · createEntry · getEntry · updateEntry(DebtEntryUpdate: null = unchanged, `clearAccount` → `account_id: null`) · setPaid · deleteEntry · acceptSplit · applySplit. fe-core's quick create / tx detail debt mode build on these.
+- Page-scoped cubits: `DebtPeopleCubit` (search debounced, `all`, `side`, paging, stale-response guard, `applyBalance`) and `DebtPersonCubit` (one open call, the money tab on its first open, per-tab search / filter / sort / paging, `setPaid`, `applyBalance`).
+
+**Pages (kit + template only)**
+- `/personal-debts`: ListPageBody + DebtSummaryCard (net, the two side boxes filter on the server) + ListToolbar (search, "ทั้งหมด" chip) + PersonBalanceRow rows, paged with a load-more error row. Empty: EmptyView; no match: EmptyView.compact. Open = 1 call; search / chip / box / next page = 1 call each. The AddTile is gone (the centre + opens debt mode).
+- `/personal-debts/people/:key` (new route; `extra` = the name for the top bar before the load): TabbedDetailBody: HeaderCard (PersonMark, contact button, NetBalance hero, icon tint) + CompactHeroBar; belowHero = AppButton "+ บันทึกรายการ" (→ `showQuickCreateSheet(preset: QuickCreatePreset.debt(person))`) + for a typed name the "ผูกกับผู้ติดต่อ" row (absorb, then pushReplacement to `c:<id>`). Tabs "รายการหนี้" / "ประวัติการจ่าย": ListToolbar (search, ประเภท จ่าย / รับ, สถานะ ค้างอยู่ / จ่ายแล้ว on tab 1, SortChip), DateGroupHeader per day in date order (none for amount sorts), LedgerRow rows (title = description ?? "จ่ายให้ / รับจาก {name}", wallet mini chip, paid chip, source title). 404 on a typed name → not-found view. Open = 1 call; tab 2 = 1 call on first open.
+- Router (debts block, granted): `/personal-debts/new` and `/personal-debts/person` removed; `personal_debt_form_page.dart` deleted. Links (granted lines): contact detail and tx detail `_openSplits` → `/personal-debts/people/<key>`; cross_tab_links_test line 73; page_presets_test debts lines.
+- arb: 18 keys appended (debtsTab*, debtsSort*, debtsDir*, debtsAddEntry, debtsPaidChip, debtsTimelineEmpty, debtsMoneyEmpty, debtsEntriesNoMatch, debtsEntrySearchHint, debtEntryPaidTo / debtEntryReceivedFrom); gen-l10n run.
+
+**Tests (new, test/features/personal_debts, 28)**: models + cubits (fake repo: one call per open, debounce, side / all, stale response dropped, money tab once, paging, setPaid patch, error states); repository against a fake HTTP adapter (query params, URL-encoded key, `account_id: null` vs absent, tags only with a wallet, every result shape, 404); pages with prod-shaped JSON (rows / hero / tabs, quick create preset before the load, failed load → error + retry, 404 → not found).
+
+**Open / TODO**
+- TODO(debt-mode), fe-core: the entry detail route `/personal-debts/entries/:id` (tx detail in debt mode). Until then a LedgerRow with a wallet tx opens `/transactions/<id>`; ledger-only rows aren't tappable. The OLD `PersonalDebtDetailPage` still sits on `/personal-debts/:id` (broken against the new API); it goes with that route.
+- TODO(debt-mode), fe-core: quick create returns only `bool` today, so after a save the person page re-opens (1 call). Patch from DebtEntryWriteResult once the sheet returns it.
+- Old code still in the tree: `PersonalDebtsCubit`, `debt_widgets.dart` (DebtTile, settle sheet), `personal_debt.dart` (old model), the old repository methods. My pages no longer use them; fe-core's files do (app.dart, home, notifications, tx detail, hub). fe-core is clearing them, then I delete them in one go. resolve_sheet already moved to createEntry (fe-event).
+- 3 red hub ratchets (page_flows_test ×2, api_spec_ratchet): the debts flows in `lib/hub/api/page_flows.dart` still name the retired operationIds, and the new debts calls have no flow. A ready block was sent to fe-core (file owner); the `/projects/*` lines in the same failure are fe-event's.
+- Money tab: no wallet filter (it would need the wallet list = an extra call); search + type + sort only.
+- Not verified on a device or against a live BE.
+
+## 2026-10-13 — FE-DEBT: old debts code removed + patch after quick create
+DONE · `flutter analyze` (whole app): No issues · full `flutter test`: 701 pass / 3 fail (none debts: fe-event's `/projects/{}/detail|tags|tags/import` flows ×2 ratchets, and `event_pick_test` "txCanJoinEvent a debt repayment" = transactions, fe-core's in-flight repayment → counterparty change) · nothing built / committed.
+- Deleted (fe-core cleared its side first): `PersonalDebtsCubit`, `debt_widgets.dart` (DebtTile, settle sheet), `personal_debt.dart` (old model incl. DebtPerson.group / PeopleResponse), `personal_debt_detail_page.dart` + its `/personal-debts/:id` route (nothing links to it any more), and every old repository method (list / listAll / get / create / update / delete / cancel / settle / acceptSplitRequest / applySplitChange). The repository is the new API only.
+- Person page "+ บันทึกรายการ" → `showQuickCreateSheet(preset: debt(person), onDebtSaved: cubit.addEntry)`: no re-fetch. `addEntry` patches the hero + counts from `person_balance` and inserts the entry by date into each loaded default-view tab (an entry older than every loaded row with more pages is left to paging). A filtered tab, or a save that also labelled other entries paid (open count ≠ old + 1), re-runs that tab's list (1 call). +3 cubit tests (31 debts tests total).
+- Home tile: my pages make no writes of their own today (no paid toggle in the UI), so nothing to `markStale()`; quick create does it.
+- Still open: entry detail route `/personal-debts/entries/:id` (fe-core, next); LedgerRow taps open `/transactions/<id>` until then; ledger-only rows not tappable. The people list doesn't hear a centre-+ save (the shell owns that sheet): it shows the change on the next open / pull.

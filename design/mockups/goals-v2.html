@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saving goals v2 mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Sweet light theme (lib/ui/tokens/app/theme/themes/sweet_theme.dart) */
+:root{
+  --primary:#FF8FB1; --primary-c:#FFD6E0; --on-primary-c:#4A1029;
+  --bg:#FFF7FA; --surface:#FFFFFF; --sv:#FCEEF2; --on:#2B1A21; --muted:#6B5258;
+  --outline:#E8C9D2; --soft:#F5E0E7;
+  --income:#22C55E; --expense:#E11D63; --warning:#F59E0B; --danger:#E11D63; --info:#A855F7;
+  --planning:#A855F7; --asset:#0284C7; --liab:#EA580C;
+  /* spacing / radius tokens */
+  --xs:4px; --sm:8px; --md:12px; --lg:16px; --xl:20px; --xxl:24px;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:20px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#EFE6EA;color:var(--on);font-family:'IBM Plex Sans Thai',system-ui,sans-serif;font-size:16px;line-height:1.45}
+.page-title{max-width:1700px;margin:24px auto 8px;padding:0 16px;font-size:14px;color:var(--muted)}
+.page-title b{color:var(--on);font-size:18px;margin-right:8px}
+.frames{display:flex;flex-wrap:wrap;gap:32px;justify-content:center;padding:16px 16px 64px;align-items:flex-start}
+.frame{display:flex;flex-direction:column;gap:8px;width:390px;max-width:100%}
+.frame-label{font-size:13px;font-weight:600;color:var(--muted);padding-left:6px}
+.frame-label span{display:inline-block;background:var(--on);color:#fff;border-radius:999px;padding:0 8px;margin-right:6px}
+.phone{width:390px;max-width:100%;background:var(--bg);border-radius:36px;border:1px solid var(--outline);overflow:hidden;box-shadow:0 8px 30px rgba(74,16,41,.10);position:relative}
+.status{height:40px;display:flex;justify-content:space-between;align-items:center;padding:0 26px;font-size:13px;font-weight:600}
+.topbar{display:flex;align-items:center;gap:var(--md);padding:4px var(--lg) var(--sm)}
+.pill-btn{width:40px;height:40px;border-radius:999px;background:var(--surface);border:1px solid var(--soft);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--on);flex:none;box-shadow:0 1px 3px rgba(74,16,41,.06)}
+.topbar .t{font-size:18px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.content{padding:0 var(--lg) var(--xxl)}
+/* text roles */
+.display{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
+.title{font-size:16px;font-weight:600}
+.section{font-size:14px;font-weight:600;color:var(--primary)}
+.label{font-size:16px;font-weight:700}
+.caption{font-size:12px;color:var(--muted)}
+.money{font-weight:700;font-variant-numeric:tabular-nums}
+.warn-t{color:var(--warning)} .danger-t{color:var(--danger)} .ok-t{color:var(--income)}
+/* chips: mini 20 / chip 28 / control 40 */
+.chip{display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 10px;border-radius:999px;border:1px solid var(--outline);font-size:13px;font-weight:500;color:var(--on);background:transparent;white-space:nowrap}
+.chip.mini{height:20px;padding:0 7px;font-size:11px}
+.chip.ctl{height:40px;padding:0 14px;font-size:14px}
+.chip.sel{background:rgba(255,143,177,.14);border-color:var(--primary);color:var(--on-primary-c)}
+.chip.warn{background:rgba(245,158,11,.14);border-color:rgba(245,158,11,.6);color:#8A5A00}
+.chip.danger{background:rgba(225,29,99,.12);border-color:rgba(225,29,99,.55);color:var(--danger)}
+.chip.ok{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.5);color:#15803D}
+.chip.info{background:rgba(168,85,247,.12);border-color:rgba(168,85,247,.5);color:#7E22CE}
+.chip.muted{background:var(--sv);border-color:var(--soft);color:var(--muted)}
+.chip.add{border-style:dashed;color:var(--muted)}
+.count{display:inline-flex;min-width:18px;height:18px;border-radius:999px;background:var(--sv);font-size:11px;align-items:center;justify-content:center;padding:0 5px;color:var(--muted)}
+.chiprow{display:flex;gap:var(--sm);flex-wrap:wrap;align-items:center}
+/* icon tile */
+.ico{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex:none}
+.ico.sm{width:32px;height:32px;border-radius:10px;font-size:16px}
+.ico.lg{width:52px;height:52px;border-radius:16px;font-size:26px}
+/* progress: used solid + expected lighter (striped) */
+.bar{height:8px;border-radius:8px;background:var(--sv);display:flex;overflow:hidden}
+.bar .u{height:100%}
+.bar .e{height:100%;opacity:.45;background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.55) 0 3px,transparent 3px 6px)}
+.bar.thick{height:10px}
+.bar-legend{display:flex;justify-content:space-between;gap:var(--sm);margin-top:var(--xs);font-size:12px;color:var(--muted)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:3px;margin-right:4px;vertical-align:middle}
+/* hero */
+.hero{border-radius:var(--r-xl);border:1.5px solid var(--accent);padding:var(--lg);background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 16%,var(--surface)) 0%,var(--surface) 70%);margin-bottom:var(--md)}
+.hero-top{display:flex;gap:var(--sm);align-items:center;margin-bottom:var(--md)}
+.hero-top .sp{flex:1}
+.hero-main{display:flex;gap:var(--md);align-items:center}
+.hero-main .txt{flex:1;min-width:0}
+.hero-desc{font-size:13px;color:var(--muted);margin-top:2px}
+.hero-foot{margin-top:var(--lg)}
+.edit-ico{width:32px;height:32px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:var(--surface);border:1px solid var(--soft);font-size:14px}
+/* boxes / sections */
+.box{background:var(--surface);border-radius:var(--r-lg);border:1px solid var(--soft);overflow:hidden}
+.row{display:flex;align-items:center;gap:var(--md);padding:12px var(--lg);min-height:48px}
+.row + .row,.row + .stack,.stack + .row,.stack + .stack{border-top:1px solid var(--soft)}
+.row .l{flex:1;min-width:0}
+.row .v{text-align:right}
+.row .chev{color:var(--outline);font-size:18px}
+.stack{padding:12px var(--lg)}
+.stack .k{font-size:13px;color:var(--muted);margin-bottom:6px}
+.sec{margin-top:var(--xl)}
+.sec-h{padding:0 var(--xs) var(--sm)}
+.sec-h .caption{margin-top:2px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:var(--sm)}
+.tile{background:var(--surface);border:1px solid var(--soft);border-radius:var(--r-md);padding:10px 12px}
+.tile .caption{margin-bottom:2px}
+.tile .money{font-size:18px}
+.tile.warn{border-color:rgba(245,158,11,.5);background:rgba(245,158,11,.06)}
+.tile.danger{border-color:rgba(225,29,99,.4);background:rgba(225,29,99,.05)}
+/* list rows (hairline) */
+.list{background:var(--surface);border-radius:var(--r-lg);border:1px solid var(--soft)}
+.prow{display:block;padding:14px var(--lg);color:inherit;text-decoration:none}
+.prow + .prow{border-top:1px solid var(--soft)}
+.prow-h{display:flex;gap:var(--md);align-items:center;margin-bottom:10px}
+.prow-h .txt{flex:1;min-width:0}
+.prow-h .title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow-n{display:flex;justify-content:space-between;align-items:baseline;margin-top:6px;font-size:13px}
+.prow-n .pct{font-weight:700;font-variant-numeric:tabular-nums}
+/* tx rows */
+.day{padding:10px var(--lg) 4px;font-size:12px;color:var(--muted);font-weight:600;background:var(--surface)}
+.tx{display:flex;gap:var(--md);padding:10px var(--lg);align-items:center;background:var(--surface)}
+.tx + .tx{border-top:1px solid var(--soft)}
+.tx .txt{flex:1;min-width:0}
+.tx .l1{display:flex;gap:6px;align-items:center}
+.tx .l1 .n{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx .l2{font-size:12px;color:var(--muted);display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:2px}
+.tx .amt{font-weight:700;font-variant-numeric:tabular-nums;color:var(--expense);white-space:nowrap}
+.tx.exp .amt{color:var(--muted);font-weight:600}
+.src{font-size:10px;font-weight:600;border-radius:999px;padding:1px 6px;line-height:16px}
+.src.n{background:var(--sv);color:var(--muted)}
+.src.ev{background:rgba(168,85,247,.12);color:#7E22CE}
+.src.rc{background:rgba(2,132,199,.10);color:var(--asset)}
+.src.pd{background:rgba(245,158,11,.14);color:#8A5A00}
+/* breakdown rows */
+.brk{padding:10px var(--lg)}
+.brk + .brk{border-top:1px solid var(--soft)}
+.brk-h{display:flex;justify-content:space-between;align-items:center;gap:var(--sm);margin-bottom:6px;font-size:14px}
+.brk-h .nm{display:flex;align-items:center;gap:8px;min-width:0}
+.bar.mini{height:6px}
+/* tabs */
+.tabs{display:flex;border-bottom:1px solid var(--soft);margin:0 calc(-1 * var(--lg)) var(--md);padding:0 var(--lg)}
+.tabs a{flex:1;text-align:center;padding:10px 0;font-size:15px;font-weight:600;color:var(--muted);text-decoration:none;border-bottom:3px solid transparent}
+.tabs a.on{color:var(--on);border-color:var(--primary)}
+/* inputs (edit mode) */
+.field{padding:10px var(--lg)}
+.field + .field,.field + .row,.row + .field{border-top:1px solid var(--soft)}
+.field .k{font-size:13px;color:var(--muted);margin-bottom:4px}
+.uline{border-bottom:1.5px solid var(--outline);padding:4px 0;min-height:32px;display:flex;align-items:center;justify-content:space-between}
+.uline.big{font-size:28px;font-weight:700;border-color:var(--primary)}
+.uline .ph{color:#C9AEB6}
+.seg{display:flex;background:var(--sv);border-radius:999px;padding:3px;gap:2px}
+.seg span{flex:1;text-align:center;height:34px;line-height:34px;border-radius:999px;font-size:13px;font-weight:500;color:var(--muted)}
+.seg span.on{background:var(--surface);color:var(--on);box-shadow:0 1px 3px rgba(74,16,41,.12);font-weight:600}
+.switch{width:44px;height:26px;border-radius:999px;background:var(--outline);position:relative;flex:none}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.switch.on{background:var(--primary)}
+.switch.on::after{left:21px}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--outline);border-radius:999px;height:40px}
+.stepper b{width:40px;text-align:center;color:var(--muted);font-weight:500}
+.stepper i{font-style:normal;min-width:64px;text-align:center;font-weight:600}
+/* buttons */
+.btn{height:44px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px;border:1px solid var(--outline);background:var(--surface);color:var(--on)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.amber{color:#B45309;border-color:rgba(245,158,11,.6)}
+.btn.red{color:var(--danger);border-color:rgba(225,29,99,.5)}
+.btns{display:flex;flex-direction:column;gap:var(--sm);margin-top:var(--xl)}
+.actionbar{position:sticky;bottom:0;display:flex;gap:var(--sm);padding:var(--md) var(--lg) 22px;background:linear-gradient(to top,var(--bg) 70%,rgba(255,247,250,0));}
+.actionbar .btn{flex:1}
+.meta{text-align:center;font-size:11px;color:var(--muted);margin-top:var(--xl)}
+.navbar{display:flex;justify-content:space-around;align-items:center;height:64px;background:var(--surface);border-top:1px solid var(--soft);font-size:11px;color:var(--muted)}
+.navbar div{display:flex;flex-direction:column;align-items:center;gap:2px}
+.navbar .plus{width:52px;height:52px;border-radius:18px;background:var(--expense);color:#fff;font-size:28px;display:flex;align-items:center;justify-content:center;margin-top:-18px;box-shadow:0 4px 12px rgba(225,29,99,.35)}
+.navbar .on{color:var(--primary);font-weight:600}
+.addtile{border:1.5px dashed var(--outline);border-radius:var(--r-lg);height:52px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-weight:500;margin-top:var(--md)}
+.hint{font-size:12px;color:var(--muted);padding:0 var(--lg) 10px}
+/* dialog */
+.scrim{position:absolute;inset:0;background:rgba(43,26,33,.38);display:flex;align-items:center;justify-content:center;padding:24px}
+.dialog{background:var(--surface);border-radius:24px;padding:22px 20px 16px;width:100%}
+.dialog .title{font-size:18px;margin-bottom:6px}
+.dialog .opts{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.fade{opacity:.55;filter:saturate(.6)}
+a.jump{color:inherit;text-decoration:none}
+:root{--save:#0D9488;--trip:#0284C7;--car:#EA580C;--emg:#16A34A}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:28px 28px 0 0;padding:10px var(--lg) 24px;box-shadow:0 -6px 24px rgba(74,16,41,.15)}
+.sheet .grab{width:40px;height:4px;border-radius:4px;background:var(--outline);margin:0 auto 12px}
+.dim{opacity:.45}
+.modes{display:flex;gap:var(--sm);margin-bottom:var(--md)}
+.modes .chip.ctl{flex:1;justify-content:center}
+.chip.save{background:rgba(13,148,136,.14);border-color:var(--save);color:#0F5F58}
+.milestones{display:flex;justify-content:space-between;position:relative;margin:6px 6px 2px}
+.milestones::before{content:"";position:absolute;left:30px;right:30px;top:13px;height:2px;background:var(--soft)}
+.ms{position:relative;text-align:center;font-size:11px;color:var(--muted);width:56px}
+.ms i{display:flex;width:28px;height:28px;border-radius:50%;margin:0 auto 2px;background:var(--surface);border:2px solid var(--outline);align-items:center;justify-content:center;font-style:normal;font-size:13px}
+.ms.done i{background:var(--save);border-color:var(--save);color:#fff}
+.ms.next i{border-color:var(--save);color:var(--save)}
+.pill-msg{display:flex;gap:var(--sm);align-items:flex-start;padding:10px 12px;border-radius:var(--r-md);font-size:13px}
+.pill-msg.danger{background:rgba(225,29,99,.08);border:1px solid rgba(225,29,99,.4);color:var(--danger)}
+.pig{width:40px;height:40px;border-radius:12px;background:rgba(13,148,136,.14);display:flex;align-items:center;justify-content:center;font-size:20px;flex:none}
+.split{display:flex;align-items:center;gap:var(--md);padding:10px var(--lg)}
+.split + .split{border-top:1px solid var(--soft)}
+.split .amt{border-bottom:1.5px solid var(--outline);min-width:96px;text-align:right;font-weight:700;padding:2px 0}
+.arrow{color:var(--muted);font-size:18px}
+.savtx .amt{color:var(--save)}
+.savtx.out .amt{color:var(--muted)}
+.btn.save{background:var(--save);border-color:var(--save);color:#fff}
+</style>
+</head>
+<body>
+
+<div class="page-title"><b>เป้าหมายการออม v2</b> mockup · ข้อมูลสมมุติ · วันนี้ = อ. 13 ต.ค. 2026 · เงินออม = บันทึกต่างหาก ไม่ใช่รายการจริง ไม่แตะยอดกระเป๋า</div>
+
+<div class="frames">
+
+<!-- 1. LIST -->
+<div class="frame" id="f1">
+  <div class="frame-label"><span>1</span>รายการเป้าหมาย</div>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span>●●● 🔋</span></div>
+    <div class="topbar"><div class="pill-btn">‹</div><div class="t">เป้าหมายการออม</div></div>
+    <div class="content">
+      <div class="hero" style="--accent:var(--save)">
+        <div class="caption">ออมแล้วทั้งหมด</div>
+        <div class="display" style="color:var(--save)">฿216,500</div>
+        <div class="tiles" style="margin-top:10px">
+          <div class="tile"><div class="caption">อยู่ในเป้าหมาย</div><div class="money">฿208,000</div></div>
+          <div class="tile"><div class="caption">ยังไม่จัดสรร</div><div class="money">฿8,500</div></div>
+        </div>
+      </div>
+      <div class="chiprow" style="margin:4px 0 12px"><span class="chip sel">กำลังออม</span><span class="chip">สำเร็จ</span><span class="chip">เก็บถาวร</span></div>
+      <div class="list">
+        <div class="prow">
+          <div class="prow-h" style="margin-bottom:0"><div class="pig">🐷</div><div class="txt"><div class="title">ยังไม่จัดสรร</div><div class="caption">เงินออมที่ยังไม่มีเป้าหมาย · 2 กระเป๋า</div></div><div class="money">฿8,500</div></div>
+        </div>
+        <div class="prow">
+          <div class="prow-h"><div class="ico" style="background:rgba(2,132,199,.14)">✈️</div><div class="txt"><div class="title">ทริปญี่ปุ่น</div><div class="caption">฿52,000 จาก ฿80,000 · ครบ 15 มี.ค. 2027</div></div><span class="chip mini warn">ช้า 2 เดือน</span></div>
+          <div class="bar thick"><div class="u" style="width:65%;background:var(--trip)"></div></div>
+          <div class="prow-n"><span class="caption">ต้องออม ฿5,500/เดือน · ออมจริง ฿4,000</span><span class="pct">65%</span></div>
+        </div>
+        <div class="prow">
+          <div class="prow-h"><div class="ico" style="background:rgba(234,88,12,.14)">🚗</div><div class="txt"><div class="title">ดาวน์รถ</div><div class="caption">฿96,000 จาก ฿300,000 · ครบ 31 ธ.ค. 2027</div></div><span class="chip mini ok">ตามแผน</span></div>
+          <div class="bar thick"><div class="u" style="width:32%;background:var(--car)"></div></div>
+          <div class="prow-n"><span class="caption">ต้องออม ฿14,000/เดือน · ออมจริง ฿15,000</span><span class="pct">32%</span></div>
+        </div>
+        <div class="prow">
+          <div class="prow-h"><div class="ico" style="background:rgba(22,163,74,.14)">🛟</div><div class="txt"><div class="title">กองทุนฉุกเฉิน</div><div class="caption">฿60,000 จาก ฿150,000 · ไม่มีกำหนด</div></div></div>
+          <div class="bar thick"><div class="u" style="width:40%;background:var(--emg)"></div></div>
+          <div class="prow-n"><span class="caption">ออมจริง ฿3,000/เดือน · ครบ ~ต.ค. 2029</span><span class="pct">40%</span></div>
+        </div>
+      </div>
+      <div class="addtile">+ เพิ่มเป้าหมาย</div>
+    </div>
+  </div>
+</div>
+
+<!-- 2. GOAL PAGE -->
+<div class="frame" id="f2">
+  <div class="frame-label"><span>2</span>หน้าเป้าหมาย</div>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span>●●● 🔋</span></div>
+    <div class="topbar"><div class="pill-btn">‹</div><div class="t">ทริปญี่ปุ่น</div></div>
+    <div class="content">
+      <div class="hero" style="--accent:var(--trip)">
+        <div class="hero-top"><span class="chip warn">ช้ากว่าแผน</span><span class="sp"></span><div class="edit-ico">✏️</div></div>
+        <div class="hero-main"><div class="ico lg" style="background:rgba(2,132,199,.16)">✈️</div><div class="txt"><div class="label">ทริปญี่ปุ่น</div><div class="hero-desc">เที่ยวโตเกียว–โอซาก้า 10 วัน</div></div></div>
+        <div class="hero-foot">
+          <div class="display" style="color:var(--trip)">฿52,000</div>
+          <div class="caption" style="margin:2px 0 8px">จาก ฿80,000</div>
+          <div class="bar thick"><div class="u" style="width:65%;background:var(--trip)"></div></div>
+          <div class="bar-legend"><span>เหลือ ฿28,000</span><span><b>65%</b></span></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:var(--sm);padding-bottom:var(--md)">
+        <div class="btn save" style="flex:1.4">＋ เพิ่มเงินออม</div><div class="btn" style="flex:1">ถอน</div><div class="btn" style="flex:1">ย้าย</div>
+      </div>
+
+      <div class="sec" style="margin-top:var(--sm)">
+        <div class="sec-h"><div class="section">ภาพรวม</div></div>
+        <div class="tiles">
+          <div class="tile"><div class="caption">ต้องออมต่อเดือน</div><div class="money">฿5,500</div></div>
+          <div class="tile"><div class="caption">ออมจริง (เฉลี่ย 3 เดือน)</div><div class="money">฿4,000</div></div>
+          <div class="tile warn"><div class="caption">ตามเพซจะครบ</div><div class="money warn-t">พ.ค. 2027</div></div>
+          <div class="tile"><div class="caption">เหลือเวลา</div><div class="money">5 เดือน</div></div>
+        </div>
+        <div class="box" style="margin-top:var(--sm);padding:12px 8px 8px">
+          <div class="milestones">
+            <div class="ms done"><i>✓</i>25%</div><div class="ms done"><i>✓</i>50%</div><div class="ms next"><i>75</i>฿60,000</div><div class="ms"><i>🏁</i>100%</div>
+          </div>
+        </div>
+        <div class="box" style="margin-top:var(--sm);padding:12px">
+          <div class="caption" style="margin-bottom:4px">ยอดสะสม (พัน ฿)</div>
+          <svg viewBox="0 0 330 135" width="100%" aria-label="history">
+            <line x1="20" y1="15" x2="320" y2="15" stroke="#F59E0B" stroke-dasharray="4 3"/>
+            <text x="22" y="11" font-size="9" fill="#8A5A00">เป้า 80</text>
+            <line x1="20" y1="110" x2="320" y2="110" stroke="#F5E0E7"/>
+            <polyline fill="none" stroke="#0284C7" stroke-width="2.5" points="20,76.75 49,69.6 78,62.5 107,57.75 136,53 165,48.25"/>
+            <polyline fill="none" stroke="#0284C7" stroke-width="2" stroke-dasharray="5 4" opacity=".6" points="165,48.25 194,43.5 223,38.75 252,34 281,29.25 310,24.5"/>
+            <polyline fill="none" stroke="#0D9488" stroke-width="1.5" stroke-dasharray="2 3" points="165,48.25 310,15"/>
+            <circle cx="165" cy="48.25" r="4" fill="#0284C7"/>
+            <g font-size="9" fill="#6B5258" text-anchor="middle"><text x="20" y="124">พ.ค.</text><text x="78" y="124">ก.ค.</text><text x="136" y="124">ก.ย.</text><text x="194" y="124">พ.ย.</text><text x="252" y="124">ม.ค.</text><text x="310" y="124">มี.ค.</text></g>
+          </svg>
+          <div class="bar-legend" style="justify-content:flex-start;gap:14px"><span><span class="dot" style="background:#0284C7"></span>ออมแล้ว / ตามเพซ</span><span><span class="dot" style="background:var(--save)"></span>เส้นที่ต้องออม</span></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h"><div class="section">แยกตามกระเป๋า</div><div class="caption">เงินออมจำว่ามาจากกระเป๋าไหน</div></div>
+        <div class="box">
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="ico sm" style="background:rgba(22,163,74,.14)">🏦</span>กสิกร</span><span class="money">฿40,000</span></div><div class="bar mini"><div class="u" style="width:77%;background:var(--trip)"></div></div></div>
+          <div class="brk"><div class="brk-h"><span class="nm"><span class="ico sm" style="background:rgba(124,58,237,.14)">🏦</span>ไทยพาณิชย์</span><span class="money">฿12,000</span></div><div class="bar mini"><div class="u" style="width:23%;background:var(--trip)"></div></div></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="box">
+          <div class="row"><div class="l">ครบกำหนด</div><div class="v">15 มี.ค. 2027</div></div>
+          <div class="row"><div class="l">🔁 ออมอัตโนมัติ</div><div class="v caption">ทุกวันที่ 25 · ฿4,000</div><span class="chev">›</span></div>
+          <div class="stack"><div class="k">โน้ต</div><div>ซื้อตั๋วเครื่องบินก่อนสิ้นปี</div></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h"><div class="section">รายการออม</div></div>
+        <div class="list" style="overflow:hidden">
+          <div class="day">13 ต.ค.</div>
+          <div class="tx savtx"><div class="pig">🐷</div><div class="txt"><div class="l1"><span class="n">ออมเข้าเป้าหมาย</span></div><div class="l2"><span class="chip mini">กสิกร</span> → ทริปญี่ปุ่น</div></div><div class="amt">+฿4,000</div></div>
+          <div class="day">25 ก.ย.</div>
+          <div class="tx savtx"><div class="pig">🐷</div><div class="txt"><div class="l1"><span class="n">ออมประจำ</span><span class="src rc">ประจำ</span></div><div class="l2"><span class="chip mini">กสิกร</span> → ทริปญี่ปุ่น</div></div><div class="amt">+฿4,000</div></div>
+          <div class="tx savtx out"><div class="pig" style="background:var(--sv)">↩️</div><div class="txt"><div class="l1"><span class="n">ถอนออม · ค่ามัดจำโรงแรม</span></div><div class="l2">ทริปญี่ปุ่น → <span class="chip mini">ไทยพาณิชย์</span></div></div><div class="amt">−฿3,000</div></div>
+          <div class="tx savtx"><div class="pig">🔀</div><div class="txt"><div class="l1"><span class="n">จัดสรร</span></div><div class="l2"><span class="chip mini">กสิกร</span> ยังไม่จัดสรร → ทริปญี่ปุ่น</div></div><div class="amt">+฿6,000</div></div>
+          <div class="caption" style="text-align:center;padding:10px;background:var(--surface)">ดูทั้งหมด ›</div>
+        </div>
+      </div>
+
+      <div class="btns"><div class="btn">🏁 ปิดเป้าหมาย</div></div>
+      <div class="meta">สร้างเมื่อ 2 พ.ค. 2026 · แก้ไขล่าสุด 13 ต.ค. 2026</div>
+    </div>
+  </div>
+</div>
+
+<!-- 3. CLOSE DIALOG -->
+<div class="frame" id="f3">
+  <div class="frame-label"><span>3</span>ปิดเป้าหมาย</div>
+  <div class="phone" style="height:640px">
+    <div class="status"><span>9:41</span><span>●●● 🔋</span></div>
+    <div class="topbar dim"><div class="pill-btn">‹</div><div class="t">ทริปญี่ปุ่น</div></div>
+    <div class="content dim">
+      <div class="hero" style="--accent:var(--trip)"><div class="hero-main"><div class="ico lg" style="background:rgba(2,132,199,.16)">✈️</div><div class="txt"><div class="label">ทริปญี่ปุ่น</div></div></div><div class="hero-foot"><div class="display">฿52,000</div></div></div>
+    </div>
+    <div class="scrim">
+      <div class="dialog">
+        <div class="title">ปิดเป้าหมาย “ทริปญี่ปุ่น”</div>
+        <div class="caption" style="font-size:14px">เงินออม ฿52,000 จะไปที่ไหน?</div>
+        <div class="box" style="margin-top:14px;background:var(--sv)">
+          <div class="row" style="min-height:40px"><div class="l caption">ถ้ากลับกระเป๋า</div></div>
+          <div class="row" style="min-height:40px"><div class="l">กสิกร</div><div class="v money ok-t">+฿40,000</div></div>
+          <div class="row" style="min-height:40px"><div class="l">ไทยพาณิชย์</div><div class="v money ok-t">+฿12,000</div></div>
+        </div>
+        <div class="opts">
+          <div class="btn save">เข้ายังไม่จัดสรร</div>
+          <div class="btn">กลับกระเป๋า</div>
+          <div class="btn" style="border:none;color:var(--muted)">ยกเลิก</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 4. QUICK CREATE ออม -->
+<div class="frame" id="f4">
+  <div class="frame-label"><span>4</span>เพิ่มรายการ · โหมดออม</div>
+  <div class="phone" style="min-height:760px">
+    <div class="status"><span>9:41</span><span>●●● 🔋</span></div>
+    <div class="topbar"><div class="pill-btn">✕</div><div class="t">เพิ่มเงินออม</div></div>
+    <div class="content">
+      <div class="modes"><span class="chip ctl">รายการ</span><span class="chip ctl">หนี้</span><span class="chip ctl save">🐷 ออม</span></div>
+      <div class="box" style="border-color:var(--save);border-width:1.5px">
+        <div class="field"><div class="k">จำนวนเงิน</div><div class="uline big" style="border-color:var(--save)"><span>฿5,000</span></div></div>
+        <div class="field"><div class="k">จากกระเป๋า <span class="caption">· ว่าง ฿21,500</span></div>
+          <div class="chiprow"><span class="chip sel">🏦 กสิกร</span><span class="chip">🏦 ไทยพาณิชย์</span><span class="chip">💵 เงินสด</span></div></div>
+        <div class="field"><div class="k">เข้า</div>
+          <div class="chiprow"><span class="chip">🐷 ยังไม่จัดสรร</span><span class="chip save">✈️ ทริปญี่ปุ่น</span><span class="chip">🚗 ดาวน์รถ</span><span class="chip">🛟 ฉุกเฉิน</span><span class="chip add">+ เป้าหมายใหม่</span></div></div>
+        <div class="row"><div class="l">วันที่</div><div class="v">วันนี้ 13 ต.ค.</div><span class="chev">›</span></div>
+        <div class="row"><div class="l">โน้ต</div><div class="v caption" style="color:#C9AEB6">ไม่มี</div></div>
+      </div>
+      <div class="caption" style="margin:8px 4px">หลังออม: ทริปญี่ปุ่น ฿57,000 · กสิกรใช้ได้ ฿16,500</div>
+    </div>
+    <div class="actionbar"><div class="btn save">บันทึก</div></div>
+  </div>
+</div>
+
+<!-- 5. MOVE SHEET -->
+<div class="frame" id="f5">
+  <div class="frame-label"><span>5</span>จัดสรร · ย้ายเป้าหมาย → เป้าหมาย</div>
+  <div class="phone" style="height:700px">
+    <div class="status"><span>9:41</span><span>●●● 🔋</span></div>
+    <div class="topbar dim"><div class="pill-btn">‹</div><div class="t">ทริปญี่ปุ่น</div></div>
+    <div class="content dim"><div class="hero" style="--accent:var(--trip)"><div class="display">฿52,000</div></div></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div class="title" style="font-size:18px;margin-bottom:12px">ย้ายเงินออม</div>
+      <div style="display:flex;align-items:center;gap:var(--sm)">
+        <div class="box" style="flex:1;padding:10px 12px"><div class="caption">จาก</div><div class="title">✈️ ทริปญี่ปุ่น</div><div class="caption">฿52,000</div></div>
+        <div class="arrow">→</div>
+        <div class="box" style="flex:1;padding:10px 12px"><div class="caption">ไป</div><div class="title">🚗 ดาวน์รถ</div><div class="caption">฿96,000</div></div>
+      </div>
+      <div class="field" style="padding:12px 0"><div class="k">จำนวนเงิน</div><div class="uline big" style="border-color:var(--save)"><span>฿45,000</span></div></div>
+      <div class="sec-h" style="margin-top:6px;display:flex;justify-content:space-between;align-items:baseline"><div class="section">แบ่งตามกระเป๋า (อัตโนมัติ)</div><span class="chip mini muted">✏️ แก้ไข</span></div>
+      <div class="box">
+        <div class="split"><span class="ico sm" style="background:rgba(22,163,74,.14)">🏦</span><div style="flex:1"><div>กสิกร</div><div class="caption">มี ฿40,000</div></div><div class="amt">฿40,000</div></div>
+        <div class="split"><span class="ico sm" style="background:rgba(124,58,237,.14)">🏦</span><div style="flex:1"><div>ไทยพาณิชย์</div><div class="caption">มี ฿12,000</div></div><div class="amt">฿5,000</div></div>
+      </div>
+      <div class="caption" style="margin:8px 4px">รวม ฿45,000 ✓ · เงินแต่ละส่วนไปพร้อมกระเป๋าของมัน (บันทึก 2 รายการ)</div>
+      <div class="btns" style="margin-top:var(--md)"><div class="btn save">ย้าย</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 6. WALLET SECTION -->
+<div class="frame" id="f6">
+  <div class="frame-label"><span>6</span>หน้ากระเป๋า · ส่วนเงินออม</div>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span>●●● 🔋</span></div>
+    <div class="topbar"><div class="pill-btn">‹</div><div class="t">กสิกร</div></div>
+    <div class="content">
+      <div class="hero" style="--accent:var(--asset)">
+        <div class="hero-main"><div class="ico lg" style="background:rgba(22,163,74,.16)">🏦</div><div class="txt"><div class="label">กสิกร</div><div class="hero-desc">บัญชีหลัก</div></div></div>
+        <div class="hero-foot"><div class="caption">ยอดจริง</div><div class="display">฿190,000</div></div>
+      </div>
+      <div class="sec" style="margin-top:0">
+        <div class="sec-h"><div class="section">เงินออมในกระเป๋านี้</div><div class="caption">ไม่ใช่รายการจริง ยอดจริงไม่เปลี่ยน</div></div>
+        <div class="box">
+          <div class="row"><div class="l">ยอดจริง</div><div class="v money">฿190,000</div></div>
+          <div class="row"><span class="ico sm" style="background:rgba(2,132,199,.14)">✈️</span><div class="l">ทริปญี่ปุ่น</div><div class="v money">฿40,000</div></div>
+          <div class="row"><span class="ico sm" style="background:rgba(234,88,12,.14)">🚗</span><div class="l">ดาวน์รถ</div><div class="v money">฿60,000</div></div>
+          <div class="row"><span class="ico sm" style="background:rgba(22,163,74,.14)">🛟</span><div class="l">กองทุนฉุกเฉิน</div><div class="v money">฿60,000</div></div>
+          <div class="row"><span class="ico sm" style="background:var(--sv)">🐷</span><div class="l">ยังไม่จัดสรร</div><div class="v money">฿8,500</div></div>
+          <div class="row" style="background:rgba(13,148,136,.06)"><div class="l"><b>ออมแล้วรวม</b></div><div class="v money">฿168,500</div></div>
+          <div class="row" style="background:rgba(34,197,94,.07)"><div class="l"><b>ใช้ได้</b></div><div class="v money ok-t">฿21,500</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="frame" id="f6b">
+  <div class="frame-label"><span>6b</span>ออมเกินยอดจริง (เตือนสีแดง)</div>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span>●●● 🔋</span></div>
+    <div class="topbar"><div class="pill-btn">‹</div><div class="t">ไทยพาณิชย์</div></div>
+    <div class="content">
+      <div class="hero" style="--accent:var(--asset)">
+        <div class="hero-main"><div class="ico lg" style="background:rgba(124,58,237,.16)">🏦</div><div class="txt"><div class="label">ไทยพาณิชย์</div><div class="hero-desc">บัญชีสำรอง</div></div></div>
+        <div class="hero-foot"><div class="caption">ยอดจริง</div><div class="display">฿30,000</div></div>
+      </div>
+      <div class="sec" style="margin-top:0">
+        <div class="sec-h"><div class="section">เงินออมในกระเป๋านี้</div></div>
+        <div class="pill-msg danger" style="margin-bottom:var(--sm)"><span>⚠️</span><span>ออมไว้ ฿48,000 มากกว่ายอดจริง ฿18,000 · ตรวจยอดกระเป๋าหรือย้ายเงินออม</span></div>
+        <div class="box">
+          <div class="row"><div class="l">ยอดจริง</div><div class="v money">฿30,000</div></div>
+          <div class="row"><span class="ico sm" style="background:rgba(2,132,199,.14)">✈️</span><div class="l">ทริปญี่ปุ่น</div><div class="v money">฿12,000</div></div>
+          <div class="row"><span class="ico sm" style="background:rgba(234,88,12,.14)">🚗</span><div class="l">ดาวน์รถ</div><div class="v money">฿36,000</div></div>
+          <div class="row" style="background:rgba(225,29,99,.05)"><div class="l"><b>ออมแล้วรวม</b></div><div class="v money danger-t">฿48,000</div></div>
+          <div class="row" style="background:rgba(225,29,99,.08)"><div class="l"><b>ใช้ได้</b></div><div class="v money danger-t">−฿18,000</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 7. PENDING -->
+<div class="frame" id="f7">
+  <div class="frame-label"><span>7</span>รอยืนยัน · ร่างออมจากรายการประจำ 🐷</div>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span>●●● 🔋</span></div>
+    <div class="topbar"><div class="pill-btn">‹</div><div class="t">รอยืนยัน</div></div>
+    <div class="content">
+      <div class="list" style="overflow:hidden">
+        <div class="day">วันนี้ 13 ต.ค.</div>
+        <div class="tx savtx"><div class="pig">🐷</div><div class="txt"><div class="l1"><span class="n">ออมทริปญี่ปุ่น</span><span class="chip mini">กสิกร</span></div><div class="l2"><span class="src" style="background:rgba(13,148,136,.14);color:#0F5F58">ออม</span><span class="src rc">ประจำ</span> → ทริปญี่ปุ่น</div></div><div class="amt">฿4,000</div></div>
+        <div class="tx"><div class="ico sm" style="background:rgba(225,29,99,.12)">🍜</div><div class="txt"><div class="l1"><span class="n">ค่าข้าวเที่ยง</span><span class="chip mini">เงินสด</span></div><div class="l2"><span class="src pd">ร่าง</span> อาหาร · #งาน</div></div><div class="amt">−฿120</div></div>
+        <div class="day">12 ต.ค.</div>
+        <div class="tx savtx"><div class="pig">🐷</div><div class="txt"><div class="l1"><span class="n">ออมดาวน์รถ</span><span class="chip mini">ไทยพาณิชย์</span></div><div class="l2"><span class="src" style="background:rgba(13,148,136,.14);color:#0F5F58">ออม</span><span class="src rc">ประจำ</span> → ดาวน์รถ</div></div><div class="amt">฿10,000</div></div>
+      </div>
+      <div class="caption" style="margin:10px 4px">แตะเพื่อตรวจสอบ · ยืนยันแล้วจะกลายเป็นรายการออม (ไม่ตัดยอดกระเป๋า)</div>
+    </div>
+  </div>
+</div>
+
+<!-- 8. CREATE GOAL -->
+<div class="frame" id="f8">
+  <div class="frame-label"><span>8</span>สร้างเป้าหมาย</div>
+  <div class="phone" style="min-height:760px">
+    <div class="status"><span>9:41</span><span>●●● 🔋</span></div>
+    <div class="topbar"><div class="pill-btn">✕</div><div class="t">เป้าหมายใหม่</div></div>
+    <div class="content">
+      <div class="hero" style="--accent:var(--save)">
+        <div class="hero-main"><div class="ico lg" style="background:rgba(13,148,136,.16)">🎯</div>
+          <div class="txt"><div class="uline" style="font-size:18px;font-weight:700"><span>แล็ปท็อปใหม่</span></div><div class="uline" style="margin-top:6px"><span class="ph">คำอธิบาย</span></div></div></div>
+        <div class="hero-foot"><div class="caption">เป้าหมาย</div><div class="uline big" style="border-color:var(--save)"><span>฿35,000</span></div></div>
+      </div>
+      <div class="box">
+        <div class="row"><div class="l">ครบกำหนด</div><div class="v">ไม่ได้เลือก</div><span class="chev">›</span></div>
+        <div class="stack"><div class="k">โน้ต</div><div class="uline"><span class="ph">โน้ต</span></div></div>
+      </div>
+      <div class="caption" style="margin:10px 4px">สร้างแล้วค่อยเพิ่มเงินออมได้เลย · ตั้งออมอัตโนมัติได้จากหน้าเป้าหมาย</div>
+    </div>
+    <div class="actionbar"><div class="btn">ยกเลิก</div><div class="btn save">สร้าง</div></div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

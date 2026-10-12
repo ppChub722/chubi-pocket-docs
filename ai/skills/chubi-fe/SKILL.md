@@ -7,6 +7,8 @@ description: Role brief for a chubi-pocket FE (Flutter) dev session — rules, k
 
 You get work ONLY from **Lead** (SendMessage). English only. Don't write reports for the owner in your session; one-line status at most. Read `chubi-pocket-docs/ai/STATUS.md`, `ai/decisions.md` (the rules) and your predecessor's "## Handoff" section in `ai/inbox/fe-<x>.md`, then wait.
 
+> **Testing (owner 2026-10-13):** do NOT run the full analyze / test suite. Run ONLY the tests for what you changed (those test files; BE: changed packages). No whole folders. Lead runs the full suite once when everyone is done. DONE ping = one line.
+
 ## Hard rules
 - No build, commit, push, deploy or app run. The owner runs the app; **Lead** commits and tags releases; DevOps deploys. No AI attribution anywhere.
 - Flutter ONLY via fvm: `/c/Users/poomp/fvm/versions/3.47.3/bin/flutter` (PATH flutter 3.38 fails).

@@ -1,5 +1,57 @@
 # 09 — Saving Goals
 
+> **0.3.1-10 — Saving goals v2 (migration 060, owner mockup `design/mockups/goals-v2.html`, 2026-10-13).** Section 0 replaces everything below: the wallet link, the % allocation, ALLOCATION_EXCEEDED, free % and `/accounts/:id/saving-allocations` are gone. Shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`, tag **Saving goals**.
+
+## 0. Saving goals v2
+
+### 0.1 A notebook, never transactions
+- A **saving entry** moves an amount of ONE wallet between buckets. The buckets are that wallet's available money, the **spare** bucket ("ยังไม่จัดสรร") or a **goal**. Entries never touch transactions or wallet balances.
+- Kinds:
+  - `save`: available → spare / goal (`wallet_id`). Saving more than the wallet's available is allowed.
+  - `withdraw`: spare / goal → back to its wallet.
+  - `move`: spare / goal → spare / goal. The wallet travels with the money.
+- A multi-wallet withdraw / move writes one row per wallet under one `group_id`. Without `splits` the BE takes largest-first; explicit splits must add up to the amount (400 SPLIT_MISMATCH).
+- A (bucket, wallet) balance is the sum of its entries, so saved money always knows its wallet. It never goes below 0 (409 INSUFFICIENT_SAVING, `details.available`), and that includes editing or deleting an entry.
+- Wallets: `Account.savings` = the caller's buckets in that wallet.
+  - available = balance − saved; it may go negative.
+  - `saved_exceeds_balance` + `over_by` mark the red warning. Nothing is blocked; the user fixes it.
+  - A wallet that doesn't track its balance has `available: null`, and saving into it is refused (400 WALLET_NOT_TRACKED).
+
+### 0.2 Goals
+- Fields: name, description, note, icon, `target_amount`, optional `deadline`, `milestones` (default 25 / 50 / 75 / 100 %).
+- State is stored:
+  - `active`
+  - `completed`: ปิดเป้าหมาย `POST /saving-goals/:id/close {to: spare | wallets}`. Every part goes to spare or back to its own wallet, written as move / withdraw entries.
+  - `archived`
+  - Restore → active.
+  - Reaching the target is `pace: reached`; the goal stays active.
+- Delete or archive while the goal holds money → 409 GOAL_HAS_SAVINGS (close first). A deleted goal stays in other buckets' history as a goal with `id` / `name` null.
+- Saving into a goal that isn't active → 409 GOAL_NOT_ACTIVE.
+- Figures (user timezone):
+  - progress_pct = saved / target (not capped)
+  - needed_monthly = remaining / (days to the deadline / 30.44, at least 1), rounded up
+  - pace_monthly = the net saved over the last 3 months, this month included (fewer months when the goal is younger)
+  - eta_date = today + ⌈remaining / pace⌉ months
+  - pace: reached · on_track · late (+ late_months) · none
+  - history: the month-end balance from the first entry to this month
+
+### 0.3 API
+- `GET /saving-goals?status=active|completed|archived` → summary {saved, in_goals, spare, currency} + the spare bucket {amount, by_wallet} + goals.
+- `GET /saving-goals/:id` → {goal, by_wallet, history, auto_save, entries}. `GET /saving-goals/spare` → the same for the spare bucket.
+- `GET /saving-entries?goal_id | bucket=spare | account_id`.
+- `POST /saving-entries`, `PUT|DELETE /saving-entries/:id`, `POST /saving-goals/:id/close` → SavingWriteResult: {entries, goals touched, spare, wallets' savings, and `goal_page` / `spare_page` = the page the action was made from}.
+- `POST|PUT|DELETE /saving-goals[/:id]`, `/archive`, `/restore`.
+- Home `/dashboard.saving_goals` and `/me/counts.goals` = SavingTotals {count, saved, in_goals, spare, available}. available = Σ (balance − saved) over the wallets that track their balance.
+
+### 0.4 Recurring ออม (spec 11 §9)
+A recurring setting of type `saving` (wallet + `goal_id`, null = spare) produces pending drafts of kind `saving` (🐷). Submitting one makes a saving entry (`source: recurring`), linked to the item (`saving_entry_id`, status done). The goal page lists it under `auto_save`.
+
+### 0.5 Migration 060
+Goals keep their texts / target / deadline with 0 saved (wallet and % dropped). New `saving_entries`. `recurring_rules.type` gains saving + `goal_id`. `recurring_items.saving_entry_id`. Pending kind `saving`.
+
+---
+
+
 Target-based savings tracked by linking to a real account. Progress derives from the linked account's balance × the goal's allocation percentage. Multiple goals can share one account via percentage allocation.
 
 No `saving_goal_id` tag on transactions. No stored progress. Goal progress is always computed from the account balance + allocation.

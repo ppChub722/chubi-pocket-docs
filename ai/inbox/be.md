@@ -464,3 +464,185 @@ The remaining 50 routes (events / projects, budgets, saving goals, scheduled, de
 4. Migrations: latest is 053 (contacts.nickname / show_nickname); currency is user-level and locked (`users.currency`, wallets take it, no migration was needed). The local DB must be at 053 or DB tests skip / fail.
 5. Every money-moving write returns `account_balances` (`shared.LoadWalletBalances` after commit); keep that when adding writes. Bodies are bare (no `{success,message,data}`), keys always present, arrays `[]`.
 6. Run `go vet` / `go test` with `TEST_DATABASE_URL` set (the release gate wants 0 SKIP); the apidoc tests take a few seconds because the 360 KB yaml is parsed per test binary.
+
+
+## 2026-10-13 00:53 — 0.3.1-10 BE: debts (person ledger) + events
+DONE · spec first in `internal/apidoc/openapi.yaml` (tags Debts / Events, version 0.3.1-10), then code · `go vet ./...` clean · `go test -count=1 ./...` with `TEST_DATABASE_URL` → 23 packages ok, 191 tests PASS, **0 SKIP**, 0 FAIL (run on the throwaway `chubi_test` DB at migration 055; the prod-restore DB on :5433 was not touched).
+Nothing committed / deployed. The local BE (:8080) and its DB are still on build 55 / migration 053.
+
+**Migrations (new, both breaking, the forced update covers it):**
+- `000054_debt_person_ledger`: personal_debts → entries (`direction` paid | received, `date`, `paid`, `source_kind`; drops `settled_amount` / `status`). Data: owed_to_me → paid, i_owe → received; settled → paid label; every repayment tx becomes its own entry and stays its wallet side; cancelled debts and splits kept at 0 are deleted; `split_paid` notifications removed. Unique `transactions.source_personal_debt_id`.
+- `000055_event_tags`: drops `projects.type`; new `event_tags`, `project_transaction_tags`, `project_my_tags`; free-text bill tags → event tags (first spelling per name per event); drops `project_transactions.tags`.
+- Both tested up → down → up on a copy of the prod restore (6 debts → 6 paid split entries, 1 cancelled deleted; tags conversion checked with sample data). The down files are best effort.
+
+**Debts (spec 12 §0)**
+- New: `GET /personal-debts/people` (paged; q / all / side; `totals` = DebtTotals), `GET /personal-debts/people/:key`, `GET|POST /personal-debts/people/:key/entries`, `GET|PUT|DELETE /personal-debts/:id` (new shapes). Accept / apply return the entry + `person_balance` (apply: updated | deleted, no zeroed).
+- Retired: `GET|POST /personal-debts`, `/cancel`, `/settle`, `split_paid` (no notice on pay / receive).
+- An entry with a wallet owns ONE transaction: both directions are synced. The tx side keeps the Debt Paid / Received category (400 SYSTEM_TRANSACTION_IMMUTABLE), can't drop its wallet (400 DEBT_TX_NEEDS_WALLET), author only (403 DEBT_TX_AUTHOR_ONLY). Deleting either deletes both.
+- Split-sourced entries edit only description / note / paid (409 ENTRY_MANAGED_BY_SOURCE). Deleting a split entry takes it off its bill and notifies a linked partner "removed".
+- `Dashboard.debts` + `/me/counts.debts_summary` = DebtTotals; `open_debts` = people with something open (was open rows). Pending `settle_debt` submits as an opposite-direction entry for the target's person.
+
+**Events (spec 10 §0; rev 2 asks A1–A5, A10, A11, A12)**
+- `Event` rows: no type / currency; my tags; totals, my_net, flags. List: status / q / tag_id / sort. `GET /projects/:id/detail` = one call. The board nests splits and carries event tags, my_share, locked, linked, source_tx (owner only).
+- Every write returns `EventPatch` (+ AddBillsResult / EventCopyResult / EventTagWriteResult variants). Create / quick / accept return EventDetail; delete / leave return `{id}`.
+- Event tags CRUD + `POST /projects/:id/tags/import`. My tags = `PUT /projects/:id {tag_ids}` (any member, private).
+- A pulled tx = a bill made from it. Money is linked both ways; tags (→ event tags by name) and texts are copied once; the tx gets `event_bill {event, bill_id, linked}`. A split labelled paid blocks the pull (422 TX_SPLIT_PAID).
+- A7 delivered as `GET /transactions?can_join_event=true`. A8 dropped per Lead (add member keeps typed name / email; bad input is 400 now, was 500).
+
+**FE contract delta (forward-ready)**
+- Transaction: `is_repayment` + `source_personal_debt_id` removed → `counterparty {entry_id, key, person, direction, paid}`; new `event_bill`. Split: `key`, `paid`, direction paid | received; `settled_amount` / `status` gone. TransactionWriteResult + `person_balance`; DeleteTransactionResult + `debt_entry_id`, `person_balance`.
+- Debts: all routes and shapes as listed above (fe-debt + fe-core briefed directly).
+- Events: every project route's shape changed (fe-event + fe-core briefed). Notable: quick create answers 201 with `{detail, new_transaction_id, account_balances}`; DELETE bills/:tx answers 200 EventPatch (was 204); the board is parents-only with `children`; bills take `tag_ids` (no `tags` / `currency`).
+- Errors: 403 FORBIDDEN_ROLE (was NOT_OWNER), 409 PROJECT_LOCKED (was 400), 409 PT_IS_CHILD (was 400), 409 OWNER_CANNOT_LEAVE (was 400), 400 SPLITS_EXCEED_AMOUNT (was SPLITS_EXCEED_PARENT), 422 NO_SHARE_TO_COPY (was 400 NOTHING_TO_COPY), plus the new codes in spec 10 §0 / spec 12 §0.
+
+**My calls (flag if the owner disagrees)**
+1. Linked bill money: only the source tx's owner may change a bill's amount / date; anyone else gets 409 BILL_MONEY_LINKED (otherwise another member would write my book). Deleting the source tx leaves the bill on the board, unlinked.
+2. Event positions fixed: the payer's share = what the splits leave, so nets sum to 0. Before, a 300 bill split 100 / 100 showed the payer share 0 / net +300.
+3. Deleting an event with bills is allowed now: personal txs are unlinked, not deleted (`PROJECT_HAS_TRANSACTIONS` is gone).
+4. Old floating repayment txs keep their tx with `account: null`.
+
+**Not done / on hold:** A6 resolve endpoint, A9 settlement, members as a tab (owner hold). The "create missing tags?" prompt of resolve / claim: the name-matching helper `projects.MatchPersonalTags` is ready; copies already auto-attach same-name tags.
+
+**Docs:** spec 12 §0 (new), spec 10 §0 (new), spec 13 (split_paid retired), `design/api/api-document.md` (recent-additions lines §04 / §10 / §12), `design/api/api-v2-notes.md`.
+
+**For DevOps / the next local build:** run migrations 054 + 055 on the local DB before the new BE starts (the old app build can't read the new shapes; the forced update covers prod). The throwaway test DB `chubi_test` (same container) is at 055 and can be reused.
+
+
+## 2026-10-13 02:30 — 0.3.1-10 BE brief 2: events by prompt (A) + recurring (B)
+DONE · spec first (`internal/apidoc/openapi.yaml`, tag Recurring + Events / Transactions deltas), then code · `go vet ./...` clean · `go test -count=1 ./...` with `TEST_DATABASE_URL` → 23 packages ok, 195 PASS, **0 SKIP**, 0 FAIL (throwaway `chubi_test` DB at migration 057; the prod-restore DB on :5433 was not touched).
+Nothing committed / deployed.
+
+**Migrations (new, breaking, the forced update covers it):**
+- `000056_event_bill_link`: `project_transactions.linked_transaction_id` (FK transactions, ON DELETE SET NULL, unique), backfilled from payer + amount. The bill ↔ tx link is now explicit (it survives diverging amounts).
+- `000057_recurring`: **drops `scheduled_transactions` and `transactions.scheduled_transaction_id` (old rows are NOT migrated, per the owner)**; new `recurring_rules`, `recurring_items`; notification types `recurring_due`, `recurring_ending`. Tested up → down → up on `chubi_test`.
+
+**A. Events (owner answers to my 4 calls)**
+- Call 1: any member with rights may edit a bill's amount / date. Mine with `also_update_link: true` changes my tx too; without it, the bill only. Another member's edit never touches my tx: I get `project_tx_changed` with `personal_transaction_id` ("อัปเดตตาม"). `409 BILL_MONEY_LINKED` dropped. The tx side: `PUT /transactions/:id {also_update_link}` changes the bill.
+- Call 3: `DELETE /projects/:id?delete_linked_txs=true` → `EventDeleteResult {id, deleted_transaction_count, account_balances}`; `Event.linked_tx_count`.
+- New: `DELETE /transactions/:id?also_delete_link=true` also deletes the bill made from it when I may edit the event (else it stays, unlinked) → result `bill_id`.
+
+**B. Recurring (spec 11, rewritten; fe-recurrent plan rev 3 + owner changes)**
+- Setting = the generator (daily / weekly with every N weeks + weekdays / monthly day or Nth weekday / yearly / hand-picked dates; end none / date / count, ≤ 2 years after the start; no end = horizon 3 months daily-weekly, 1 year monthly-yearly; extend).
+- Items = own records linked to a pending draft or a real tx (same mechanism as event bills). Status from the link: upcoming / pending / done / not_created; archived = user flag; delete = real delete. Each item has `seq` (3/12) and an internal `slot` (its rule date), so an item can move dates without a duplicate.
+- The due check runs inside `GET /me/counts`, `/dashboard`, `/notifications`, `/notifications/unread-count` and every recurring read. It only produces items of ACTIVE settings and one-offs (paused produce nothing). One pending draft each, exactly once (row locks). It sends ONE grouped `recurring_due` notice and a `recurring_ending` notice when 2 are left. Settings on an archived wallet auto-pause.
+- "สร้างใหม่" (`POST /recurring-items/:id/create`): target pending | transaction, any field incl. the date (a future date → upcoming). Manual items. Bulk `POST /recurring-items/batch` edit / create / archive / restore / delete. Edits scope this / following / past / upcoming / all + `also_update_link` (no notification).
+- Transactions: a future-dated create → one-off upcoming (`rows: []`, `upcoming`); an edit to a future date MOVES the row out (400 `FUTURE_DATE_NOT_ALLOWED` for transfers / debt / event-bill / others' rows); rows carry `recurring_item`; `DELETE ?also_delete_link=true` → `recurring_item_id`.
+- Deleting a linked item: `?delete_linked_tx=true`. Deleting a setting: `?delete_linked_txs=true`.
+- Scheduled module, routes and its me / dashboard counts are gone. `MeCounts.recurring {active_count, upcoming_count}`; the dashboard `upcoming` list reads the items.
+
+**FE contract delta (forward-ready; fe-recurrent / fe-core / fe-event had the spec)**
+- One change since the spec ping: requests use `RecurrenceRuleInput` (only `freq` required) and `RecurrenceEndInput` (only `kind` required). Responses keep the full `RecurrenceRule` / `RecurrenceEnd`.
+- `/scheduled-transactions/*` removed; `PendingTransaction.source` gains `recurring` | `upcoming` with `source_ref {item_id, recurring, seq, total}`.
+- Errors: 400 INVALID_RULE / END_TOO_FAR / ACCOUNT_NOT_FOUND / INVALID_CATEGORY / TAG_NOT_FOUND / FUTURE_DATE_NOT_ALLOWED; 409 INVALID_TRANSITION / ITEM_ALREADY_LINKED (batch: `details.ids`).
+
+**My calls (flag if the owner disagrees)**
+1. `also_update_link` on an item linked to a TRANSFER changes the item only (the pair is edited from the transaction).
+2. Renaming a setting updates the description of items still showing the old name (an item without its own description shows the setting's name).
+3. Resume on a setting whose wallet is archived → 400 ACCOUNT_NOT_FOUND. Restore puts a setting back as paused, not active.
+4. A manual item dated today or earlier starts "ยังไม่สร้าง" (not auto-produced); dated later it is upcoming and the due check produces it on its date.
+
+**Docs:** spec 11 (rewritten as Recurring), spec 10 §0.4, spec 13 §2.9 / 2.10 / 2.5a, spec 04 §2.6, `design/api/api-document.md` (§04 / §10 / §11 / §13 lines).
+
+**For DevOps / the next local build:** run migrations 054 → 057 on the local DB before the new BE starts. The due check reads the recurring tables on every boot call, so the BE fails without 057. `chubi_test` is at 057.
+
+**Next:** brief 3 (wallets `track_balance`, saving goals G1–G7, the agreed budget items), each spec first + an FE ping.
+
+
+## 2026-10-13 — 0.3.1-10 BE brief 3: wallets track_balance, goals fix, budgets v2
+DONE · spec first in `internal/apidoc/openapi.yaml`, then code · `go vet ./...` clean · `go test -count=1 ./...` with `TEST_DATABASE_URL` → 23 packages ok, 198 PASS, **0 SKIP**, 0 FAIL (throwaway `chubi_test` DB at migration 059; the prod-restore DB was only read: 1 personal yearly budget, which 059 converts).
+Nothing committed / deployed.
+
+**Migrations (new):**
+- `000058_wallet_track_balance` — `accounts.track_balance` (default true). Additive.
+- `000059_budgets_v2` — BREAKING for budgets.
+  - New tables: budgets v2 + `budget_categories`, `budget_wallets`, `budget_periods`.
+  - Personal v1 budgets → recurring budgets on their category (+ sub-categories), same period. Event-scope budgets are dropped.
+  - Tested up → down → up.
+
+**1. Wallets — `track_balance` (spec 03 note; fe-core pinged)**
+- `Account.track_balance`. Create takes it (false = no opening balance).
+- `PUT {track_balance: true, current_balance}` turns it back on in ONE call (an adjustment row when it differs).
+- Adjust on an untracked wallet → 409 BALANCE_NOT_TRACKED.
+- Untracked wallets are left out of `AccountList.totals` (counted in `untracked_count`), the dashboard net worth and card-due reminders.
+
+**2. Saving goals (per Lead: % work stopped until goals v2; spec 09 note; fe-saving pinged)**
+- A goal on an archived / given-away wallet shows the REAL wallet (live AccountRef, `archived: true`, that wallet's currency / balance). The "(archived)" / THB placeholder is gone.
+- Every goal read / write answers the full `SavingGoal` schema (replaces SavingGoalTouch).
+
+**3. Budgets v2 (spec 08 §0, rewritten; fe-budget + fe-core pinged)**
+- Named tracker; scope all / categories (± sub-categories) / tag names / wallets, OR-matched.
+- Recurring periods (`rule` daily|weekly|monthly|yearly × interval; end none|date|count) or one range (fixed / open until ปิดงบ).
+- Each started period is stored with its own amount / note: `PUT /budgets/:id/periods/:period_id`.
+- Setup edits take `apply` following | all.
+- Sources:
+  - USED = normal / recurring-linked txs + my share of event bills (once);
+  - EXPECTED = upcoming recurring items + pending drafts (current period).
+- Status over > warn (per-budget warn_pct, default 80, null = off) > pace > ok, with tone.
+- Forecast: daily allowance, avg, forecast end / over date, history avg of 6.
+- Routes:
+  - `GET /budgets` (status / sort; hero counts)
+  - `GET /budgets/:id` (one call: forecast, by_source, by_category, 6 periods, items)
+  - `/periods`, `/items`, `/close`, `/archive`, `/restore`
+  - DELETE → `{id}`
+- The FE asks B1–B7 are covered by the v2 shapes: page-ready list + summary, BE status / tone, past periods, writes return the page, no currency field (user currency), spent = my_share via report scope, the full spec schema.
+
+**FE contract delta**
+- Wallets: `track_balance`, `current_balance`, `untracked_count`, 409 BALANCE_NOT_TRACKED.
+- Goals: no shape change (SavingGoal spelled out); `linked_account` / `currency` are the real wallet's.
+- Budgets: everything new. `/budgets/overview` is gone; `category_id`, `period`, `scope`, `project_id` and `currency` are gone.
+- `Category.budget_count` now = budgets tracking the category; a delete takes it out of their scope.
+
+**My calls on budgets (sent to Lead; flag any the owner disagrees with)**
+1. Events: one "อีเวนต์" source per the decision (the mockup's claimed / unclaimed split dropped).
+2. A mixed scope is OR. "everything" excludes system rows and debt entries' txs.
+3. Tag names match my tx tags, a bill's event tags and my tags on the event.
+4. Expected = upcoming + pending in the current period; open-ended looks 30 days ahead.
+5. Pace shows even with ไม่เตือน; open-ended budgets get no pace chip.
+6. Periods:
+   - "following" keeps past periods (a rule change runs from the current period's start);
+   - "all" re-amounts every period not set on its own, and a rule sent with all rebuilds from the start (per-period edits survive where the start date matches).
+7. ปิดงบ = ends today; เก็บถาวร is separate.
+8. Budget totals (Home tile / More) sum the current periods of active budgets, so overlapping budgets add up twice.
+
+**Not built (by Lead):** goals หยุดนับ / paused state, header total, form-options, free %.
+
+**For DevOps / the next local build:** run migrations 054 → 059 on the local DB before the new BE starts. `chubi_test` is at 059.
+
+
+## 2026-10-13 — 0.3.1-10 BE: saving goals v2 (Lead brief, owner mockup goals-v2.html)
+DONE · spec first (`openapi.yaml`, tag Saving goals; fe-saving + fe-core pinged), then code · `go vet ./...` clean · `go test -count=1 ./...` with `TEST_DATABASE_URL` → 23 packages ok, 198 PASS, **0 SKIP**, 0 FAIL (`chubi_test` at migration 060).
+Nothing committed / deployed.
+
+**Migration `000060_goals_v2` (breaking; up → down → up tested)**
+- Goals drop `linked_account_id` / `allocation_pct` and gain `milestones` and `closed_at`; state is active | completed | archived. Old goals are kept with 0 saved.
+- New `saving_entries` table: one wallet · from → to bucket · amount · date · note · source · group_id.
+- `recurring_rules.type` gains `saving` + `goal_id`; `recurring_items.saving_entry_id`; pending kind `saving`.
+
+**What it does (spec 09 §0, rewritten)**
+- **Notebook, not transactions.**
+  - Kinds: save (wallet available → spare / goal), withdraw (→ back to its wallet), move (spare / goal ↔ spare / goal).
+  - Multi-wallet moves write one row per wallet under one group_id: largest-first auto-split, or explicit `splits` (400 SPLIT_MISMATCH).
+  - A (bucket, wallet) never goes below 0 (409 INSUFFICIENT_SAVING + details.available), and that includes edits and deletes.
+  - Saved above the wallet balance is allowed: a red flag only.
+- **Wallets:** `Account.savings` {balance, saved, spare, available (null if untracked), saved_exceeds_balance, over_by, buckets}. Saving into an untracked wallet → 400 WALLET_NOT_TRACKED.
+- **Goals:**
+  - BE-computed figures: needed_monthly, pace_monthly (3-month net), eta_date, pace reached | on_track | late (+ late_months) | none, milestones, history (month-end balances), by_wallet shares.
+  - Close {to: spare | wallets} → completed (every part goes to spare or back to its own wallet).
+  - Delete / archive while holding money → 409 GOAL_HAS_SAVINGS. Saving into a goal that isn't active → 409 GOAL_NOT_ACTIVE.
+- **Write results:** every write returns SavingWriteResult {entries, goals touched, spare, wallets' savings, goal_page | spare_page}. The two pages were added per fe-saving's ask (via Lead): one button = one call.
+- **Recurring ออม:** a saving setting produces 🐷 pending drafts; submitting one makes a saving entry linked to the item; the goal page lists auto_save.
+- **Home / More:** `/dashboard.saving_goals` and `/me/counts.goals` = SavingTotals {count, saved, in_goals, spare, available}.
+
+**FE contract delta**
+- Goals: all new shapes, built on fe-saving's proposal. Differences: a nested detail page, page-based entries paging, the `pace` enum, `actions` flags. `/accounts/:id/saving-allocations`, ALLOCATION_EXCEEDED and free % are gone.
+- Wallets gain `savings`.
+- Pending: kind `saving`, `draft.goal_id`, `resolved.goal`, `submitted[].saving_entry_id` (rows [] for a saving). New submit error codes MISSING_ACCOUNT, WALLET_NOT_TRACKED, GOAL_NOT_ACTIVE.
+- Recurring: type `saving`, `goal_id` / `goal`, `RecurringItem.saving_entry_id`.
+
+**My calls (flag if the owner disagrees)**
+1. completed is a stored state set only by ปิดเป้าหมาย; reaching 100 % is pace=reached and stays active.
+2. needed_monthly uses 30.44-day months, rounded up to the baht (the mockup's ฿5,500 vs the computed ฿5,571 looks hand-rounded). pace = net (withdrawals count).
+3. Delete / archive need an empty goal (close first). Entries keep pointing at a deleted goal as a nameless goal.
+4. Saving into an untracked wallet is refused (available makes no sense there).
+
+**For DevOps / the next local build:** run migrations 054 → 060 before the new BE starts.

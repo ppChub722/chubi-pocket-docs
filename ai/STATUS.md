@@ -13,7 +13,14 @@ _Last updated: 2026-10-13 late night by Lead (handoff before the team restart)._
 - Rules and owner decisions: `ai/decisions.md`. Discussed but not started: `ai/backlog.md`.
 - Releases are tag-based: Lead commits, bumps, tags `v<version>` in be / app / docs and pushes; DevOps runs `chubi-pocket-be/scripts/release.sh <brief-dir>` from the tags (brief template: `ai/templates/release-brief/`). Local env: `scripts/local-deploy.sh --web` (only when the owner orders).
 
-## In progress (handoff 2026-10-13 night — ALL team sessions are being restarted)
+## In progress (2026-10-13 ~04:20) — ALL 0.3.1-10 WORK DONE, GREEN, uncommitted
+- Done: debts · events (link-by-prompt, 3-choice delete, event tags) · recurring (+ ออม type) · wallets track_balance · budgets v2 · saving goals v2 (saving tx) · More page (4 sections) · 0.3.1-9 leftovers · quick-create presets / mode colours. Migrations 054–060.
+- Lead full run: flutter analyze 0 issues · flutter test 887/0 (after 2 small fixes) · go vet clean · go test 23 pkgs ok (chubi_test DB).
+- Next (owner's go): back up the local DB → migrations 054–060 → local build → owner tests once (smoke first) → commit + tags → release 0.3.1-10 on the NEW VPS.
+- Known small open item: tapping a pending 🐷 saving draft confirms it directly (no edit sheet yet).
+- Later (backlog): module dashboards, dashboard "แผนเดือนนี้", events E1 / E2 / E5, budget rollover + quick-create budget chip.
+
+## Earlier handoff (2026-10-13 — team restarted)
 - **Committed + pushed as app `3a82aeb` (0.3.1-10 wip, on top of the v0.3.1-9 tag `e8305e3`); ships with 0.3.1-10:**
   - FE-A: counted shell chrome (bottom bar after a fast back) + TopScrim
   - FE-D: change password back to a page (entry under the username row)
@@ -39,7 +46,8 @@ _Last updated: 2026-10-13 late night by Lead (handoff before the team restart)._
 - 0.3.1-10: debts + events + budgets + scheduled + goals in parallel (1 FE per page group, FE-A/FE-B as supporters).
 
 ## Team (session names change; check ListAgents)
-- Until the restart (2026-10-13): Lead `chubi-pocket-99` · FE-A `-81` (kit / shell owner) · FE-B `-a0` (templates) · FE-C `-1a` (tx / debts) · FE-D `-02` (settings / profile / events) · FE-E `-61` (wallets / categories / tags / contacts / budgets / scheduled / goals) · BE `-bc` · QA `-59` · DevOps `-e3`. New sessions: roll call and map them to these roles.
+- From 2026-10-12 (restart): Lead `chubi-pocket-57` · **fe-core** (kit / hub / shell / router / templates, plus auth, tx / quick create, settings, wallets / categories / tags / contacts; working on the 0.3.1-9 leftovers) · **fe-debt** · **fe-event** · **fe-budget** · **fe-recurrent** (scheduled) · **fe-saving** (goals). The 5 feature FEs are onboarding read-only; they build only from hub templates + kit, and fe-core handles missing pieces. Inboxes: fe-core.md / fe-debts.md / fe-events.md / fe-budget.md / fe-recurrent.md / fe-saving.md. No BE / QA / DevOps session yet.
+- Before the restart: FE-A (kit / shell) + FE-B (templates) → now fe-core; FE-C / FE-D / FE-E handoffs are in their inbox files.
 - Local env: docker BE `localhost:8080` + DB `:5433` (restored from prod 2026-10-13; the old QA users are gone).
 
 ## Old log

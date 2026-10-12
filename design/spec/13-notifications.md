@@ -68,7 +68,9 @@ The full set of notification types in Phase 1b. Each entry: when it fires, recip
 
 **Suppressed when:** the splitter's `auto_notify_linked_split_contacts = false` and no manual "send notification" choice was made.
 
-### 2.2 `split_paid`
+### 2.2 `split_paid` — RETIRED in 0.3.1-10
+
+> Retired (migration 054): nothing is sent on pay / receive (owner rule). Repayments are person-ledger entries (spec 12 §0); the rows were deleted and the type removed from the mute / auto switches. Kept below for history.
 
 **Fires when:** a personal `transactions` row of type `expense` is inserted with `source_split_id` set, AND the split's creditor resolves to a linked user.
 
@@ -212,6 +214,24 @@ Added people get the ordinary `split_created`. If the partner hasn't added the s
 **Deep-link:** split detail. Lets the creditor know "Bob cancelled his tracking of this debt."
 
 Phase 2+. (Phase 1b: the cancel happens silently on the debtor's side; the creditor finds out at next sync.)
+
+### 2.9 `recurring_due` (0.3.1-10, migration 057)
+
+**When:** the recurring due check turned items into pending drafts (spec 11 §4). The due check runs inside `GET /me/counts`, `GET /dashboard`, `GET /notifications`, `GET /notifications/unread-count` and every recurring read.
+
+**Grouped:** ONE notice while it is unread — new drafts add to its `count` and move it to the top; once read, the next batch makes a new one.
+
+**Payload:** `{"count": 3}`. **Deep-link:** `/pending`.
+
+### 2.10 `recurring_ending` (0.3.1-10, migration 057)
+
+**When:** an active recurring setting has 2 or fewer upcoming items left. Once per setting; "ต่ออีก" (extend) re-arms it.
+
+**Payload:** `{"recurring_id": "...", "name": "Netflix", "left": 2}`. **Deep-link:** `/recurring/{id}`.
+
+### 2.5a `project_tx_changed` on a bill made from my transaction (0.3.1-10)
+
+A member other than me edits the amount / date of a bill made from my transaction: the transaction is NOT changed; I get `project_tx_changed` with `personal_transaction_id` in the payload and a one-tap "อัปเดตตาม" (spec 10 §0.4).
 
 ---
 

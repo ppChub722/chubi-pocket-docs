@@ -12,6 +12,49 @@ Global conventions in [`overview.md`](overview.md).
 
 ---
 
+> **0.3.1-10 — the person ledger (migration 054) supersedes §1–§4 where they disagree.** Shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`, tag **Debts**.
+
+## 0. The person ledger (0.3.1-10)
+
+### 0.1 Model
+- One record type, an **entry**: `{person, direction paid | received, amount > 0, date, description, note, paid label, optional wallet transaction, optional split source}`.
+  - **paid** = I paid them / for them (net +amount); **received** = they paid me / for me (net −amount).
+  - **net per person** = Σ paid − Σ received. > 0 = they owe me (ติดคุณ), < 0 = I owe them (คุณติด), 0 = หายกัน. It can flip sign freely.
+  - The **paid label** (`paid`) never changes a number. There is no cancel, no `settled_amount`, no `outstanding`, no `status`: stop counting = delete.
+- **Person key**: `c:<contact_id>` (one of my contacts) or `n:<name>` (a typed name, matched case-insensitively; the BE returns it lower-cased and trimmed). `shared.DebtKey` / `shared.DebtKeySQL`.
+- **Wallet side**: an entry with a wallet owns exactly ONE transaction (`transactions.source_personal_debt_id`, unique): paid = expense, received = income, in the reserved Debt Paid / Debt Received category, same date / amount / description / note. Entry and transaction are one record:
+  - edits on either side write both (`PUT /personal-debts/:id` → the tx; `PUT /transactions/:id` → the entry, via `transactions.DebtLinks`);
+  - deleting either deletes both (the wallet balance comes back);
+  - from the tx side the category stays the reserved one (400 `SYSTEM_TRANSACTION_IMMUTABLE`), the wallet can't be dropped (400 `DEBT_TX_NEEDS_WALLET`: making the entry ledger-only is `PUT /personal-debts/:id {account_id: null}`), and a wallet co-member who isn't the author can't edit / delete it (403 `DEBT_TX_AUTHOR_ONLY`);
+  - the tx shows `counterparty: {entry_id, key, person, direction, paid}` to its author; it can't carry splits or join an event.
+- **Tags** live only on the wallet transaction (an entry without a wallet takes no tags: 400 `TAGS_NEED_WALLET`).
+- **Split-sourced entries** (`source_kind`): `transaction` = a split on my bill (the bill owns amount / person / date); `partner` = another user's split on me (the mirror); `event` reserved for the event resolve flow (on hold). Only description / note / paid change on them (409 `ENTRY_MANAGED_BY_SOURCE`). Deleting a `transaction` split takes it off the bill (my_share grows; a linked partner gets `split_changed` "removed").
+- An expense split = a `paid` entry (they owe me); an income split = `received`. The mirror on a linked partner's side has the opposite direction.
+
+### 0.2 Endpoints
+| Route | What |
+|---|---|
+| `GET /personal-debts/people?page&per_page&q&all&side` | One list, \|net\| desc then latest entry. Default: people with something open (net ≠ 0 OR an entry not labelled paid); `all=true` = everyone; `side=owed_to_me` (net > 0) / `i_owe` (net < 0). `totals` (`DebtTotals {owed_to_me, i_owe, net, open_count}`) cover every person and ignore the filters. |
+| `GET /personal-debts/people/:key` | The person page: `DebtPerson` + `counts {entries, money}` + first page of entries. A contact key with no entries answers zeros; a typed key with none → 404. |
+| `GET /personal-debts/people/:key/entries` | `q` (description / note), `sort` date_desc \| date_asc \| amount_desc \| amount_asc, `direction`, `paid`, `money=true` (has a wallet tx), `account_id`, `from` / `to`. |
+| `POST /personal-debts/people/:key/entries` | The ONE write: `{direction, amount, date?, account_id?, description?, note?, tag_ids?, mark_paid_ids?, person_name?}` → 201 `DebtEntryWriteResult {entry, person_balance, previous_person_balance, transaction, account_balances}`. `mark_paid_ids` labels entries of the same person paid (400 `ENTRY_NOT_FOUND` otherwise). |
+| `GET /personal-debts/:id` | The tx-detail page in debt mode: `{entry, person_balance, transaction (full row \| null)}`. |
+| `PUT /personal-debts/:id` | Partial; `account_id: null` = ledger-only (tx deleted), a value creates / moves the tx; `key` moves a manual entry to another person (`previous_person_balance` set). |
+| `DELETE /personal-debts/:id` | `{id, transaction_id, person_balance, account_balances}`. |
+| `POST /personal-debts/split-requests/:nid/accept` | Mirror entry (`partner`) → `DebtEntryWriteResult`. |
+| `POST /personal-debts/split-changes/:nid/apply` | `{result updated \| deleted, entry, person_balance}` (no more `zeroed`). |
+
+Retired: `GET / POST /personal-debts`, `/cancel`, `/settle`, the `split_paid` notification (nothing is sent on pay / receive). `GET /transactions?counterparty_key=` lists a person's wallet transactions. The pending `settle_debt` draft submits as a new entry with the target's person in the opposite direction.
+
+### 0.3 Totals everywhere
+`Dashboard.debts` and `/me/counts.debts_summary` are `DebtTotals` (the same query as the people header); `/me/counts.open_debts` = people with something open.
+
+### 0.4 Migration 054 (data)
+`owed_to_me` → paid, `i_owe` → received; `settled` → paid label; each repayment transaction becomes its own entry (same person, its type → direction) and stays its wallet side; cancelled debts and splits kept at amount 0 are deleted; `split_paid` notifications removed. Down migration is best effort (data is disposable).
+
+---
+
+
 ## 1. The model
 
 ### 1.1 Three layers

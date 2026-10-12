@@ -31,6 +31,44 @@ Global conventions (base URL, error envelope, data types, HTTP verbs) are in [`o
 
 ---
 
+
+> **0.3.1-10 (migration 055) — events API.** Shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`, tag **Events**. Section 0 below wins where older sections disagree.
+
+## 0. Events in 0.3.1-10
+
+### 0.1 Page-ready reads, a patch from every write
+- `GET /projects` rows are `Event`: my personal tags, `members_count` (active), `total_expense` / `total_income`, `my_net`, my member id / role, flags `is_owner`, `is_locked` (status ≠ active), `can_add_bill` (active event, I'm an active owner / contributor), `can_edit` (owner), `can_manage_members` (owner, not archived). Filters `status` (default active, `all`), `q` (name), `tag_id` (repeatable, my tags), `sort` updated_desc | start_date_desc | name_asc. No `type`, no currency (single user currency).
+- `GET /projects/:id/detail` = one call: event + summary + members + event tags + the first board page.
+- Board (`GET /projects/:id/transactions`): bills (parents) with `children` (splits) nested, `transaction_member` refs, event `tags`, `marks` / `my_mark`, `my_share` (payer = amount − Σ others' splits, split member = my split), `locked` (the edit rule: event cancelled / archived, or I'm a viewer / not active), `linked`, `source_tx` (only for that transaction's owner). Filters `type`, `mine`, `q`, `tag_id`, `sort`.
+- Summary positions: expense bills only; the payer's share of a bill is what its splits leave them (all of it without splits), so the nets add up to 0 (fixed in 0.3.1-10: the payer's remainder on a split bill was not counted). `by_tag` = the top 5 event tags by total, with my share; `tag: null` = untagged.
+- Every write returns `EventPatch {event, summary, members, tags, row, removed_row_id, account_balances}` (variants: `AddBillsResult` + `new_transaction_id` / `rows`, `EventCopyResult` + `transaction`, `EventTagWriteResult` + `tag`). Create / quick create / accept-invite return the detail. Delete / leave return `{id}`.
+
+### 0.2 Create and edit
+- `POST /projects` takes everything at once (`planned_amount`, `start_date` / `end_date` with end ≥ start else 400 `INVALID_DATE_RANGE`, `icon_code`, description / note, my `tag_ids`).
+- `PUT /projects/:id` is owner-only, except `tag_ids` alone: my personal tags on the event, any member, private to me. null clears description / note / dates / planned_amount / icon.
+- `DELETE /projects/:id` (owner): the event goes; personal transactions in it stay in their books, unlinked (no more `PROJECT_HAS_TRANSACTIONS`).
+- `POST /projects/:id/members`: `ad_hoc + display_name` or `email + display_name` (invite); anything else 400 (was 500). `request-link` acknowledges a pending invite, else 409 `NOT_PENDING`.
+
+### 0.3 Tags (owner 2026-10-12)
+- **Event tags** (`event_tags`, owned by the event, shared by its members, icon / colour; unique name per event, case-insensitive → 409 `TAG_NAME_TAKEN`): `GET / POST /projects/:id/tags`, `PUT / DELETE /projects/:id/tags/:tag_id` (an active non-viewer member, event not cancelled / archived). Bills carry them (`tag_ids`; another event's id → 400 `TAG_NOT_FOUND`). `mine` = I have a personal tag with that name.
+- `POST /projects/:id/tags/import {tag_ids?}` creates a personal tag (name + icon) for each listed event tag (none = all) I don't have by name yet.
+- **My tags on an event** (`project_my_tags`): each member's own personal tags; the list filters by them.
+- Name matching (`MatchPersonalTags`): a copy into my book (`copy`, the recorded-for-you auto copy) attaches my personal tags with the same names; the "create the missing ones?" prompt of the resolve flow is on hold.
+- Migration 055 turned the free-text `project_transactions.tags` into event tags (one per name per event, first spelling).
+
+### 0.4 A personal transaction pulled in (owner 2026-10-12)
+- `POST /projects/:id/bills` / `POST /projects/quick` make a bill FROM the transaction (explicit link `project_transactions.linked_transaction_id`, migration 056; `shared.EventBillPredicate`): the **money** (amount · date) is linked BY PROMPT; the **splits** move to the board; the transaction's **tags** (→ event tags by name, missing ones created) and **description / note** are copied once, then independent.
+- Linked money by prompt (owner 2026-10-13, replaces "409 `BILL_MONEY_LINKED`"): any member with rights may edit a bill's amount / date. The transaction's owner editing it sends `also_update_link: true` to change the transaction too (the wallet moves, `account_balances` in the patch); without it only the bill changes. Anyone else's edit never touches the transaction: its owner gets `project_tx_changed` (with `personal_transaction_id`) and a one-tap "อัปเดตตาม". Editing the transaction with `also_update_link: true` changes the bill (`transactions.EventBillSyncer`; board splits that no longer fit → 400 `SPLITS_EXCEED_AMOUNT`). Description / note / tags / splits are each side's own.
+- Deleting the transaction with `DELETE /transactions/:id?also_delete_link=true` removes the bill too when I may edit the event (an active non-viewer member, the event not cancelled / archived); the result carries `bill_id`. Without it the bill stays, unlinked.
+- Deleting an event: `DELETE /projects/:id?delete_linked_txs=true` also deletes MY transactions in it (balances come back); the result is `EventDeleteResult {id, deleted_transaction_count, account_balances}`. `Event.linked_tx_count` = my transactions in the event (so the app asks only when > 0).
+- A split labelled paid blocks the pull (422 `TX_SPLIT_PAID`; was repaid / forgiven). Bill candidates: `GET /transactions?can_join_event=true`.
+- The transaction shows `event_bill {event, bill_id, linked}`; the bill shows `linked` to everyone and `source_tx` to the transaction's owner.
+
+### 0.5 On hold (owner)
+The resolve endpoint (A6), settlement (A9), members as a tab, member candidates / add-by-contact (A8).
+
+---
+
 ## Phase summary
 
 | Concern | Phase 1b | Phase 2 | Phase 3 |

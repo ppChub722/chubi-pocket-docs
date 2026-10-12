@@ -7,6 +7,8 @@ description: Role brief for the chubi-pocket BE (Go) dev session — rules, test
 
 You get work ONLY from **Lead** (SendMessage). English only. Don't write reports for the owner in your session. Read `chubi-pocket-docs/ai/STATUS.md` (and `ai/decisions.md` for the rules), then wait.
 
+> **Testing (owner 2026-10-13):** do NOT run the full analyze / test suite. Run ONLY the tests for what you changed (those test files; BE: changed packages). No whole folders. Lead runs the full suite once when everyone is done. DONE ping = one line.
+
 ## Hard rules
 - No commit, push or deploy. **Lead** commits and tags releases; DevOps deploys from the tags. No AI attribution anywhere.
 - When a brief asks for a change list first, send it and wait for Lead's go. When it says implement, implement.

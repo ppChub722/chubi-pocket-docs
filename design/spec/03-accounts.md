@@ -10,6 +10,10 @@ Global conventions (base URL, error envelope, data types, HTTP verbs) are in [`o
 
 ---
 
+> **0.3.1-10 (migration 058) — a wallet without a balance** (owner 2026-10-12, "ติดตามยอดเงิน"). Every wallet type has `track_balance` (default true; create may send false = no opening balance asked, any `balance` sent is ignored). Off: the app shows no balance (list / pickers / hero); the wallet is left out of every total (`AccountList.totals`, counted in `untracked_count`), the dashboard net worth and the card-due reminders; `POST /accounts/:id/adjust-balance` → 409 `BALANCE_NOT_TRACKED`. Transfers still work and its transactions still count in income / expense reports; `balance` keeps the running sum. Turning it back on is one call: `PUT /accounts/:id {track_balance: true, current_balance}` (an adjustment row when it differs; `current_balance` without `track_balance: true` → 400 `VALIDATION_ERROR`). Owner only, like every wallet field.
+
+> **0.3.1-10 — wallet savings (goals v2).** `Account.savings` = the caller's saving buckets in the wallet: `saved` (goals + spare), `spare`, `available` (= balance − saved; null when the balance isn't tracked), `saved_exceeds_balance` + `over_by` (red warning only), `buckets[]`. See spec 09 §0.
+
 ## Phase summary
 
 | Concern | Phase 0/1 | Phase 2 | Phase 3 |
