@@ -14,11 +14,12 @@ _Last updated: 2026-10-13 evening by Lead._
 
 ## In progress
 - **0.3.1-9: PREPARED, not deployed** (2026-10-13 evening). Tags `v0.3.1-9` pushed in be / app / docs.
-  - be `5b7722e` · app `58b4e9b` (build **51**, pubspec `0.3.1-9+9`) · docs = the tag
+  - be `5b7722e` · app `82e5f63` (build **52**, pubspec `0.3.1-9+9`) · docs = the tag (tags moved once after the owner's local review fixes)
   - scope: hub kit adopted app-wide (raw-widget ratchet 0), API v2 thin FE, detail / list standards, pull-to-refresh everywhere, layout-true skeletons, sheets as kit organisms + one popover organism, entity chips, compact hero = hero card, wallet hero balance + ActionBar + adjust sheet, dev portal `/#/dev`
-  - gates: app analyze 0 issues · 471 tests pass · BE vet clean · 190 pass, 0 skip
-  - local env deployed from this tree (BE migration 53, web :5181)
-  - brief ready, NOT sent: `chubi-pocket/release-briefs/0.3.1-9/` (EXPECT_MIGRATIONS=53, MIN_APP_BUILD=51)
+  - review fixes: token-fixed AppInput sizes (hero fields line up), compact split section in quick forms + event chip, full-width row labels
+  - gates: app analyze 0 issues · 531 tests pass · BE vet clean · 190 pass, 0 skip
+  - local env rebuilt from this tree for the owner (BE migration 53, web :5181)
+  - brief ready, NOT sent: `chubi-pocket/release-briefs/0.3.1-9/` (EXPECT_MIGRATIONS=53, MIN_APP_BUILD=52)
 - **Next:** the owner checks local :5181. On "สั่ง release" Lead sends DevOps the brief folder. A bug found first → fix, re-commit, move the tags (nothing deployed yet).
 
 ## Waiting on the owner

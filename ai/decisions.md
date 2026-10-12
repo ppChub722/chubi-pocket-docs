@@ -39,6 +39,8 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - **"แบ่งรายการ" section (Split Transaction, owner 2026-10-12):**
   - one section in quick create, pending and tx detail; inside, the rows "แบ่งยอด" (people; หารเท่ากัน only once someone is added) and "อีเวนต์", same row-label style, no separators
   - collapse: pending = collapsible, default closed; quick create = collapsible, default open; tx detail (view + edit) = always open
+  - two looks (owner 2026-10-13): quick forms (quick create + pending) use the COMPACT look (one-line header without description, rows styled like the Note row); tx detail uses the full section (heading + description)
+  - the event value is an entity chip with × to clear; empty = an add chip like "+ Add person"
   - **tx entry layout (owner 2026-10-13):**
     - tx DETAIL (view + edit): the hero contains the big wallet + category pick cards; the tag row sits outside; no wallet/category chip rows
     - QUICK CREATE + PENDING (add page, แก้ร่าง): ONE shared EntryCard with type + date, description + amount, a wallet chip row and a category chip row INSIDE the card; tags outside, below
@@ -135,6 +137,7 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - **Few options → popover:** ≤ ~5 short options with no search / description use ONE centralized popover / menu organism (filters, sort, row options, ⋯ menus); everything else is a sheet.
 - **Entity values in rows show as the entity's chip** (icon + colour); a nested category shows its path as chip › chip.
 - **Sheets are organisms:** every sheet is a kit organism (generic or domain) and appears on one hub "Sheets" page.
+- **AppInput geometry comes from tokens, not from the value font** (owner 2026-10-13): the same size = the same height, the label token = the same label top, the underline at a fixed offset. Fields side by side line up by construction, with no per-page alignment code.
 - **Every visual widget lives in the kit, even if used once** (owner 2026-10-13). Pages only pick kit pieces and set parameters; feature code is state / API / navigation wiring only (no styling, colours, paddings or custom layout). A feature wrapper that just feeds a kit organism is fine.
     - note: stacked, indented value, no input frame in view, frame only in edit. This is on DETAIL pages; the quick forms (quick create, pending) keep the compact label-left note row
   - kit chips only
