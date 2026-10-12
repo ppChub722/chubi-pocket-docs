@@ -19,7 +19,11 @@ _Last updated: 2026-10-13 late night by Lead (handoff before the team restart)._
   - FE-D: change password back to a page (entry under the username row)
   - FE-E: ListToolbar chips 28
   - FE-B: fail-fast loads + contact page tests + OFFLINE MODE (ConnectionBanner / ConnectionScope)
-  The last one was still IN FLIGHT at handoff: read `ai/inbox/fe-b.md` "## Handoff 2026-10-13" before touching it, then run the whole analyze / test.
+  The tree is GREEN at handoff (analyze 0 issues · 579 tests pass). FE-B left these offline-mode items (see `ai/inbox/fe-b.md` "## Handoff 2026-10-13"):
+  - page-specific submit buttons (quick create, auth, pages with their own AppButtons) are not yet disabled while offline
+  - the shell wiring is untested
+  - it never ran against a stopped BE
+  - BE should spec `GET /health` (it is in the api_flows baseline now)
 - Every role wrote "## Handoff 2026-10-13" (state + gotchas) in its `ai/inbox/<role>.md`. Role skills are updated.
 - Local env: BE :8080 + web :5181 (build 55), with the DB restored from prod (users 4 / accounts 6 / tx 12). The QA users are gone; recreate them locally when QA is needed.
 - Old VPS (Happy-Host) RETIRED, full backup in `chubi-pocket/backups/vps-happyhost-2026-10-13/` (secrets). New server: `engineering/new-vps-runbook.md`; scripts read `VPS_HOST`.

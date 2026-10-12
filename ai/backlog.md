@@ -11,6 +11,11 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
 - Then the BE implements A/B/D/E/F/G and the FEs adopt them (thin FE); pages not reached yet only get minimal shape adaptation.
 - FE-only fixes (FE-B): wallet by id, patchBalance, badge double start, drill-down filter, lazy contacts, event picker cache.
 
+## Offline mode leftovers (FE-B handoff 2026-10-13; the core is done, the tree is green)
+- Page-specific submit buttons are not disabled while offline: quick create, auth, and pages with their own AppButtons.
+- The shell wiring has no tests. Nobody has run it against a stopped local BE yet (ask DevOps to stop the container).
+- The BE should spec `GET /health` in OpenAPI; it was added to the api_flows baseline.
+
 ## Bugs reported by the owner (logged, not briefed)
 - **Bottom bar missing after a fast back** (2026-10-13, prod 0.3.1-9): pressing back quickly from an edit page that hides the bottom bar (via ShellChromeHider) to a main tab leaves the bottom bar hidden. Likely a race in the hide/show (the restore runs before the pop finishes, or the hide of the leaving page lands after the show). Owner: "ยังไม่แก้ รับเรื่องไว้ก่อน".
 - **Contact detail "doesn't open"** (2026-10-13, prod build 55). FE-D checked it: NOT a code bug. The VPS went offline again ~21:55, and the page sits on the skeleton for 10–25 s (connect 10 s + receive 15 s) before the error + retry shows. Fix proposal (Lead: do it in the template, all detail pages):
