@@ -101,3 +101,13 @@ DONE · one visit to the old VPS (up 22:13 Thai), read-only except `backup.sh`; 
 - **Local BE:** be `a307437` +121 dirty · health 200 `{"status":"ok"}` · `/api/v1/openapi.json` info.version `0.3.1-10`.
 - **Web:** :5181 from app `3a82aeb` +288 dirty · HTTP 200.
 - Note: the DB is `chubi_pocket_db` (container `chubi_pocket_db`, :5433), not `chubi_pocket`. Prod / old VPS untouched. The migrations are breaking by design: rollback = restore the dump above (needs the owner's OK in this window).
+
+## 2026-10-13 — release 0.3.1-10 (last deploy on the old Happy-Host box)
+DONE · live, verified · from tag v0.3.1-10 · QA pass: no · owner ordered "deploy on the old VPS, last time" in my window
+- **be** `f503d9c` · **app** `4d838f1` (build **58**, Firebase **2058**, `firsttester`) · **docs** `4edeba2` (tags Lead's)
+- **migrations:** 054–060 applied (prod 053 → 060, not dirty); pre-deploy backup `chubi_pocket-20261012-2133.dump.gz` (UTC)
+- **`.env`:** `LATEST_APP_BUILD=58`, `MIN_APP_BUILD=58` (forced update; builds ≤57 locked out), backup `.env.bak-0.3.1-10`
+- **verify:** `/health` 200 · app/version 58/58 · unauthenticated `/transactions` 401 · app log errors 0 · migration 60
+- **checks (tag worktrees):** BE go vet clean, go test 198 pass / 0 fail / 0 skip · app analyze clean, flutter test 887 pass. The BE tests ran against the restored local DB: they only delete rows they created.
+- **entry:** `ai/releases/0.3.1-10.md` UNCOMMITTED in the main docs tree (Lead commits). Worktrees removed.
+- The old box is still the live prod; migrate to the new VPS with `engineering/new-vps-runbook.md` (the pre-deploy dump above is newer than the one in `backups/`: pull a fresh one first).
