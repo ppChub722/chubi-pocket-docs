@@ -10,10 +10,11 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - Devs may talk to each other directly (owner 2026-10-11): shared files, kit/API needs, blockers, handoffs. DONE pings and owner-level questions still go to Lead.
 - Only the owner runs the app (`./run-web.sh`), except QA, which may run it locally (never prod).
 - QA runs only on the owner's order; checklists list the changed items only; no screenshots by default; FAILs + a PASS count.
+- Local builds (`local-deploy.sh` / `--web`) happen ONLY when the owner asks (owner 2026-10-12). Lead doesn't trigger rebuilds on its own after FE/BE changes.
 - QA may create any data it needs in the LOCAL DB without asking (owner 2026-10-11). Never prod.
 - QA runs NO servers: DevOps brings up the local BE + web (:5181). QA scripts persist in `ai/qa/` and get reused (explore only new pages); screenshots go to `ai/qa/shots/<date>/` (gitignored). (owner 2026-10-11)
 - DevOps runs the pre-release checks (analyze/test, vet/test) and one final report.
-- Versioning `0.3.1-N`; build = app commit count. `MIN_APP_BUILD` moves only for breaking BE changes.
+- Versioning `0.3.1-N`; build = app commit count. **From 0.3.1-9 every release forces the update (`MIN_APP_BUILD` = the new build, owner 2026-10-12)**, so old app builds never constrain the API: breaking changes are fine.
 - Data is disposable (DB wipe OK); migration squash is planned.
 
 ## Product
@@ -25,9 +26,32 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
   - a "ฉัน" row (create/edit) with an "อัตโนมัติ" chip (default on; typing turns it off)
   - save only when balanced; equal split includes me (remainder on ฉัน)
   - share line "คนอื่นติดคุณ" (expense) / "คุณติดคนอื่น" (income)
-  - identity lock only for app-linked contacts
-  - split row (2026-10-11): bigger profile icon; tap it → contact picker (no "create from search"; a "สร้างผู้ติดต่อใหม่" button opens contact create); name is a text input for typed names (contact rows read-only, same size); "อัตโนมัติ" = icon only in the ฉัน row's X slot; ฿ stuck to the number
+  - ~~identity lock only for app-linked contacts~~ → 2026-10-12: NO identity lock. Levels 2 and 3 can change person via the picker (BE = atomic remove + add, same amount; the old user gets "อัปเดตตาม", the new one split_created). The picker has "ไม่ผูกผู้ติดต่อ" (back to a typed name)
+  - split row look (2026-10-12):
+    - aligned slots, avatar | name | amount | a fixed trailing slot
+    - "ส่วนของฉัน" in a lighter, muted style
+    - level 1 = an outlined input; levels 2/3 = the name on a faint tint of the avatar colour (tap → picker)
+  - split row (2026-10-11): bigger profile icon; tap it → contact picker (no "create from search"; a "สร้างผู้ติดต่อใหม่" button opens contact create); typed names are an input (look updated 2026-10-12 below); "อัตโนมัติ" = icon only in the ฉัน row's X slot; ฿ stuck to the number
 - **Person look (PersonMark):** typed name = 👤, the same colour for all; contact = its icon; linked = its icon + 🔗 inline right after the avatar; names aligned (reserved slot).
+- **"แบ่งรายการ" section (Split Transaction, owner 2026-10-12):**
+  - one section in quick create, pending and tx detail; inside, the rows "แบ่งยอด" (people; หารเท่ากัน only once someone is added) and "อีเวนต์", same row-label style, no separators
+  - collapse: pending = collapsible, default closed; quick create = collapsible, default open; tx detail (view + edit) = always open
+  - quick create keeps the category / wallet cards (it mirrors tx detail); pending keeps chip rows
+- **Avatars:** the frame thickness and inner padding scale with size; small avatars get a relatively larger icon.
+- **Debts model answers (owner 2026-10-12, for the 0.3.1-10 plan; build after the 0.3.1-9 API work):**
+  - no "ยกเลิกหนี้"; stopping counting = delete (with a confirm dialog)
+  - person ledger: lending and repaying are ONE function, a signed amount with the person; the BE stores +/−, nothing more
+    - the UI button label follows the state, e.g. net 0 → "ให้ยืม"; จ่ายคืน / รับคืน otherwise
+    - a negative typed amount is accepted, never rejected
+  - the people list hides anyone with nothing open; owed-to-me and I-owe sit in ONE list
+  - repayments are editable from tx detail
+  - split-sourced debts: only description / note / paid label editable on the debt page
+- **Currency (owner 2026-10-12):**
+  - USER-level currency on /me, set once and LOCKED (default THB), shown only on the profile
+  - wallets have no currency picker; the server sets each wallet to the user's currency
+  - DB currency columns stay; multi-currency probably never
+- **Hub proposals vs app (owner 2026-10-12):** FEs may freely fix the hub (duplicates, misplaced items, old → new versions); anything that changes the app's look waits for the owner's review in the hub.
+- **"Commit only" (owner 2026-10-12):** when asked, DevOps commits without push / deploy / APK / tags; the real release comes separately.
 - **Pending drafts (2026-10-11):** layout close to quick create; splits AND event in a collapsible section (tap to open / close); event = `draft.project_id`. A draft may hold incomplete splits; confirm needs them balanced.
 - **Events:** a separate book; personal entries via resolve (my share). Pulling a tx into an event MOVES its splits to the board; removing moves them back; a tx can be attached / moved / removed later. Wallet-less bills are OK.
 - Categories: sub-categories show their own icon; new categories append to the end; max 3 levels.
@@ -62,6 +86,21 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
   - a half-day freeze for the bulk move
   - the hub is reachable in prod via the secret tap
   - PickerTile and WalletSummaryTitle are deleted
+- **Dev hub = the developer portal (owner 2026-10-12):** `/#/dev` holds UI (the App hub), API (OpenAPI-driven: schemas, endpoints, which pages use them), Labs and Debug.
+  - Workflow for ANY page / feature task: read the hub first (the UI pieces + the API docs for that page), propose UI and API optimisations (spec first), review, then code.
+  - The BE sends page-ready data; the FE never loads whole lists just to look things up.
+- **Person display name (owner 2026-10-12, resolved by the BE):**
+  - contacts get `nickname` back (migration 053) + a per-contact setting `show_nickname`, so the owner can save "แม่" and switch to the profile name without deleting it
+  - contact with a nickname and show_nickname on → the nickname
+  - linked contact without a nickname → the linked user's profile name (live)
+  - unlinked contact → contact.display_name
+  - no contact → the stored snapshot
+  - the same rule everywhere, including the contacts page
+- **Debts people list:** people whose debts are all settled are hidden by default and shown under the "ทั้งหมด" filter. The API dev page in prod is view-only (no "try it").
+- **Thin FE (owner 2026-10-12):** the FE only displays, as far as possible.
+  - one button = one call; one page open = one call (a page-ready endpoint)
+  - business logic, aggregates, totals, statuses and wording-driving flags live in the BE: it's easier and faster there
+  - only instant feedback while typing stays client-side (e.g. the split remainder); the BE recomputes and validates on save and returns the final state, so the FE never re-fetches after a write
 - **Terms (owner 2026-10-12):** "หัวข้อ section" = the big green section heading; "หัวข้อ" = a row's field label. A section's description sits right under its heading (attached).
 - **Detail-page standard (2026-10-11; gallery approved, pages migrating; tx detail / create are exempt, debt detail is rebuilt in the debts round):**
   - hero: ✏️ top row right (a top row with no chips collapses: the title moves up, ✏️ sits level with it); status = chips in the top row; one hero style (the tx one) for every entity incl. contact + category, border in the entity colour, everything else in rows below

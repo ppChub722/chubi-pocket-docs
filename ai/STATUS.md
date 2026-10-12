@@ -1,9 +1,9 @@
 # STATUS — read this first (rewritten, not appended)
 
-_Last updated: 2026-10-12 by Lead._
+_Last updated: 2026-10-12 night by Lead._
 
 ## Live (prod)
-- **0.3.1-7**: app `b4d9d52` (build 48, Firebase 2048) · be `c62ac06` · docs `9708071` · migration **052** · `LATEST_APP_BUILD=48` · `MIN_APP_BUILD=0`.
+- **0.3.1-8** (2026-10-12): app `f6f89f1` (build 49, Firebase 2049) · be `98344c6` · docs `b0d4d0f` · migration **052** · `LATEST_APP_BUILD=49` · `MIN_APP_BUILD=0` · tags v0.3.1-8.
 - Details per release: `ai/releases/<version>.md`.
 
 ## How the team works
@@ -12,28 +12,28 @@ _Last updated: 2026-10-12 by Lead._
 - Rules and owner decisions: `ai/decisions.md`. Discussed but not started: `ai/backlog.md`.
 - Releases: DevOps runs `chubi-pocket-be/scripts/release.sh <version> <brief-dir>` (brief template: `ai/templates/release-brief/`). Before QA runs: `scripts/local-deploy.sh`.
 
-## In progress
-- **0.3.1-8: code DONE, uncommitted, nobody editing:**
-  - the UI round: 15 items of the owner's 18-item note
-  - pending add page + "แก้ร่าง" sheet (items 11/13) + BE `draft.project_id` (event on drafts, submit-time split checks)
-  - the detail standard on 7 detail pages (tx + debt excluded) + a collapsing empty hero top row
-  - AppChip system-wide (3 sizes; old chips deleted)
-  - DevOps tooling (release.sh, local-deploy.sh --web, serve-web.js, release-apk.sh)
-  - QA scripts `ai/qa/`
-  - docs `ai/`
-- Item 10 (category icon/colour) was already done. Item 9 is done via the detail standard.
+## In progress (night of 2026-10-12 → 13; owner asleep, Lead relays)
+- **0.3.1-9 = App hub + dev portal + API v2 (forced update):**
+  - BE (`-bc`) implements spec v2 (93 ops; A/B/D/E/F/G + nickname migration 053 + the contact-name rule); currency unchanged
+  - FE-C (`-1a`) adopts API v2 on tx + home (+ minimal debts adaptation)
+  - FE-D (`-02`) on pending / notifications / settings / More / me (+ minimal events adaptation)
+  - FE-E (`-61`) on wallets / categories / tags / contacts + the nickname setting (+ minimal budgets / scheduled / goals adaptation)
+  - FE-A (`-81`) + FE-B (`-a0`): hub-only proposals (AppInput rule, SelectCard gradient, AppMessage, grouped sections), a hub self-audit, the HubPlayground; NOT used in the app until the owner reviews
+  - When everyone's DONE: DevOps (`-e3`) COMMITS ONLY (wip subjects; no push / deploy / APK / tags), then plans how the real release deploys pre-made commits
+- release.sh `sudo grep` fix: waiting for the owner's approval in the DevOps session.
 
-## Waiting on the owner
-- 0.3.1-8: a QA check of the changes first, or GO.
-- QA's debts notes in the backlog: keep for the debts round, or drop.
+## Waiting on the owner (tomorrow)
+- Review in the hub: AppInput, SelectCard gradient, AppMessage, grouped sections + row icons, the rest of the hub (after the self-audit). Then say which to adopt app-wide.
+- 0.3.1-10 questions: events (8), budgets / scheduled / goals (5); debts is answered (`ai/inbox/fe-debts.md` rev 2).
+- Single currency: parked; the DB/spec stay as-is.
+- Local builds only when the owner asks.
 
 ## Next releases
-- 0.3.1-8 = the round above.
-- Next: the App hub (design system) plan, phases 0–4 in `ai/backlog.md` (includes the open detail-standard leftovers).
-- Later: debts rework, the remaining pages (events, budgets, scheduled, saving goals), the "อัปเดตตาม" URL bug.
+- 0.3.1-9: the above, released with `MIN_APP_BUILD` = the new build.
+- 0.3.1-10: debts + events + budgets + scheduled + goals in parallel (1 FE per page group, FE-A/FE-B as supporters).
 
 ## Team (session names change; check ListAgents)
-- Open now: Lead `chubi-pocket-99` · FE-A `chubi-pocket-81` · FE-B `chubi-pocket-a0` (kit owner) · BE `chubi-pocket-bc` · QA `chubi-pocket-59` (qa-lead) · DevOps `chubi-pocket-e3`. Open sessions with `/chubi-<role>` (QA: `/chubi-qa QA-fix` or `/chubi-qa qa-lead`).
+- Open now: Lead `chubi-pocket-99` · FE-A `-81` (kit owner) · FE-B `-a0` · FE-C `-1a` (debts) · FE-D `-02` (events) · FE-E `-61` (budgets / scheduled / goals) · BE `-bc` · QA `-59` (qa-lead) · DevOps `-e3`.
 - Local env: docker BE `localhost:8080` + DB `:5433`; QA users qaa4858675 (+ linked qab/qac/qae), qlead657724, password qapass1234.
 
 ## Old log

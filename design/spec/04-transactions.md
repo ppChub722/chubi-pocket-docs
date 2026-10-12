@@ -322,9 +322,9 @@ Body = the **whole new list**: `{"splits": [{"debt_id": uuid, "owed_amount": n, 
 - no `debt_id` → adds a person;
 - a split left out → removed; `[]` removes all.
 
-**Changing a saved split's person (2026-10-10, narrowed 2026-10-11):** `person_name` / `contact_id` on a kept item — left out or equal to the current values = no change; `"contact_id": null` (the key present) drops the contact, back to a free name.
+**Changing a saved split's person (2026-10-10; lock lifted 2026-10-12):** `person_name` / `contact_id` on a kept item — left out or equal to the current values = no change; `"contact_id": null` (the key present) drops the contact, back to a free name.
 - The split is a **free name, or its contact has no app account** (`linked_user_id` null) → the person changes in place: rename, switch to another of my contacts, link to a contact, or drop back to a free name. Same debt row, repayments kept, nobody notified. A new contact's `display_name` is the default name. If the new contact **has** an app account, they get `split_created` for the split's current amount, exactly as for a new split.
-- The split's contact **is linked to an app user** (they may hold a mirror) → any change is `422 SPLIT_IDENTITY_LOCKED`; remove it and add a new one instead.
+- The split's contact **is linked to an app user** (they may hold a mirror), and the contact changes (another contact, or `"contact_id": null`) → **remove + add in one transaction**, same amount (the amount sent on the item): the old split is removed exactly as if it were left out of the list — the old partner hears `split_changed` removed ("อัปเดตตาม"), or their pending `split_created` is superseded; unpaid → the row is deleted, repaid → it stays at 0 (overpaid); the new person is a **new debt row** (new `debt_id`, nothing repaid, appended after the others) and, if linked to an app user, gets `split_created`. Never touches anyone's book. A **rename that keeps the same linked contact** is in place and silent (same row). There is no identity lock any more. **A split that has a contact always shows the contact's resolved name (API v2, 2026-10-12): a sent `person_name` on it is ignored (same contact → ignored; a changed contact → that contact's name); only a free-name split renames in place.**
 
 Rules:
 - Author only, expense / income only.
@@ -336,7 +336,6 @@ Rules:
   - `400 VALIDATION_ERROR` (unknown or duplicate `debt_id`, a new person without a name)
   - `400 CONTACT_NOT_FOUND`
   - `409 CONTACT_ARCHIVED`
-  - `422 SPLIT_IDENTITY_LOCKED` (changing the person of a split whose contact is linked to an app user)
   - `400 SPLITS_EXCEED_SHARE` (an event bill: Σ > amount − the board's member splits, spec 10 §4.25)
   - `400 SYSTEM_TRANSACTION_IMMUTABLE` (a debt repayment or another system row)
 

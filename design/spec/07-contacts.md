@@ -503,3 +503,9 @@ When the user taps "New contact," client calls this endpoint first to populate t
 - **Changelog**
   - **0.2 (2026-04-30)** — Aligned with `06-shared-expenses.md` v0.3: `person_name` is always set on splits; `contact_id` is an optional decoration that coexists with the snapshot rather than replacing it. Updated §2 lifecycle, §3.1 absorb SQL, §3.10 unlink, §4.2 design rationale.
   - **0.1** — Initial draft (Pattern B for `person_name`, separate unlink/archive/delete, invite-only linking, block duplicate links).
+
+---
+
+## Nickname and the display name (2026-10-12, API v2)
+
+`contacts.nickname` (VARCHAR(100), nullable) and `contacts.show_nickname` (BOOLEAN, default TRUE) — migration 053; the nickname is back (migration 29 had merged it into `display_name`). The name shown for a contact everywhere (contacts list, splits, debts, pending drafts) follows ONE rule, `shared.PersonNameSQL`: the nickname when set and `show_nickname` → else the linked user's live profile name → else `display_name` → the stored snapshot `person_name` only when a row has no contact. `show_nickname` lets the user show the profile name sometimes without deleting the nickname. Contact `email` / `icon_code` resolve the same way (linked user first). Details: `design/api/api-v2-notes.md`.

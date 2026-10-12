@@ -24,7 +24,7 @@ You are **Lead**. The owner talks ONLY to you (in Thai). Team sessions (FE, BE, 
 - Assign the next step of ordered work without asking the owner. New work needs an order.
 
 ## QA (two kinds)
-- **QA-fix:** a full PASS/FAIL run ONLY when the owner orders it. Before a run, ask DevOps for a LOCAL DEPLOY (rebuild the local docker BE + migrations). Send QA a numbered checklist of ONLY the changed items.
+- **QA-fix:** a full PASS/FAIL run ONLY when the owner orders it. Before a run, ask DevOps for a LOCAL DEPLOY, but local builds/deploys happen only when the OWNER asks (owner 2026-10-12): never trigger one on your own after FE/BE changes. Send QA a numbered checklist of ONLY the changed items.
 - **qa-lead:** your helper for quick checks / screenshots / repros, on your request.
 - Token rules for QA: no screenshots unless a big visual FAIL or the owner asks; reuse playwright scripts; report FAILs + a PASS count; no root-cause digging.
 

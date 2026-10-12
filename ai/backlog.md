@@ -2,7 +2,26 @@
 
 Lead keeps this list current. Delete an item once it's briefed, or move it into STATUS "In progress".
 
-## Next: App hub (design system), BOTH FEs, before any feature work (owner 2026-10-12: "design first, then features")
+## 0.3.1-9 (in progress): App hub + API hub + API rework (forced update)
+- The App hub (Phases 1–4) is DONE and uncommitted.
+- API hub:
+  - BE writes the OpenAPI spec (A, B, D, E, F, G from ai/inbox/be.md; breaking OK) + `/api/v1/openapi.json`
+  - FE-A adds the API + Labs sections to /#/dev
+  - **the owner reviews the spec before any code**
+- Then the BE implements A/B/D/E/F/G and the FEs adopt them (thin FE); pages not reached yet only get minimal shape adaptation.
+- FE-only fixes (FE-B): wallet by id, patchBalance, badge double start, drill-down filter, lazy contacts, event picker cache.
+
+## Note for the scheduled / recurrence round (owner 2026-10-12)
+- Places using DayOfMonthGrid (scheduled tx, wallet statement/due day…) may need CUSTOM recurrence: every N weeks, several days a month (e.g. the 3rd and 27th), etc.
+- Consider borrowing the Google Calendar recurrence model (iCal RRULE: FREQ / INTERVAL / BYDAY / BYMONTHDAY) and its "custom repeat" UI.
+
+## 0.3.1-10: debts rework (after the API cleanup, owner 2026-10-12)
+- API item C (`/personal-debts/people` + `/people/:key`, paged, live names) built together with the new debt model.
+- Bugs held for that round:
+  - "อัปเดตตาม" URL (`personal_debts_repository.dart:99`)
+  - scheduled detail "not found" (the scheduled round)
+
+## (done) App hub (design system), BOTH FEs, before any feature work (owner 2026-10-12: "design first, then features")
 - Phase 0 map is DONE: `ai/inbox/fe-a.md` "App hub, Phase 0: THE MAP" (106 rows, missing atoms AppInput / AppCard / AppText…, 30 hub pages, FE-A/FE-B split, ~12–14 days). It has 8 owner questions, open.
 - Phase 1 (the bulk move, a half-day freeze) starts after the 0.3.1-8 APK is out.
 - **Architecture:**

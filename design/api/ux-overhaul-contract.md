@@ -1,5 +1,7 @@
 # API contract — Phase 2 UX overhaul additions
 
+> **Superseded (2026-10-12):** for every page reached so far the response shapes below were replaced by API v2 — see [`api-v2-notes.md`](api-v2-notes.md) and `chubi-pocket-be/internal/apidoc/openapi.yaml`.
+
 Status: **§0–§11 implemented** (2026-10-08). §12 (Google sign-in) is still planned only.
 The app is pre-release (single user), so the FE is written against this contract **before** the BE lands;
 until then the affected UI hides itself or shows a placeholder.
