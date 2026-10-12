@@ -122,3 +122,16 @@ export async function waitGone(page, match, timeout = 8000) {
   }
   return false;
 }
+
+/** Full-page shot of the current screen: grow the viewport so the whole scroll content fits, crop to the content
+ *  (above the bottom nav), shoot, restore. */
+export async function fullPageShot(page, path, height = 2400) {
+  const vp = page.viewportSize();
+  await page.setViewportSize({ width: vp.width, height });
+  await page.waitForTimeout(1000);
+  const ns = await nodes(page);
+  const bottom = Math.max(...ns.filter((n) => n.y + n.h < height - 120 && n.h < height - 200).map((n) => n.y + n.h), 0);
+  await page.screenshot({ path, clip: { x: 0, y: 0, width: vp.width, height: Math.min(height, bottom + 24) } });
+  await page.setViewportSize(vp);
+  await page.waitForTimeout(500);
+}

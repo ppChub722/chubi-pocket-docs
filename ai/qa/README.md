@@ -42,6 +42,8 @@ A flow prints `PASS id` / `FAIL id · repro/expected-vs-actual` / `NOTE id · od
 | Contacts: list → contact detail | `pages/contacts.mjs` | `openContacts`, `openContactDetail(page, /^QR/)`; also `createContact`, `contactNames` (used by debt flows) |
 | Transactions: list → transaction detail | `pages/transactions.mjs` | `openTransactions`, `openTransactionDetail(page, match?)` (default first row), `readTransaction` |
 | Wallets (กระเป๋า): list → wallet detail | `pages/accounts.mjs` | `openAccounts`, `openAccountDetail(page, match?)` |
+| Saving goals: list → goal detail | `pages/saving-goals.mjs` | `openGoals`, `openGoalDetail(page, match?)`, `readGoal` |
+| Full-page shot of any screen | `lib/screen.mjs` `fullPageShot(page, path)` | grows the viewport to 412x2400, crops to the content, shoots, restores |
 | Categories: list → category detail | `pages/categories.mjs` | `openCategories(page, 'expense'|'income')`, `openCategoryDetail(page, /^Groceries/)`, `readCategory` |
 | Dev widget gallery (no login) | `pages/dev-widgets.mjs` | `openGalleryTab(page, 'AppChip')`, `listTabs`, `selectTab`, `scrollBody` - any gallery tab is one call |
 | Debts list (hero, cards = direction filter, status, search, row→person, More tile) | `flows/debt-list.mjs` | creates + deletes its own big fixtures |

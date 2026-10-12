@@ -10,10 +10,13 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - Devs may talk to each other directly (owner 2026-10-11): shared files, kit/API needs, blockers, handoffs. DONE pings and owner-level questions still go to Lead.
 - Only the owner runs the app (`./run-web.sh`), except QA, which may run it locally (never prod).
 - QA runs only on the owner's order; checklists list the changed items only; no screenshots by default; FAILs + a PASS count.
-- Local builds (`local-deploy.sh` / `--web`) happen ONLY when the owner asks (owner 2026-10-12). Lead doesn't trigger rebuilds on its own after FE/BE changes.
+- Local builds happen ONLY when the owner orders one (owner 2026-10-13, final). Lead just reports "done"; the owner builds and checks, and anything wrong gets fixed. No QA verification unless the owner orders it (QA is token-heavy).
 - QA may create any data it needs in the LOCAL DB without asking (owner 2026-10-11). Never prod.
 - QA runs NO servers: DevOps brings up the local BE + web (:5181). QA scripts persist in `ai/qa/` and get reused (explore only new pages); screenshots go to `ai/qa/shots/<date>/` (gitignored). (owner 2026-10-11)
-- DevOps runs the pre-release checks (analyze/test, vet/test) and one final report.
+- **Tag-based releases (owner 2026-10-13):**
+  - "สั่ง release" = Lead commits (several commits OK), bumps the version, tags `v<version>` in be / app / docs and pushes
+  - DevOps deploys FROM THE TAG in a separate worktree: checks there, then BE + migrations, APK, env, verify; one final report. DevOps never commits / tags / pushes
+  - any tag can be redeployed or rolled back; the team keeps working during a release
 - Versioning `0.3.1-N`; build = app commit count. **From 0.3.1-9 every release forces the update (`MIN_APP_BUILD` = the new build, owner 2026-10-12)**, so old app builds never constrain the API: breaking changes are fine.
 - Data is disposable (DB wipe OK); migration squash is planned.
 
@@ -36,7 +39,9 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - **"แบ่งรายการ" section (Split Transaction, owner 2026-10-12):**
   - one section in quick create, pending and tx detail; inside, the rows "แบ่งยอด" (people; หารเท่ากัน only once someone is added) and "อีเวนต์", same row-label style, no separators
   - collapse: pending = collapsible, default closed; quick create = collapsible, default open; tx detail (view + edit) = always open
-  - quick create keeps the category / wallet cards (it mirrors tx detail); pending keeps chip rows
+  - **tx entry layout (owner 2026-10-13):**
+    - tx DETAIL (view + edit): the hero contains the big wallet + category pick cards; the tag row sits outside; no wallet/category chip rows
+    - QUICK CREATE + PENDING (add page, แก้ร่าง): ONE shared EntryCard with type + date, description + amount, a wallet chip row and a category chip row INSIDE the card; tags outside, below
 - **Avatars:** the frame thickness and inner padding scale with size; small avatars get a relatively larger icon.
 - **Debts model answers (owner 2026-10-12, for the 0.3.1-10 plan; build after the 0.3.1-9 API work):**
   - no "ยกเลิกหนี้"; stopping counting = delete (with a confirm dialog)
@@ -50,8 +55,12 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
   - USER-level currency on /me, set once and LOCKED (default THB), shown only on the profile
   - wallets have no currency picker; the server sets each wallet to the user's currency
   - DB currency columns stay; multi-currency probably never
+- **All-hands hub adoption (owner 2026-10-13):**
+  - finish the hub, then move EVERY page (unreached ones too) onto hub templates + kit pieces only; UI standards only, the feature / model redesigns come later
+  - the hub proposals become the real kit: AppInput (option a), AppMessage, PickCard fixed height, the editable-text indent rule (read-only text flush with the title; editable text indented by the frame padding so the frame appears without moving, its edge on the title)
+  - once adopted, the hub shows only what the app uses (no "today / current")
 - **Hub proposals vs app (owner 2026-10-12):** FEs may freely fix the hub (duplicates, misplaced items, old → new versions); anything that changes the app's look waits for the owner's review in the hub.
-- **"Commit only" (owner 2026-10-12):** when asked, DevOps commits without push / deploy / APK / tags; the real release comes separately.
+- (superseded 2026-10-13 by tag-based releases) "commit only" nights: Lead now commits itself.
 - **Pending drafts (2026-10-11):** layout close to quick create; splits AND event in a collapsible section (tap to open / close); event = `draft.project_id`. A draft may hold incomplete splits; confirm needs them balanced.
 - **Events:** a separate book; personal entries via resolve (my share). Pulling a tx into an event MOVES its splits to the board; removing moves them back; a tx can be attached / moved / removed later. Wallet-less bills are OK.
 - Categories: sub-categories show their own icon; new categories append to the end; max 3 levels.
@@ -61,7 +70,10 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 
 ## UI
 - Picker selection = highlight, never ✓ (SelectCardGroup too). One picker shell with an optional compact search.
-- **Chips:** AppChip with 3 sizes, mini 20 / chip 28 / control 32 (approved 2026-10-11). Mini = tags + the wallet in tx / pending list rows, the pending source chip. Every chip moves to AppChip, no wrappers, old chip widgets deleted (2026-10-11).
+- **Chips:** AppChip with 3 sizes, mini 20 / chip 28 / control **40** (control was 32; changed 2026-10-13: ONE control height of 40 for tappable chips, icon buttons, the search capsule, top-bar pills and dense inputs).
+- **Tint colour (owner 2026-10-13):**
+  - heroes / tinted cards take the entity's ICON main colour (first bg slot, else glyph; gradient = first stop); border and glyph are contrast-clamped, text always onSurface; no custom icon → the semantic fallback
+  - exceptions: the tx hero = type colour; budget over / near limit = danger / warning; Home / More tiles = fixed module colours Mini = tags + the wallet in tx / pending list rows, the pending source chip. Every chip moves to AppChip, no wrappers, old chip widgets deleted (2026-10-11).
   - mini 20 = dense list rows only, display
   - chip 28 = display chips in cards / sections / member rows
   - control 32 = anything tappable + every chip in a hero top row
@@ -70,8 +82,8 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
   - no raised / shadow chips
   - quiet labels are outlined (owner re-checks on real screens)
 - **Hero spacing:** 16 / 12 / 8, top-row controls 32. Detail pages use sections. The note is always shown ("แตะค้างเพื่อแก้ไข"). Long-press enters edit.
-- **Titles never change** (on scroll or in edit mode). A compact hero bar appears once the hero scrolls away (detail pages only).
-- ✏️ on a list = enter edit/reorder mode. ⠿ = the drag handle. Archive (amber) + delete (red) buttons in edit mode only.
+- **Titles never change** (on scroll or in edit mode). A compact hero bar appears once the hero scrolls away (detail pages only). It is a small version of the hero card (same surface, tint, border, icon tile, text styles), on every page (owner 2026-10-13).
+- ✏️ on a list = enter edit/reorder mode, placed at the RIGHT end of the list toolbar after the filter / sort chips, like the tags page (owner 2026-10-13). ⠿ = the drag handle. Archive (amber) + delete (red) buttons in edit mode only.
 - **Design system (owner 2026-10-12):**
   - Atomic Design terms, English only in the hub / dev: Tokens · Atoms · Molecules · Organisms · Templates (+ Domain, Debug)
   - the app hub is the single source of truth: every UI change goes to the hub first, the owner reviews, then pages
@@ -103,7 +115,28 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
   - only instant feedback while typing stays client-side (e.g. the split remainder); the BE recomputes and validates on save and returns the final state, so the FE never re-fetches after a write
 - **Terms (owner 2026-10-12):** "หัวข้อ section" = the big green section heading; "หัวข้อ" = a row's field label. A section's description sits right under its heading (attached).
 - **Detail-page standard (2026-10-11; gallery approved, pages migrating; tx detail / create are exempt, debt detail is rebuilt in the debts round):**
-  - hero: ✏️ top row right (a top row with no chips collapses: the title moves up, ✏️ sits level with it); status = chips in the top row; one hero style (the tx one) for every entity incl. contact + category, border in the entity colour, everything else in rows below
+  - hero: ✏️ top row right (a top row with no chips collapses: the title moves up, ✏️ sits level with it). Exception (owner 2026-10-13): on the contact hero the "Linked" chip sits in the subtitle line under the name, replacing the "Contact" subtitle; status = chips in the top row; one hero style (the tx one) for every entity incl. contact + category, border in the entity colour, everything else in rows below
+  - page order (owner 2026-10-13): hero → TAG row (right under the card, every page with tags) → content WITHOUT a heading (basic rows, description, note) → headed sections → archive / delete buttons (edit mode only; plain buttons, NOT a section: no heading, no box) → meta
+  - the CONTACT detail page is the reference (owner 2026-10-13):
+    - all content without a heading is gathered into ONE grouped box at the top (basic rows + description + note, hairlines between rows)
+    - only TAGS stay a plain chip strip under the hero
+    - headed sections are boxed, heading outside
+    - icons per group: all rows or none; no lone single-row boxes
+    - DESCRIPTION lives in the HERO under the name (muted, max 2 lines; hidden when empty in view; edited in place in edit). The top box holds the basic rows + note; the note may sit alone there (owner 2026-10-13)
+    - an avatar / icon without a custom IconCode tints with its generated (initials) colour
+    - in-card editing shows field-name LABELS (ชื่อ / คำอธิบาย / จำนวนเงิน) in create / edit only: left of the underline in entity heroes, above it on the tx hero / EntryCard; placeholders stay friendly ("ค่าอะไร?")
+- **Wallet (owner 2026-10-13):**
+  - create: the opening balance is typed into the hero balance, no ±; liabilities enter what's owed as a positive number
+  - edit: the balance is read-only (Adjust balance only)
+  - an ActionBar under the hero: ปรับยอด / + รายการ / ⇄ โอน (quick create preset to this wallet / transfer from it)
+  - the adjust-balance sheet uses the quick-create look
+  - the credit section is uniform label-left / value-right rows
+- **Pull-to-refresh on every page and every tab** (owner 2026-10-13): pulling down = re-opening the page (re-runs its load). It's the default in every template.
+- **Few options → popover:** ≤ ~5 short options with no search / description use ONE centralized popover / menu organism (filters, sort, row options, ⋯ menus); everything else is a sheet.
+- **Entity values in rows show as the entity's chip** (icon + colour); a nested category shows its path as chip › chip.
+- **Sheets are organisms:** every sheet is a kit organism (generic or domain) and appears on one hub "Sheets" page.
+- **Every visual widget lives in the kit, even if used once** (owner 2026-10-13). Pages only pick kit pieces and set parameters; feature code is state / API / navigation wiring only (no styling, colours, paddings or custom layout). A feature wrapper that just feeds a kit organism is fine.
+    - note: stacked, indented value, no input frame in view, frame only in edit. This is on DETAIL pages; the quick forms (quick create, pending) keep the compact label-left note row
   - kit chips only
   - archive amber + delete red (edit mode)
   - DetailMeta at the bottom of every page
@@ -112,9 +145,10 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
   - locked = 🔒 icon
 - New or one-off detail patterns go into the gallery "รายละเอียด" (Detail patterns) tab first. Every shared widget goes into ui.dart + `/dev/widgets`.
 - Quick create: the title "รายการใหม่" swaps to the amount · category summary once the amount scrolls away (owner 2026-10-11, restores the old behaviour; the one exception to "titles never change"); no navigation after save; the centre + presets the current wallet (debt mode is planned).
+- List rows are separated by a thin hairline divider, not boxed per day (owner 2026-10-13).
 - Tx and pending lists share one row: line 1 = icon + title + wallet mini chip, amount right; line 2 = [source] · category · tags. Pending groups by day like the tx list.
 - Bulk delete in select toolbars = a red trash icon only, right-aligned (no "ลบ" text buttons).
-- Saving: a dim overlay + spinner while a save / delete / reorder call runs. Skeletons only on the first page load.
+- Saving: a dim overlay + spinner while a save / delete / reorder call runs. Skeletons only on the first page load. Skeletons mirror the real layout: each template renders its own skeleton from the same slots / heights, built from kit `.skeleton` variants, and the template (not the page) enforces "first load only" (owner 2026-10-13).
 - Errors: a load failure with no data → full-page error + retry; a failed save / action → stay on the page with a snackbar or banner + retry (never lose edits).
 - Top-right shell icons highlight the current page, like the bottom bar tabs.
 - Wallet identifiers: plain digits, no formatting; the section says it exists only to match slips.

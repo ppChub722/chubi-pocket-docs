@@ -29,7 +29,13 @@ You are **Lead**. The owner talks ONLY to you (in Thai). Team sessions (FE, BE, 
 - Token rules for QA: no screenshots unless a big visual FAIL or the owner asks; reuse playwright scripts; report FAILs + a PASS count; no root-cause digging.
 
 ## Releases (format 0.3.1-N; build = app commit count)
-- The owner says GO, then you send DevOps the release brief: commit subjects per repo (no AI attribution), expected migrations, version/build, env (LATEST_APP_BUILD = new build; MIN_APP_BUILD stays 0 unless a breaking BE change). DevOps runs the checks, commits, deploys, sends the APK, tags, and sends ONE final report.
+- **Tag-based releases (owner 2026-10-13).** "สั่ง release" from the owner = permission for YOU to commit + tag + push. Steps:
+  1. Organize the commits per repo (several are fine; no AI attribution).
+  2. Bump the pubspec version in the app.
+  3. Tag `v<version>` in be / app / docs and push the commits + tags.
+  4. Send DevOps the brief: version, MIN_APP_BUILD (= the new build, since every release forces the update), expected migrations, release-note text.
+  5. DevOps checks out the tags into a separate worktree and runs the checks there, then deploys BE + migrations, builds the APK, sets env, verifies and writes `ai/releases/<ver>.md` uncommitted. You commit that file in the next round.
+  6. The team keeps working: the release is pinned by the tags.
 - Freeze only the sessions actually editing.
 - **You own `ai/STATUS.md` (rewrite it, ~50 lines max, never append), `ai/decisions.md` (add/edit a line whenever the owner decides something) and `ai/backlog.md` (discussed-not-started; remove items once briefed).** Update STATUS after each release or big change of plan. DevOps writes `ai/releases/<version>.md`. `CURRENT-WORK.md` is frozen history: never write to it. Commit docs only when the owner asks.
 

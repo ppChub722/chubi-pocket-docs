@@ -1,72 +1,73 @@
 # Release brief (Lead → DevOps)
 
-A release brief is a folder of 5 files. DevOps runs
-`chubi-pocket-be/scripts/release.sh <folder>`, which reads them as they are,
-so they need no back-and-forth.
+**Lead** commits, bumps the app `pubspec.yaml` version, tags `v<version>` in
+be / app / docs and pushes commits and tags. **DevOps** only deploys what the
+tags contain: it never commits, tags or pushes.
+
+A brief is a folder of 2 files. DevOps runs
+`chubi-pocket-be/scripts/release.sh <folder>`.
 
 **Copy this folder OUTSIDE the repos** (for example to your scratchpad) and
 fill it in. The script writes `.state`, `logs/` and `summary.txt` into the
-folder. It refuses a folder inside chubi-pocket-be, -app or -docs, because
-`git add -A` would commit them.
+folder, and refuses a folder inside chubi-pocket-be, -app or -docs.
 
 | File | What |
 |---|---|
-| `brief.env` | the facts: version, expected migrations, MIN build, path counts, QA |
-| `be.msg` | BE commit message: subject line, blank line, body. Leave it out when `BE_PATHS=0`. |
-| `app.msg` | app commit message, same format. Leave it out when `APP_PATHS=0`. |
-| `docs.msg` | docs commit message, same format |
+| `brief.env` | the facts: version, expected migrations, MIN build, QA flag |
 | `entry.md` | your part of the release entry (`ai/releases/<version>.md`): release note + what the owner should test |
 
 ## brief.env
 
 ```
-VERSION=0.3.1-8          # tag v0.3.1-8; pubspec becomes 0.3.1-8+8
+VERSION=0.3.1-9          # the tag is v0.3.1-9; app pubspec must say 0.3.1-9+…
 EXPECT_MIGRATIONS=none   # or the new migration numbers, e.g. "53 54"
 MIN_APP_BUILD=unchanged  # or a number: forced update, set after the APK is out
-BE_PATHS=13              # changed paths per repo, counted with
-APP_PATHS=112            #   git status --porcelain --untracked-files=all | wc -l
-DOCS_PATHS=5             # "any" skips the check; 0 = no changes in that repo
 QA=n                     # y = a QA pass ran on this tree
+SKIP_BE=n                # optional: y = app-only release (no BE deploy)
+SKIP_APP=n               # optional: y = BE-only release (no APK, LATEST unchanged)
 ```
 
-- **Path counts** guard against an unfrozen or wrong tree: a mismatch stops the release.
-- `BE_PATHS=0` gives an app-only release: no BE commit, deploy or tag. The script checks that prod already runs BE HEAD.
-- `APP_PATHS=0` gives a BE-only release: no app commit, APK or LATEST change, and no app tag.
+## Before you ask DevOps to release
 
-## Commit messages
-
-- Subject: `feat: … (0.3.1-8)`. The subject must be unique, because the script finds an existing release commit by its exact subject when it resumes.
-- No AI attribution or Co-Authored-By lines.
-- English only. Wrap the body at about 72 columns.
-
-## entry.md
-
-Free text in English, added under the facts the script writes itself:
-hashes, checks, backup, build, env, verify and tags. For example:
-
-```
-- **Release note:** dashboard numbers now use the share basis (intended).
-- **Owner to test:** update banner on build 47 → install 48; …
-```
+1. Everything is committed and pushed, and the app `pubspec.yaml` has
+   `version: <VERSION>+<n>`.
+2. Annotated tags exist and are pushed in all three repos:
+   `git tag -a v<VERSION> -m <VERSION> && git push origin v<VERSION>`.
+   The app build number is the commit count at the tag, so the tag must be on
+   the last app commit of the release.
+3. The local DB (:5433) is at the be tag's newest migration. The BE checks run
+   against it and need 0 skipped tests (ask DevOps for a local deploy first
+   when the release has a new migration).
 
 ## What release.sh does
 
-1. preflight: on main, not behind origin, path counts, new migrations vs the brief, prod reachable and healthy
-2. checks:
-   - BE `go vet` + `go test -count=1 -v`, which needs the :5433 DB at the tree's newest migration and 0 skipped tests
-   - app `flutter analyze` + `flutter test`
-   - both run in parallel; any failure stops the release
-3. pubspec bump, one commit per repo, push
-4. `deploy.sh --skip-apk`, then `release-apk.sh`
-5. prod `.env`: `.env.bak-<version>`, LATEST (and MIN), recreate the app
-6. verify:
-   - `/health`
-   - `app/version`
-   - unauthenticated route → 401
-   - app log errors 0
-   - prod label = BE release
-7. offsite copy: `NO_RESTORE=1 pull-to-dev.sh --no-dump`
-8. release entry `ai/releases/<version>.md`, docs commit, push; annotated tags `v<version>` on the released repos
-9. summary in `summary.txt`
+1. preflight: resolves the tags (must exist on origin), app pubspec matches,
+   new migrations in the be tag vs prod vs `EXPECT_MIGRATIONS`, prod
+   reachable and healthy
+2. checks out the be and app tags into clean worktrees (`C:\chubi-rel\<version>`)
+   so the team's main trees stay free
+3. checks, in the worktrees: BE `go vet` + `go test` (0 failed, 0 skipped),
+   app `flutter analyze` + `flutter test`; red stops the release
+4. BE: backup, migrate, swap, health (`deploy.sh --dir <be worktree>`)
+5. APK from the app tag (`release-apk.sh --dir <app worktree>`), sent to
+   `firsttester`
+6. prod `.env`: `.env.bak-<version>`, `LATEST_APP_BUILD` (never lowered),
+   `MIN_APP_BUILD`; the app is recreated
+7. verify: `/health`, `app/version`, an unauthenticated route → 401, app log
+   errors 0, prod image label = be tag
+8. offsite backup copy
+9. writes `ai/releases/<version>.md` into the MAIN docs tree, **uncommitted**
+   (Lead commits it), then removes the worktrees and writes `summary.txt`
 
-`--dry-run` runs the preflight and prints the plan, including the entry it would write, and changes nothing. A failed run can be re-run: steps already done are skipped.
+`--dry-run` resolves the tags and prints the plan, including the entry, and
+changes nothing. A failed run can be re-run: finished steps are skipped.
+
+## Redeploy / rollback
+
+Same command with an older `VERSION` (its tags already exist). Notes:
+- Migrations are **never rolled back**. If prod's migration is newer than the
+  tag's newest, the script refuses; restore from the pre-deploy dump instead.
+- `LATEST_APP_BUILD` is never lowered, and an APK whose build is not newer
+  than LATEST is not uploaded again.
+- `--skip-checks` skips the checks for a tag that already passed them.
+- `SKIP_APP=y` is the usual rollback: BE only.

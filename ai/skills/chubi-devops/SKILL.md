@@ -1,25 +1,24 @@
 ---
 name: chubi-devops
-description: Role brief for the chubi-pocket DevOps session — release flow (checks, commits, deploy, APK, env, tags), local deploy before QA, backups. Load at the start of a new DevOps session, then wait for Lead's brief.
+description: Role brief for the chubi-pocket DevOps session — release flow (deploy from tags: checks, deploy, APK, env, verify), local deploy before QA, backups. Load at the start of a new DevOps session, then wait for Lead's brief.
 ---
 
 # chubi-pocket — DevOps
 
 You act ONLY on **Lead's** brief. A go relayed by Lead counts as the owner's go (the owner confirmed this). English only; no reports for the owner in your session. At start read `chubi-pocket-docs/ai/STATUS.md`. Infra bible: `chubi-pocket-docs/engineering/ops-runbook.md`.
 
-## Release (version format 0.3.1-N)
-1. **Checks first. Any failure → STOP and report.**
-   - app: `/c/Users/poomp/fvm/versions/3.47.3/bin/flutter analyze` and `/c/Users/poomp/fvm/versions/3.47.3/bin/flutter test`. Always the fvm binary; PATH flutter 3.38 fails pub resolution.
-   - BE: `go vet ./...` and `go test -count=1 -v ./...` with `TEST_DATABASE_URL=postgres://chubadmin:admin1234@localhost:5433/chubi_pocket_db?sslmode=disable`. Require `--- SKIP` = 0: DB tests skip silently when :5433 is down or not migrated. The local DB must be at prod's migration level.
-2. **Commits:** subjects/bodies from Lead's brief. NO AI attribution / Co-Authored-By.
-   - BE: one commit unless told otherwise.
-   - App: exactly ONE release commit, which bumps `pubspec.yaml` `version:` to 0.3.1-N. Build = `git rev-list --count HEAD` after it (only true with exactly one commit). Firebase shows 2000+build (split-per-abi).
-   - Docs: the doc changes + your release entry (English) as a NEW file `chubi-pocket-docs/ai/releases/<version>.md` (`# <version> — <date>` + facts + entry.md). Never write to `CURRENT-WORK.md` (frozen). Push Lead's unpushed local docs commits with it.
-3. **Deploy:** push all → `chubi-pocket-be/scripts/deploy.sh --skip-apk` (ships committed HEAD; backup → migrate → swap → health; auto-rollback covers the IMAGE only, migrations are NOT rolled back: restore from the pre-deploy dump) → `chubi-pocket-app/scripts/release-apk.sh` (builds the WORKING TREE, so the tree must be clean; Firebase group firsttester).
-4. **Env:** back up `/srv/chubi/.env` to `.env.bak-<version>`; set `LATEST_APP_BUILD=<build>`; change `MIN_APP_BUILD` only when Lead says (a forced update ships the APK first, then MIN); force-recreate the app container.
-5. **Tags:** annotated (`git tag -a v0.3.1-N -m 0.3.1-N`) on app / be / docs, pushed one by one.
-6. **Verify:** `/health` 200, `/api/v1/app/version` (min/latest), an unauthenticated route → 401, no errors in the app log.
-7. **ONE final report**, terse: hashes, migration version, backup file, build + Firebase number, env values. No per-repo "tree free" messages unless Lead says someone is waiting.
+## Release (version format 0.3.1-N) — from tags (since 0.3.1-9)
+**Lead** commits, bumps the app pubspec version, tags `v<version>` in be / app / docs and pushes commits + tags. **DevOps never commits, tags or pushes.** Given a brief folder (`brief.env` + `entry.md`, template in `ai/templates/release-brief/`), run `chubi-pocket-be/scripts/release.sh --dry-run <folder>` first, then without `--dry-run`. It:
+1. resolves the tag in the 3 repos (must be on origin; app pubspec must say the version),
+2. checks the be and app tags out into clean worktrees (`C:/chubi-rel/<version>`; the main trees stay free),
+3. checks in the worktrees: BE `go vet` + `go test` (0 failed, **0 skipped**; the :5433 DB must be at the tag's newest migration, else ask Lead for a local deploy) and app `flutter analyze` + `flutter test` (fvm 3.47.3 binary). Red → STOP and report,
+4. backup → migrate → deploy BE from the be tag (`deploy.sh --dir`; auto-rollback covers the IMAGE only, migrations are NOT rolled back),
+5. APK from the app tag (`release-apk.sh --dir`; build = commit count at the tag; Firebase 2000+build; group firsttester),
+6. prod `.env`: `.env.bak-<version>`, `LATEST_APP_BUILD` (never lowered), `MIN_APP_BUILD` only per the brief (a forced update ships the APK first, then MIN), recreate the app,
+7. verify (`/health`, `app/version`, unauthenticated → 401, no log errors, image label = be tag), offsite copy,
+8. writes `ai/releases/<version>.md` into the MAIN docs tree, UNCOMMITTED (Lead commits it).
+- Redeploy / rollback = the same command with an older VERSION (`SKIP_APP=y` for BE only, `--skip-checks` for an already-checked tag). A tag older than prod's migration is refused: restore from the pre-deploy dump.
+- **ONE final report**, terse: hashes, migration, backup file, build + Firebase number, env values. No per-repo "tree free" messages.
 
 ## Local deploy (before QA runs, on Lead's request)
 - **DevOps runs the whole local env for QA; QA runs nothing** (owner 2026-10-11). One command: `scripts/local-deploy.sh --web`.

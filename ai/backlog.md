@@ -16,6 +16,7 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
 - Consider borrowing the Google Calendar recurrence model (iCal RRULE: FREQ / INTERVAL / BYDAY / BYMONTHDAY) and its "custom repeat" UI.
 
 ## 0.3.1-10: debts rework (after the API cleanup, owner 2026-10-12)
+- Debts UI gets finished ONCE in 0.3.1-10, together with the model rework (owner 2026-10-13). No more debts UI tweaks in 0.3.1-9: today's state is the hub-adopted minimal one; cancel sits in การจัดการ until the model removes it.
 - API item C (`/personal-debts/people` + `/people/:key`, paged, live names) built together with the new debt model.
 - Bugs held for that round:
   - "อัปเดตตาม" URL (`personal_debts_repository.dart:99`)
@@ -85,6 +86,7 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
   - type maxLength 50 vs BE 30
   - planned-on-create double call
   - the resolve tab is "coming soon"
+  - the resolve sheet's category chip has no icon / colour (the model it gets has no getter; FE-D 2026-10-13)
   - multi-select add from the event page
   - member picker → PickerSheet
   - "โปรเจกต์ → อีเวนต์" wording (~33 strings)
