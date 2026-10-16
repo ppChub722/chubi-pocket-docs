@@ -10,7 +10,11 @@ _Last updated: 2026-10-15 by Lead._
 
 ## Live (prod)
 - **0.3.1-10** (2026-10-13): be `f503d9c` · app `4d838f1` (build 58, Firebase 2058) · migration 060 · `LATEST_APP_BUILD=MIN_APP_BUILD=58` · tags v0.3.1-10. QA pass: no. Details: `ai/releases/0.3.1-10.md`.
-- Prod is still the old Happy-Host box (the owner ordered this last deploy there). The new server runbook: `engineering/new-vps-runbook.md`.
+- Prod is the old Happy-Host box and is probably down (2026-10-16). **No new VPS until 0.3.3** (owner 2026-10-16): until then everything is local only; releases are tags + local builds, no deploys. The new server runbook: `engineering/new-vps-runbook.md`.
+
+## In progress (2026-10-16)
+- UI library: the other AI works on its own branch (`ai/briefs/ppforge-ui-library.md`).
+- 0.3.1-11 briefs written: `ai/briefs/0.3.1-11-be.md` (currency, then 0.3.3 delete / archive BE) and `ai/briefs/0.3.1-11-fe.md` (currency + logic bugs, no `lib/ui/` edits). Waiting for the BE / fe-core sessions to start.
 
 ## Next: 0.3.1-11
 - **UI review round** (owner: "UI แปลกมาก"): after the library switch; owner sends screenshots per page → Lead discusses → fixes in the library → release. Not started.
