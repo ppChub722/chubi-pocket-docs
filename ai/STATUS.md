@@ -12,10 +12,12 @@ _Last updated: 2026-10-17 by Lead._
 - **0.3.1-10** (2026-10-13): be `f503d9c` · app `4d838f1` (build 58, Firebase 2058) · migration 060 · `LATEST_APP_BUILD=MIN_APP_BUILD=58` · tags v0.3.1-10. QA pass: no. Details: `ai/releases/0.3.1-10.md`.
 - Prod is the old Happy-Host box and is probably down (2026-10-16). **No new VPS until 0.3.3** (owner 2026-10-16): until then everything is local only; releases are tags + local builds, no deploys. The new server runbook: `engineering/new-vps-runbook.md`.
 
-## In progress (2026-10-17)
-- Committed: be 1b5dfe0 (currency, recurring + budgets summaries) · app 4c6ce78 (currency, list pages, budgets redesign, card action slot, search toggle) · docs bfba8c4. BE 0.3.3 delete / archive is on branch feat/0.3.3-delete-archive (worktree chubi-pocket-be-033), not merged yet.
-- Lead is writing the 0.4.0 plan and briefs. Team: BE chubi-pocket-e7 · FE-core chubi-pocket-7b · FE-pages chubi-pocket-b2. No code changes until the briefs arrive.
-
+## In progress (2026-10-17, Lead handoff)
+- **0.4.0 briefs are written and waiting for the owner's OK**: ai/briefs/0.4.0-plan.md (team, worktrees, milestones M1–M5) · 0.4.0-be.md · 0.4.0-fe-core.md · 0.4.0-fe-pages.md. Not sent yet. Once the owner says go, send each session its brief (one short message pointing at the file).
+- Sessions (idle, waiting): BE chubi-pocket-e7 · FE-core chubi-pocket-7b · FE-pages chubi-pocket-b2 (greeted, set up, no code changes).
+- Design reference artifact (approved): https://claude.ai/artifact/EJq2vwbaKkYmMu27ZtZPZ7 . To change it in a new session, read it with the Artifact tool (action read) and republish to the same url.
+- Committed: be 1b5dfe0 · app 4c6ce78 · docs (this commit). BE 0.3.3 branch feat/0.3.3-delete-archive (worktree chubi-pocket-be-033) not merged: BE M1 item 1 merges it.
+- Owner decisions today are in ai/decisions.md (note label stays โน้ต, 0.4.0 scope, kit freeze lifted, edit mode, sections, hero anatomy, รอรับ/รอจ่าย, ผูกกับ, เตือนจ่าย, event tags, shell swipe, page indicator).
 
 ## Waiting on the owner
 - UI library: package name / repo location (the library AI asks the owner).
