@@ -292,6 +292,8 @@ Mark as `actioned` (the user followed through on the suggested action). Sets `ac
 
 Mark as `dismissed` (user saw it but won't act). Sets `dismissed_at`. Also implies `read`.
 
+**Dismiss = archive (0.3.3).** A dismissed row is hidden: `GET /v1/notifications` leaves it out by default; `?dismissed=true` lists only the hidden ones, `?dismissed=all` both. `POST /v1/notifications/:id/restore` clears `dismissed_at` (read stays; idempotent; 404 if not yours). Dismissed rows are already read, so the unread count never includes them. `DELETE` stays the hard delete.
+
 ### 3.6 `DELETE /v1/notifications/:id`
 
 Hard-delete from the caller's inbox. Only the recipient can delete their own.

@@ -340,6 +340,8 @@ Soft-hide the contact. Sets `status = 'archived'`. Splits still reference it; co
 
 **Response — `200 OK`:** the contact with `status = archived`.
 
+
+**Contacts and money records are independent (owner 2026-10-16, replaces the first 0.3.3 rule).** A debt can be with anyone; a typed name (level 1) is always valid. **Archive only hides** a contact from the contacts list and the pickers: it never blocks or changes a money record (new entries, repayments, splits, event quick-add and pending submit all work with it, and `last_used_at` still bumps). **Delete** drops every record that references the contact back to a typed name: the contact id becomes NULL, the person name stays on the record (snapshot of the SHOWN name: nickname when shown, else the linked profile name, else `display_name`; taken in the same transaction), amounts unchanged. For a linked contact the link to the other user ends (no more split notifications from those entries); their book is untouched. Relinking stays possible per record (picker) and through `unlinked-names` / `absorb`.
 ### 3.12 `POST /v1/contacts/:id/restore`
 
 Reactivate an archived contact.

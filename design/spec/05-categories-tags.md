@@ -168,7 +168,7 @@ Create a category.
 
 **Validation:**
 
-- Parent must belong to same user + same `type` + be `status = 'active'` + not `is_system`
+- Parent must belong to same user + same `type` + not `is_system`
 - Resulting depth ≤ 3
 - No duplicate `(user_id, type, parent_id, LOWER(name))` among active categories
 
@@ -181,7 +181,7 @@ Create a category.
 | 400 | `VALIDATION_ERROR` | Invalid name, type, etc. |
 | 400 | `MAX_DEPTH_EXCEEDED` | Would exceed 3 levels |
 | 400 | `DUPLICATE_NAME` | Sibling with same name (case-insensitive) |
-| 400 | `INVALID_PARENT` | Parent is system, archived, wrong type, or not owned |
+| 400 | `INVALID_PARENT` | Parent is system, wrong type, or not owned |
 | 401 | `UNAUTHORIZED` | |
 
 ### 3.2 `GET /v1/categories`
@@ -193,7 +193,7 @@ List categories owned by the user. Returns a flat list by default; client builds
 | Name | Description |
 |---|---|
 | `type` | Filter by `income` \| `expense` |
-| `status` | `active` (default) \| `archived` \| `all` |
+| `status` | **removed 0.3.3** (migration 061): categories have no status; delete is always hard |
 | `include_system` | `true` \| `false` (default `false` — system cats hidden from pickers) |
 
 **Response — `200 OK`:**
@@ -209,7 +209,6 @@ List categories owned by the user. Returns a flat list by default; client builds
       "is_system": false,
       "icon": "restaurant",
       "color": "#FF5722",
-      "status": "active",
       "sort_order": 0,
       "include_in_report": true,
       "description": "Restaurants and groceries",
@@ -240,7 +239,6 @@ Get a single category. Includes computed `depth` (1 = root, 2 = child, 3 = grand
   "is_system": false,
   "icon": "restaurant",
   "color": "#FF5722",
-  "status": "active",
   "child_count": 0,
   "transaction_count": 42
 }
@@ -276,7 +274,7 @@ Update a category. Partial.
 | `type` | — | **immutable** | Delete + recreate if wrong |
 | `is_system` | — | **immutable** | |
 | `sort_order` | — | via §3.13 only | |
-| `status` | — | via dedicated endpoints (§3.5, §3.6) | |
+| `status` | — | no such field (removed 0.3.3) | |
 
 **Parent change rules:**
 
@@ -411,7 +409,6 @@ Bulk-rewrite `(parent_id, sort_order)` for the user's category tree atomically. 
 
 - The payload **must include every `(user_id, type)` row that's being touched**. The server treats the batch as the authoritative new layout for any `(type)` that appears in the payload — rows of that type missing from the payload retain their existing `(parent_id, sort_order)` only if no row in the payload claims their slot. Simplest client behavior: send the whole tree for whichever `type` the user reordered.
 - System categories (`is_system = true`) **may** appear in the payload but their `parent_id` must remain `null`. `sort_order` is editable.
-- Archived categories may not be reordered (filter them out client-side).
 - Validation runs entirely before any writes. On failure, no row changes.
 - Cycle detection runs against the post-batch parent map (so dragging A under B and B under A in the same batch is rejected).
 
@@ -430,7 +427,7 @@ Returning the full list lets the client replace its local cache without a follow
 | 400 | `VALIDATION_ERROR` | Malformed payload |
 | 400 | `MAX_DEPTH_EXCEEDED` | Some path exceeds 3 levels post-batch |
 | 400 | `CYCLE_DETECTED` | Batch defines a cycle |
-| 400 | `INVALID_PARENT` | A `parent_id` references a system, archived, or wrong-type category |
+| 400 | `INVALID_PARENT` | A `parent_id` references a system or wrong-type category |
 | 400 | `DUPLICATE_NAME` | Reparenting collides with an existing sibling name |
 | 401 | `UNAUTHORIZED` | |
 | 403 | `FORBIDDEN` | A referenced id doesn't belong to the user |
@@ -481,7 +478,7 @@ No restrictions beyond the normal rules: target must be same type, active, not s
 
 ### 4.10 Uniqueness per (user, type, parent_id)
 
-Allows the same name under different parents ("Travel > Food" and "Home > Food" both OK) but not among siblings ("Food" can't appear twice under the same parent at the same type). Case-insensitive. Archived rows excluded from the uniqueness check — so users can archive a category and reuse its name.
+Allows the same name under different parents ("Travel > Food" and "Home > Food" both OK) but not among siblings ("Food" can't appear twice under the same parent at the same type). Case-insensitive.
 
 ### 4.11 Tags flat, case-insensitive, hard-delete only
 

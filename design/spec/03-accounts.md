@@ -120,7 +120,7 @@ List accounts owned by the user.
 
 | Name | Description |
 |---|---|
-| `status` | Filter by status (`active`, `archived`, `closed`); default `active` |
+| `status` | Filter by status (`active`, `archived`; `closed` was merged into `archived` in 0.3.3); default `active` |
 | `type` | Filter by account type |
 
 **Response — `200 OK`:**
@@ -256,19 +256,24 @@ Manually adjust the balance to a target value. Backend computes the delta and cr
 | 400 | `VALIDATION_ERROR` | Invalid date or balance |
 | 401 / 403 / 404 | | |
 
-### 2.6 `DELETE /v1/accounts/:id`
+### 2.5a `POST /v1/accounts/:id/archive` and `/restore` (0.3.3)
 
-Archive the account. Always soft — sets `status = 'archived'`. Preserves transaction history; archived accounts are hidden from default lists.
+Archive = hidden + ignored + read-only (owner only; 409 `ACCOUNT_HAS_MEMBERS` while other members are active; idempotent). An archived wallet is out of the default list (`?status=archived|all`), out of EVERY calculation (wallet totals, transaction summaries, budgets, dashboard: `shared.ReportScopePredicate` skips its rows; `GET /transactions` hides its rows unless `include_archived=true` or `account_id` is that wallet), and read-only: any write on it (new / edit / delete a row, transfer in or out, debt entry, recurring setting, saving entry) answers 409 `ACCOUNT_ARCHIVED` until `POST /restore`. Recurring settings on an archived wallet are auto-paused (recurring module). `DELETE /v1/accounts/:id` is the real delete (§2.6).
 
-To actually hard-delete: impossible while transactions reference it. Delete all transactions first (not recommended — destroys history).
+### 2.6 `DELETE /v1/accounts/:id` and `GET /v1/accounts/:id/delete-preview` (0.3.3)
 
-**Success — `200 OK`:**
+**A real delete** (this replaces the old "DELETE = archive"; archive = `POST /:id/archive`, §2.5a). Owner only; 409 `ACCOUNT_HAS_MEMBERS` while other members are active. One DB transaction:
 
-```json
-{ "message": "Account archived", "status": "archived" }
-```
+1. the wallet's opening-balance / adjustment rows are deleted (they only drive this wallet);
+2. every other row of every author (an ex-member's too) gets `account_id = NULL`: it stays in the books as a wallet-less row. Both legs of a transfer count: the leg of the deleted wallet becomes wallet-less, the twin leg and its wallet are unchanged (spec 04 §4.16a);
+3. recurring settings lose the wallet (`ON DELETE SET NULL`; they keep running, wallet-less);
+4. saving entries lose the wallet (`saving_entries.account_id` nullable, `ON DELETE SET NULL`): goal money is KEPT, unallocated (spec 09);
+5. `user_notification_settings.default_account_id` → NULL; budget wallet scopes and memberships cascade; pending drafts that name the wallet get a `last_error` on submit;
+6. the wallet row is deleted.
 
-**Errors:** `401`, `403`, `404`.
+`GET /:id/delete-preview` → `{ transactions, transfers, system_rows_deleted, recurring, saving_entries: { count, amount } }` so the confirm can say what happens. The delete answers `{ id, deleted: <same shape> }`.
+
+**Errors:** `401`, `403 NOT_OWNER`, `404`, `409 ACCOUNT_HAS_MEMBERS`.
 
 ### 2.7 `GET /v1/accounts/:id/summary`
 
@@ -372,7 +377,7 @@ For the same reason the users module uses `status` (users §3.3): states will pr
 
 - `active` — normal
 - `archived` — soft-deleted; user-triggered; hidden from default list
-- `closed` — bank/provider closed the account; kept for history; labeled "Closed" in UI (Phase 2 UX)
+- `closed` — removed in 0.3.3 (migration 061): merged into `archived`
 
 ### 3.6 Balance atomicity with transactions
 
@@ -405,11 +410,9 @@ Alternative (lock currency immutably) is cleaner schema-wise but annoys users wh
 
 Type-conditional rule (credit_limit required only for credit types) is enforced in Go, not via DB CHECK. Easier to evolve — if we add a new account type with different rules later, no migration needed.
 
-### 3.10 Archive is always soft; hard delete is not offered
+### 3.10 Archive is soft; delete is real (0.3.3)
 
-Accounts always have associated transactions (even a fresh account has its "Opening Balance" transaction). Hard-deleting would cascade-destroy transaction history or orphan rows. Neither is desirable. `DELETE /v1/accounts/:id` always archives.
-
-If user truly wants to hard-delete: Phase 3 admin endpoint can do it, logging the cascade for audit.
+Archive (hide + ignore + read-only, restorable) and delete (rows survive wallet-less) are two separate actions since 0.3.3; see §2.5a and §2.6. The opening-balance row is the only one deleted with the wallet.
 
 ### 3.11 Loans and savings are not account types
 

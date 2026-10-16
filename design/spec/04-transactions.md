@@ -243,7 +243,6 @@ For transfers, response includes both rows:
 | 400 | `VALIDATION_ERROR` | Invalid fields |
 | 400 | `CATEGORY_TYPE_MISMATCH` | Expense category used on income tx or vice versa |
 | 400 | `TRANSFER_SAME_ACCOUNT` | `account_id = transfer_to_account_id` |
-| 400 | `TRANSFER_CURRENCY_MISMATCH` | Source + destination different currencies (Phase 1) |
 | 400 | `SYSTEM_CATEGORY_NOT_ALLOWED` | User tried to use a system category on a non-transfer transaction |
 | 400 | `SPLITS_MISMATCH` | Sum of splits + my_share ≠ amount |
 | 400 | `SPLITS_ON_TRANSFER` | Transfer with splits attached |
@@ -507,6 +506,16 @@ The owner (`user_id`) can edit or delete any transaction at any time, regardless
 This is the unified shared-expenses model. Settlement state is per-caller computed; there's no global state to corrupt by editing. Drift between this transaction and any downstream personal_debts or other members' personal entries is documented behavior — surfaced by `project_tx_changed` notifications (for project-context parents) so other members can update their books if they choose.
 
 Earlier drafts had `SPLITS_HAVE_SETTLEMENTS` and `HAS_SETTLEMENTS` guards. Removed under the unified model.
+
+### 4.16a Transfer legs without a wallet (0.3.3)
+
+A transfer stays two rows sharing `transfer_group_id`; OUT / IN come from the system category (Transfer Out / Transfer In), not from the wallet. When a wallet is deleted (spec 03 §delete) its leg keeps living with `account_id = NULL`; the other leg and its wallet balance are unchanged and reports are unaffected (transfer categories are not in reports).
+
+- Create: both wallets are still required. A wallet-less leg only comes from deleting a wallet.
+- Edit (from either row): amount / date / description / note move only the legs that have a wallet. `account_id` = the OUT leg's wallet, `transfer_to_account_id` = the IN leg's; each is re-filed on its own. A wallet-less leg can be given a wallet (its balance moves); a leg that has a wallet cannot be cleared (400); the legs cannot share a wallet.
+- Delete: removes both rows, reverses only the legs that have a wallet.
+- Authorization: a wallet-less leg needs no membership; the leg that has a wallet needs it as before (both legs wallet-less: the author only).
+- `transfer_peer.account` is `null` when the twin has no wallet (the page shows "ไม่ผูกกระเป๋า" and offers a wallet picker).
 
 ### 4.15 Account change via delete + recreate
 

@@ -1,3 +1,69 @@
+# fe-core inbox (newest on top)
+
+## 2026-10-16 — Wallet detail hero ✏️ → standard slot
+Full analyze/test: see ping. No commit. Only file: `lib/features/accounts/presentation/pages/account_detail_page.dart` (hero top-row ✏️ is now `CardActionButton(AppIcons.edit)`, same as HeaderCard / TxHeroCard). No lib/ui change. Every hero ✏️ is now the same 40px slot.
+
+
+## 2026-10-16 — Hero ✏️ into the same action slot
+analyze 0 · tests 918 pass / 0 fail (full run). No commit.
+- Kit exception files: `lib/ui/molecules/card_action_button.dart` (size 32→40 = the one control height; icon 20) · `lib/ui/organisms/header_card.dart` (`onEdit` now renders `CardActionButton(AppIcons.edit)` instead of `AppIconButton.edit`; same position: top row right of `topActions`, or title row when no top row) · `lib/ui/domain/transactions/tx_hero_card.dart` (same swap for its ✏️). Test: `test/ui/toolbar_toggle_test.dart` (HeaderCard ✏️ is a CardActionButton of the standard size).
+- So every hero ✏️ and every summary-card 🔍 are the same 40px outlined round button. `AppIconButton.edit` stays for list headers (✏️ reorder rows).
+- A hero needing both ✏️ and 🔍 passes the 🔍 in `topActions` (left of ✏️); no new param needed.
+- Not touched: wallet hero in account_detail_page (line ~1531 uses AppIconButton.edit for its own row) — say if it should switch too. Transactions / Events summary cards not started (waiting for the owner's pick).
+
+
+## 2026-10-16 — Task 4: summary-card 🔍 + collapsible toolbar, status dropdown, Budgets redesign
+analyze 0 · tests 917 pass / 0 fail (full; `connection_cubit_test` failed once under load, passes alone and on rerun — timing flake, not ours). No commit.
+
+### lib/ui / lib/hub files touched (owner-approved exception) — library AI must port
+- NEW `lib/ui/molecules/card_action_button.dart`: `CardActionButton(icon,onTap,tooltip,selected,showDot)` — the standard top-right action slot (32px round, red dot `ValueKey('cardActionDot')`). Exported in `ui.dart`.
+- `lib/ui/templates/list_toolbar.dart`: `ListToolbar(collapse: ToolbarToggleState?)` (AnimatedSize hide/show); NEW `ToolbarToggleState` (ValueNotifier<bool>; `.of(pageKey)` remembered per page for the session, closed by default; `.local()`; `.toggle()`; `.resetAll()` for tests) and `ToolbarToggleButton(state, filtered, tooltip)` (the 🔍, dot while hidden + filtered). ListPageBody unchanged (header list already hosts the toolbar).
+- `lib/ui/domain/money/debt_summary_card.dart`: new `action:` slot after the 👁.
+- `lib/ui/atoms/add_tile.dart`: card variant minHeight 64→44, row 48→44, vertical padding xs, icon 20.
+- `lib/ui/molecules/progress_row.dart`: new `marker` (0..1 pace tick, `ValueKey('progressMarker')`).
+- `lib/ui/domain/progress/progress_tone.dart`: new `ProgressTone.normal` (= primary/teal).
+- `lib/ui/domain/progress/progress_card.dart`: new `trailing` (far right of the name line), `paceMarker`, `alignWithTitle` (bar + footer under the title column); percent text not tinted for `normal`.
+- hub: `lib/hub/pages/toolbar_toggle_demo.dart` (new, in the List page template page), progress page marker demo, `hub_registry.dart` covers += ToolbarToggleState / ToolbarToggleButton / CardActionButton. Tests: `test/ui/toolbar_toggle_test.dart`.
+- NOT done: "detail heroes that already have ✏️ get the same slot" — only summary cards (Debts, Budgets, Goals, Recurring, Wallets) use the slot; HeaderCard/hero not touched. Say if wanted.
+
+### Pages
+- 🔍 in the card + hidden-by-default toolbar, red dot (search text / non-default status / non-default sort): Budgets ('budgets'), Saving goals ('saving_goals'), Recurring ('recurring', hidden on the upcoming tab), Debts ('personal_debts', via `action:`), Wallets ('wallets': new name search + existing sort inside the toolbar, ✏️ reorder kept on its own row; local name filter).
+- Status = ONE dropdown chip "สถานะ: … ▾" (OptionMenuAnchor + AppChip): Budgets (ใช้งาน/จบแล้ว/เก็บถาวร), Saving goals (กำลังออม/สำเร็จ/เก็บถาวร), Recurring (ใช้งาน/เก็บถาวร/ทั้งหมด; count chips gone).
+- Budgets: new `budget_summary_card.dart` — used / limit, bar, "เหลือรวม ฿X · N%", 4 tappable tiles (ทั้งหมด/ปกติ/ใกล้เต็ม/เกินงบ, ring when selected, tap again clears) → server `?health=` (one call). Row: "เหลือ ฿X" / red "เกิน ฿X" right of the name, short caption "รายปี · เหลือ N วัน", bar+footer under the title, teal→amber→red, pace tick from period start/end (`budgetPaceFraction`, unit-tested), "ตามเพซจะเกิน" mini badge, no .00 on whole amounts. Summary card shows only on the active status; ended/archived get a compact card (caption + 🔍). BE fields used: summary.total_limit/total_used/total_remaining/used_pct/counts{all,ok,near,over}, period.on_pace_to_exceed, `?health=normal|near|over`.
+- Recurring: card wired to BE `summary` (parser already matched); search now uses BE `q` (one call per change, stale responses ignored).
+- Notes: `MoneyVisibilityToggle` renders nothing while `kMoneyPrivacyEnabled` is off, so the 👁 is not visible yet; kit `moneyString` has no decimals option (budgets use `budgetRowMoney` via CurrencyFormatter) — a `decimals` param would let that helper go. Old arb keys bgStatActive / bgStatPace now unused.
+
+
+## 2026-10-16 — Task 3: list pages = Debts pattern (Budgets / Saving goals / Recurring)
+analyze 0 issues · tests 902 pass / 0 fail (full run). No commit, lib/ui untouched.
+Pattern on all three: ListPageBody, summary card margin (lg,sm,lg,xs) → ListToolbar with search + chips → hairline rows (rowDividers) on the page background → AddTile; topInset sm.
+- **Budgets:** plain AppCard with caption + 4-stat StatGrid above the toolbar; search by name (local filter in BudgetsCubit: `query` / `visible` / `search()`; `GET /budgets` has no `q`); no-match empty view. Rows (ProgressCard) were already hairline.
+- **Saving goals:** AppCard with "saved in total" + big total + StatGrid (in goals / not allocated), no more clipped SummaryStats; toolbar with search + Saving/Reached/Archived; first row = "Not allocated" ListRow with the 🐷 IconTile (Saving chip, no search only), then goal ListRows. Search local (API has only `status`).
+- **Recurring** (recurring_home_page.dart): card → tabs → toolbar (recurring tab only) → rows. New feature-level `recurring_summary_card.dart` + `domain/recurring_summary.dart`; local name search. Divider indent kept 64 (TxRow text starts at 64), not 72.
+- Tests: one new test per page (inset card above toolbar, search, first row, order); existing prod-shaped / failing-load tests pass.
+- **BE gaps:** (1) `GET /recurring` needs top-level `summary: {month_pay, month_receive, next: {name, date, amount, type} | null}` (month totals of active recurrings). Until then the card shows "—" in the boxes (FE reads `body['summary']`, null-safe). (2) Optional `q` on `GET /recurring`, `GET /budgets`, `GET /saving-goals` for server-side search (FE filters loaded rows today).
+- Profile currency call checked against BE `UpdateProfileRequest` (currency optional, 3 letters): matches.
+
+
+## 2026-10-16 — 0.3.1-11 FE (currency + logic bugs)
+analyze 0 issues · tests 898 pass / 0 fail. No commit.
+
+**Currency**
+- New `lib/core/utils/user_currency.dart`: `context.userCurrency`, `userCurrencySymbol` (select; build() only), `readUserCurrencySymbol` (read; use in builders/handlers). All feature symbols now come from the user's currency (accounts, notifications, recurring, goals, events, budgets). Removed `ProjectView.userCurrency/currency/symbol` + 'THB' fallbacks.
+- `CurrencyFormatter`: decimals follow the symbol (¥ = 0), `decimalsOf(code)`; tests added.
+- Profile: currency editable (CurrencyTile in edit mode) with a confirm dialog "not converted"; `UsersRepository.updateMe(currency:)`. arb: profileCurrencyChange{Title,Message,Confirm}. NEEDS BE: `PUT /users/me` accepting `currency` (not checked against the new OpenAPI).
+- App never sends currency except register (picker kept: decisions say "picked at first setup"; brief says no picker on any form — Lead to decide) and profile.
+
+**Bugs**
+- Recurring: the list already shows paused (status=current = active+paused; filter chips exist), test added. Detail went stale after item writes (add/edit/delete/batch/last installment): quiet `GET /recurring/{id}` after them (`_syncRecurring`). BE idea: return the recurring in item-write responses.
+- Budgets: list/detail also reload when the tx rows list changes (`bookChanged()` never bumped `revision`).
+- Saving goals: `staleTick` + reload on tx change; pending 🐷 draft now opens the sheet (saving-draft support added in quick_create_sheet.dart; confirm from the sheet).
+- Events: paging already existed; fixed the real gap (first page fits screen → never loads page 2). Not reproduced the "20" cap on device.
+- Offline: no change needed; `AppButton(submits: true)` is disabled offline and every network-calling page already sets it.
+
+**Kit (lib/ui) needs, not done (frozen):** default ฿ in many widgets (`UiConfig`, AmountInput, etc.); `CurrencyFormatter.roundsToZero` callers in kit (money_text, net_balance) don't pass the symbol → JPY zero-check uses 2 decimals; `Currencies` list/decimals belong in the library; hub pages still show THB demo data.
+**Other:** `TransactionsCubit.bookChanged()/refresh()` don't bump `revision`. No test for profile currency edit page (no EditProfilePage test exists).
+
 # FE-CORE inbox (kit · hub · shell · router · templates · auth · quick create / tx)
 
 ## 2026-10-12 23:30 — 0.3.1-9 leftovers (Lead brief tasks 1–5)

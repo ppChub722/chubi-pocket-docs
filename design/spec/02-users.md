@@ -304,9 +304,9 @@ Indexing individual keys: if a preference becomes query-hot (e.g., filter users 
 
 CHECK constraint grows by phase — adding values is a single-line migration.
 
-### 3.4 Currency change does not retroactively convert
+### 3.4 Currency change is a relabel
 
-Changing the user's default `currency` affects only new transactions going forward. Historical transactions keep their original currency. Phase 2 adds per-transaction currency + display-time conversion for the dashboard.
+Changing `currency` (`PUT /users/me`, any time) relabels only: no conversion, amounts untouched. The `currency` column of the user's wallets, debts and event rows follows in the same transaction, so it never disagrees with the setting. Calculations ignore currency entirely (no filters, grouping or mismatch checks); shared splits / debts pass amounts as-is between users with different currencies. Display uses the viewer's current setting.
 
 ### 3.5 Deactivated users can still reactivate themselves
 

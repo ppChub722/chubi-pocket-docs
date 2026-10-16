@@ -27,7 +27,7 @@ User-level (`users.currency`): set at registration (default THB) and then LOCKED
 - An `update_tx` draft now really applies `account_id` / `category_id` (the Go-built update request counts a non-nil value as present).
 
 ## Wallets, categories, tags, contacts
-- Wallet totals: `liabilities` and `credit_used` are positive numbers owed (a negative balance on a credit wallet is a debt), `net = assets − liabilities`; wallets in a currency other than the user's are not summed (`other_currency_count`). `sort_order` is the caller's own order (`account_members.sort_order`). `getAccount?include=summary,members` replaces the old summary / members routes.
+- Wallet totals: `liabilities` and `credit_used` are positive numbers owed (a negative balance on a credit wallet is a debt), `net = assets − liabilities`; every tracked wallet is summed as-is (currency is a label; `other_currency_count` removed 2026-10-16). `sort_order` is the caller's own order (`account_members.sort_order`). `getAccount?include=summary,members` replaces the old summary / members routes.
 - Inviting a member is owner-only (403 `NOT_OWNER`); `OWNER_MUST_TRANSFER` is 400; `SCOPE_NOT_ALLOWED` is 403; leaving yourself returns `{account: null, members: []}`; restore = `POST /accounts/:id/restore`.
 - Category `depth` / `path` are computed per response from one tree query; deleting shifts the children up to the grandparent first and `reparented` shows them after the shift; `is_fee_category` reads the user's `fee_category_id` preference.
 - Contacts: `acceptContactLinkRequest` returns `contact: null` (the linked contact belongs to the sender); link-request errors 409 `REQUEST_REJECTED` / `NOT_ACCEPTED`. Tags: the old attach / detach routes and `GET /tags/:id` are gone.

@@ -61,6 +61,10 @@ This module owns `saving_goals`. References `accounts` (required link source). N
 Global conventions (base URL, error envelope, data types, HTTP verbs) are in [`overview.md`](overview.md).
 
 ---
+### 0.6 Entries with no wallet (0.3.3)
+
+`saving_entries.account_id` is nullable (`ON DELETE SET NULL`, migration 061). NULL = **unallocated**: the money counts for its goal (`saved_amount`, progress, history, `by_wallet` shows one share with `wallet: null`) and for NO wallet: it never enters a wallet's available / spare / saved numbers, and there is no balance to compare with. The no-negative rule still applies to the wallet-less pool (a bucket cannot go below 0). Two ways to get such money: deleting a wallet that holds goal money keeps it (spec 03 §2.6; `delete-preview` reports it as kept and unlinked), and `POST /saving-entries` `kind: save` with no `wallet_id` (owner 2026-10-16: no wallet means NO wallet; the user's default wallet is never used). A withdraw / move without `splits` takes largest-first across wallets and the wallet-less pool alike. `SavingEntry.wallet`, `SavingWalletShare.wallet` and the wallet bucket ref are nullable.
+
 
 ## Phase summary
 

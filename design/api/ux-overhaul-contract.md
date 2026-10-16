@@ -402,7 +402,7 @@ rules apply only on submit. Migration 000046 (`pending_transactions`).
 - **Submit is per draft**: each runs in its own DB transaction (transaction + tags + removing the draft). A
   failed one stays pending with `last_error`; the others go through. Codes: `MISSING_TYPE`, `MISSING_AMOUNT`,
   `MISSING_DATE`, `ACCOUNT_NOT_FOUND`, `CATEGORY_NOT_FOUND`, `CATEGORY_TYPE_MISMATCH`, `TRANSFER_SAME_ACCOUNT`,
-  `TRANSFER_NEEDS_WALLETS`, `TRANSFER_CURRENCY_MISMATCH`, `SPLITS_ON_TRANSFER`, `CONTACT_NOT_FOUND`,
+  `TRANSFER_NEEDS_WALLETS`, `SPLITS_ON_TRANSFER`, `CONTACT_NOT_FOUND`,
   `TAG_NOT_FOUND`, `DEBT_NOT_FOUND`, `DEBT_ALREADY_SETTLED`, `OVERPAYMENT`, `TRANSACTION_NOT_FOUND`,
   `NOT_FOUND`, `SUBMIT_FAILED` (with the server message). Added 2026-10-11 (events + splits):
   `INVALID_SPLIT`, `SPLITS_EXCEED_AMOUNT`, `PROJECT_NOT_FOUND`, `PROJECT_NOT_ACTIVE`,

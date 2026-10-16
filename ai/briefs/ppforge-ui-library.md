@@ -73,3 +73,7 @@ Write progress and the final report to `chubi-pocket-docs/ai/inbox/ui-lib.md` (n
 - the injection points you created (icons, colours, strings, formatters)
 - leaks left + baselines
 - analyze / test results in both repos
+
+## Kit changes made on chubi main after the freeze (owner-approved exceptions)
+Port these into the library when you sync. fe-core lists the exact files / APIs in `ai/inbox/fe-core.md`.
+- 2026-10-16: hero / summary card top-right action slot (✏️ on detail heroes, 🔍 on list summary cards); collapsible search + filter row in ListPageBody / ListToolbar (toggle from the 🔍, red dot while a hidden filter is active); ProgressCard pace marker + state colours; lower AddTile.

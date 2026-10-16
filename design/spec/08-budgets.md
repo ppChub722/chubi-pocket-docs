@@ -46,6 +46,8 @@
 
 ### 0.5 API
 - `GET /budgets?status=active|ended|archived&sort=risk|name|newest` → each budget at its current period + the hero / chip counts.
+  - **Summary card (0.3.1-11)**, same whatever `status` / `health`: `summary` also carries `total_limit`, `total_used`, `total_remaining`, `used_pct`, `counts: {all, ok, near, over}` over the ACTIVE budgets (state active or upcoming = `active_count`) at their CURRENT period. `total_limit` = the plain sum of the current periods' amounts (an overridden period counts its override). `total_used` counts each counted row (transaction / event share) ONCE even when budgets overlap (named budgets with overlapping scopes), so it can be less than the sum of the budgets' `used`. `total_remaining` = limit − used (negative when over); `used_pct` rounded, not clamped, 0 when the limit is 0. `counts`: over = status over; near = status warn (at / above the budget's own `warn_pct`); ok = the rest (ok or pace); ok + near + over = all.
+  - `?health=normal|near|over` narrows the ROWS to that group (normal = ok + pace), never the summary (a tile tap = one call). Each `period` has `on_pace_to_exceed` (the forecast says the current period ends over; independent of `status`: the "on pace" row badge).
 - `GET /budgets/:id?period_id` → the page in one call: forecast, by_source, by_category (used, share of used), the 6 newest periods, the first 20 items (expected first).
 - Paging: `GET /budgets/:id/periods`, `GET /budgets/:id/items?period_id&source`.
 - `POST /budgets`, `PUT /budgets/:id`, `PUT /budgets/:id/periods/:period_id`, `POST /budgets/:id/close | archive | restore`: each returns the page. `DELETE` → `{id}`.
