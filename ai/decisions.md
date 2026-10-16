@@ -61,6 +61,8 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
   - **delete an entry with a wallet tx (owner 2026-10-12):** a confirm modal names both (the debt + the wallet tx; the balance comes back), then deletes BOTH. Deleting the tx from tx detail = the same modal, and the entry goes too. Split-sourced debts have no own tx, so the modal names the debt only
   - split-sourced debts: only description / note / paid label editable on the debt page
 - **Roadmap (owner 2026-10-15):** the plan is [`product/roadmap-1.0.md`](../product/roadmap-1.0.md) and ends at 1.0 (stable for the owner's circle, then frozen). The old phase plan is cancelled. No Play Store (APK via Firebase + web), no monetization, no Next.js web / admin, no receipt photos.
+- **0.4.0 = the UI round (owner 2026-10-17):** everything in the design reference ("Chubi Page Reference" artifact) ships as version 0.4.0 = "every page's UI done". The old per-version split (0.3.1-11 / 0.3.2 / 0.3.3 / 0.4) is parked; versions after 0.4.0 get re-planned from scratch. Team: BE (chubi-pocket-e7) · FE-core = kit / templates / pending / settings / notifications (chubi-pocket-7b) · FE-pages = module pages (chubi-pocket-b2) · QA only at the end on the owner's order.
+- **Kit freeze lifted (owner 2026-10-17):** the library AI works on its own branch; chubi edits lib/ui freely and the library follows later.
 - **Currency (owner 2026-10-15, replaces 2026-10-12):**
   - USER-level currency on /me, picked at first setup (default THB); every record keeps its currency column, filled by the server from the user's setting; no currency picker on any form
   - changeable at any time = relabel only, no conversion, with a warning before saving (no longer locked)

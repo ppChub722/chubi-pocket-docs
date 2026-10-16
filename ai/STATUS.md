@@ -1,25 +1,21 @@
 # STATUS — read this first (rewritten, not appended)
 
-_Last updated: 2026-10-15 by Lead._
+_Last updated: 2026-10-17 by Lead._
 
 ## Plan
-- **The plan ends at 1.0** (owner 2026-10-15): [`product/roadmap-1.0.md`](../product/roadmap-1.0.md). 0.3.1-11 UI round → 0.3.2 LLM drafts → 0.3.3 delete / archive → 0.4 dashboard, push, export, onboarding, dark mode → 0.5 hardening → 1.0 stable for the owner's circle, then frozen.
+- **Now: 0.4.0 = the UI round** (owner 2026-10-17): every page's UI per the approved design reference https://claude.ai/artifact/EJq2vwbaKkYmMu27ZtZPZ7 ("Chubi Page Reference"). The earlier 0.3.1-11 / 0.3.2 / 0.3.3 / 0.4 split is parked; versions after 0.4.0 get re-planned. The plan still ends at 1.0 (product/roadmap-1.0.md).
 - The old phase plan (`product/phases.md`) is cancelled. No Play Store, no monetization, no web / admin app.
 - Currency: one per user, auto-filled, changeable as a relabel, ignored in all calculations (`ai/decisions.md` → Currency).
-- **UI library first:** another AI extracts this app's UI into a ready-made Flutter library (brief `ai/briefs/ppforge-ui-library.md`, reports `ai/inbox/ui-lib.md`). Order: extract (no visual change) → chubi switches onto it → the 0.3.1-11 UI round happens in the library. **`lib/ui/` is frozen in chubi until the switch.**
+- **UI library:** the library AI works on its own branch (brief `ai/briefs/ppforge-ui-library.md`). The kit freeze is LIFTED (owner 2026-10-17): chubi edits lib/ui freely; the library follows later.
 
 ## Live (prod)
 - **0.3.1-10** (2026-10-13): be `f503d9c` · app `4d838f1` (build 58, Firebase 2058) · migration 060 · `LATEST_APP_BUILD=MIN_APP_BUILD=58` · tags v0.3.1-10. QA pass: no. Details: `ai/releases/0.3.1-10.md`.
 - Prod is the old Happy-Host box and is probably down (2026-10-16). **No new VPS until 0.3.3** (owner 2026-10-16): until then everything is local only; releases are tags + local builds, no deploys. The new server runbook: `engineering/new-vps-runbook.md`.
 
-## In progress (2026-10-16)
-- UI library: the other AI works on its own branch (`ai/briefs/ppforge-ui-library.md`).
-- 0.3.1-11 briefs written: `ai/briefs/0.3.1-11-be.md` (currency, then 0.3.3 delete / archive BE) and `ai/briefs/0.3.1-11-fe.md` (currency + logic bugs, no `lib/ui/` edits). Waiting for the BE / fe-core sessions to start.
+## In progress (2026-10-17)
+- Committed: be 1b5dfe0 (currency, recurring + budgets summaries) · app 4c6ce78 (currency, list pages, budgets redesign, card action slot, search toggle) · docs bfba8c4. BE 0.3.3 delete / archive is on branch feat/0.3.3-delete-archive (worktree chubi-pocket-be-033), not merged yet.
+- Lead is writing the 0.4.0 plan and briefs. Team: BE chubi-pocket-e7 · FE-core chubi-pocket-7b · FE-pages chubi-pocket-b2. No code changes until the briefs arrive.
 
-## Next: 0.3.1-11
-- **UI review round** (owner: "UI แปลกมาก"): after the library switch; owner sends screenshots per page → Lead discusses → fixes in the library → release. Not started.
-- **Currency auto** from the user setting (`ai/backlog.md`).
-- Leftovers: page bugs (events / budgets / recurring / goals, `ai/backlog.md` → Remaining pages), offline-mode leftovers, pending 🐷 draft should open an edit sheet.
 
 ## Waiting on the owner
 - UI library: package name / repo location (the library AI asks the owner).
