@@ -1,5 +1,7 @@
 # Phases — development plan
 
+> **CANCELLED 2026-10-15 (owner).** Phase 2 / Phase 3 below are no longer the plan. The canonical plan is [`roadmap-1.0.md`](roadmap-1.0.md), which ends at 1.0 (no Play Store, no monetization, no web app). This file is kept as history only.
+
 Per-phase development plan: goal, modules, exit criteria, risks, dependencies. Replaces the four `phaseN.md` files (combined here at v0.5 of the product docs).
 
 `phases.md` is **canonical** for what ships in each phase. Per-module Phase summary tables in the spec files (e.g., [`design/spec/06-shared-expenses.md`](../design/spec/06-shared-expenses.md)) are snapshot-from-write-time and updated at phase transitions, not continuously.

@@ -37,7 +37,7 @@ All repos live side-by-side in the same parent folder so cross-repo references w
 
 ### Key entry points
 - **Product overview:** [`product/overview.md`](product/overview.md) — what & who
-- **Phase plan:** [`product/phases.md`](product/phases.md) — **canonical** for what ships in each phase
+- **Roadmap:** [`product/roadmap-1.0.md`](product/roadmap-1.0.md) — **canonical** plan up to 1.0 (the old [`product/phases.md`](product/phases.md) is cancelled, history only)
 - **Current phase detail:** [`product/phase0/overview.md`](product/phase0/overview.md)
 - **Design overview:** [`design/overview.md`](design/overview.md) — map of the technical docs
 
@@ -49,7 +49,7 @@ All repos live side-by-side in the same parent folder so cross-repo references w
 1. [`design/api/api-document.md`](design/api/api-document.md) — endpoint contracts
 2. [`design/database/schema.md`](design/database/schema.md) — DB schema
 3. [`design/spec/`](design/spec/overview.md) — module behavior, business rules
-4. Current phase scope: [`product/phases.md`](product/phases.md)
+4. Release scope: [`product/roadmap-1.0.md`](product/roadmap-1.0.md)
 
 ### Working on `chubi-pocket-app`
 1. [`design/frontend/app/overview.md`](design/frontend/app/overview.md) — architecture (Bloc / go_router / dio / Repository pattern)
@@ -89,4 +89,4 @@ All repos live side-by-side in the same parent folder so cross-repo references w
 
 ## Status
 
-**Phase 1 complete** (1a + 1b + 1c shipped end-to-end as of 2026-05-07). Solo dev, AI-assisted. Phase 2 (UX polish) up next. See [`product/phases.md`](product/phases.md) for what's in scope and what's deferred.
+Live on 0.3.1-10. Solo dev, AI-assisted. The plan runs to 1.0 only (owner 2026-10-15): see [`product/roadmap-1.0.md`](product/roadmap-1.0.md). Day-to-day state: [`ai/STATUS.md`](ai/STATUS.md).

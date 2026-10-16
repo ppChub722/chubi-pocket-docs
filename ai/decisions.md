@@ -58,10 +58,13 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
   - **entry detail (view + edit) = THE TRANSACTION DETAIL PAGE (owner 2026-10-12):** the same page, only opened from a different place (debts vs tx list). Debt mode swaps type → Paid / Received and category → person; the wallet may be "ไม่ผูก" (ledger only). Built on the tx detail template (fe-core owns it); no separate debt detail page
   - **delete an entry with a wallet tx (owner 2026-10-12):** a confirm modal names both (the debt + the wallet tx; the balance comes back), then deletes BOTH. Deleting the tx from tx detail = the same modal, and the entry goes too. Split-sourced debts have no own tx, so the modal names the debt only
   - split-sourced debts: only description / note / paid label editable on the debt page
-- **Currency (owner 2026-10-12):**
-  - USER-level currency on /me, set once and LOCKED (default THB), shown only on the profile
-  - wallets have no currency picker; the server sets each wallet to the user's currency
-  - DB currency columns stay; multi-currency probably never
+- **Roadmap (owner 2026-10-15):** the plan is [`product/roadmap-1.0.md`](../product/roadmap-1.0.md) and ends at 1.0 (stable for the owner's circle, then frozen). The old phase plan is cancelled. No Play Store (APK via Firebase + web), no monetization, no Next.js web / admin, no receipt photos.
+- **Currency (owner 2026-10-15, replaces 2026-10-12):**
+  - USER-level currency on /me, picked at first setup (default THB); every record keeps its currency column, filled by the server from the user's setting; no currency picker on any form
+  - changeable at any time = relabel only, no conversion, with a warning before saving (no longer locked)
+  - calculations IGNORE currency: everyone is treated as the same currency; shared splits / debts / events pass amounts as-is; no cross-currency hint
+  - display uses the viewer's current setting (symbol + that currency's decimals, e.g. JPY 0); hard-coded THB / ฿ in the app becomes the user's currency
+  - multi-currency conversion: never
 - **All-hands hub adoption (owner 2026-10-13):**
   - finish the hub, then move EVERY page (unreached ones too) onto hub templates + kit pieces only; UI standards only, the feature / model redesigns come later
   - the hub proposals become the real kit: AppInput (option a), AppMessage, PickCard fixed height, the editable-text indent rule (read-only text flush with the title; editable text indented by the frame padding so the frame appears without moving, its edge on the title)
@@ -78,6 +81,7 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - name / description / note on every record (labels ชื่อ / คำอธิบาย / โน้ต); TextLimits 100 / 200 / 500.
 
 ## UI
+- **UI library (owner 2026-10-15):** another AI (not this team) extracts this app's UI (kit, hub templates, shell pieces) into a separate, ready-made Flutter library; the owner's future projects build their UI from it. chubi-pocket moves onto it too: extract (no visual change) → chubi switches → the 0.3.1-11 UI round happens in the library. `lib/ui/` is frozen in chubi until the switch. Brief: `ai/briefs/ppforge-ui-library.md`; reports: `ai/inbox/ui-lib.md`.
 - Picker selection = highlight, never ✓ (SelectCardGroup too). One picker shell with an optional compact search.
 - **Chips:** AppChip with 3 sizes, mini 20 / chip 28 / control **40** (control was 32; changed 2026-10-13: ONE control height of 40 for tappable chips, icon buttons, the search capsule, top-bar pills and dense inputs). Exception (owner 2026-10-13 night): the filter / sort chip row under a list's search uses chip 28, one size below the 40 search.
 - **Tint colour (owner 2026-10-13):**

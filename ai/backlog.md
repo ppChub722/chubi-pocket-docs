@@ -2,14 +2,11 @@
 
 Lead keeps this list current. Delete an item once it's briefed, or move it into STATUS "In progress".
 
-## 0.3.1-9 (in progress): App hub + API hub + API rework (forced update)
-- The App hub (Phases 1–4) is DONE and uncommitted.
-- API hub:
-  - BE writes the OpenAPI spec (A, B, D, E, F, G from ai/inbox/be.md; breaking OK) + `/api/v1/openapi.json`
-  - FE-A adds the API + Labs sections to /#/dev
-  - **the owner reviews the spec before any code**
-- Then the BE implements A/B/D/E/F/G and the FEs adopt them (thin FE); pages not reached yet only get minimal shape adaptation.
-- FE-only fixes (FE-B): wallet by id, patchBalance, badge double start, drill-down filter, lazy contacts, event picker cache.
+Release scope comes from `product/roadmap-1.0.md` (owner 2026-10-15). Items here that the roadmap puts out of scope (Play Store, monetization, web / admin, receipt photos, multi-currency) are dropped.
+
+## 0.3.1-11: currency auto from the user setting (owner 2026-10-15; rules in decisions.md → Currency)
+- BE: fill every record's currency from the user's setting; allow changing the user currency (relabel, no conversion).
+- FE: remove hard-coded THB / ฿ (events create, budgets create, goals list, …) → the user's currency with its decimals; profile setting becomes editable with a warning.
 
 ## Offline mode leftovers (FE-B handoff 2026-10-13; the core is done, the tree is green)
 - Page-specific submit buttons are not disabled while offline: quick create, auth, and pages with their own AppButtons.
@@ -137,8 +134,8 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
 ## Dashboard: "แผนเดือนนี้" (owner 2026-10-13: a dashboard sub-feature, later)
 - Expected income (recurring) − recurring bills − goal contributions − category budgets = free to spend, plus a daily allowance. Built on Recurring.
 
-## Small open items (0.3.1-10)
+## Small open items (0.3.1-11)
 - Tapping a pending 🐷 saving draft confirms it directly; it should open an edit sheet first (fe-saving).
 
-## NEXT: 0.3.1-10 UI review round (owner 2026-10-13 04:30)
-- Owner on the local build: "UI แปลกมาก น่าจะต้องปรับอีกเยอะ". Release is on hold. Next session: owner sends screenshots per page → Lead discusses → fixes at the kit / template root (pixel tests) → re-tag v0.3.1-10 (move tags) → release on the NEW VPS.
+## NEXT: 0.3.1-11 UI review round (owner 2026-10-13 04:30; 0.3.1-10 shipped as is)
+- Owner on the local build: "UI แปลกมาก น่าจะต้องปรับอีกเยอะ". Flow: owner sends screenshots per page → Lead discusses → fixes at the kit / template root (pixel tests) → release 0.3.1-11.
