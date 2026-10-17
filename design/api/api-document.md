@@ -948,7 +948,7 @@ Error codes specific to shared wallets:
 |---|---|---|---|---|
 | Wallet | `POST /accounts/:id/archive` | `POST /accounts/:id/restore` | `DELETE /accounts/:id` (hard) | confirm text: `GET /accounts/:id?include=delete_preview`; owner, no other active member |
 | Budget | `POST /budgets/:id/archive` | `POST /budgets/:id/restore` | `DELETE /budgets/:id` | |
-| Saving goal | `POST /saving-goals/:id/archive` (only with 0 saved: 409 GOAL_HAS_SAVINGS) | `POST /saving-goals/:id/restore` | `DELETE /saving-goals/:id` (only empty) | closing a goal (ปิดเป้าหมาย) moves the money first |
+| Saving goal | `POST /saving-goals/:id/archive` (also with money held, 0.4.0-1: it counts in no total until restored) | `POST /saving-goals/:id/restore` | `DELETE /saving-goals/:id` (only empty) | closing a goal (ปิดเป้าหมาย) moves the money first |
 | Event | `POST /projects/:id/archive` | `POST /projects/:id/restore` | `DELETE /projects/:id` (`?delete_linked_txs`) | owner only; restore = active |
 | Contact | `POST /contacts/:id/archive` | `POST /contacts/:id/restore` | `DELETE /contacts/:id` | archive only hides; delete drops records to typed names |
 | Recurring | `POST /recurring/:id/archive` | `POST /recurring/:id/restore` | `DELETE /recurring/:id` (`?delete_linked_txs`) | an occurrence: archive = skip, `DELETE /recurring-items/:id` |

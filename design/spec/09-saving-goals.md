@@ -18,14 +18,15 @@
   - A wallet that doesn't track its balance has `available: null`, and saving into it is refused (400 WALLET_NOT_TRACKED).
 
 ### 0.2 Goals
-- Fields: name, description, note, icon, `target_amount`, optional `deadline`, `milestones` (default 25 / 50 / 75 / 100 %).
+- Fields: name, description, note, icon, optional `target_amount` (0.4.0-1, see §0.8), optional `deadline`, `milestones` (default 25 / 50 / 75 / 100 %).
 - State is stored:
   - `active`
   - `completed`: ปิดเป้าหมาย `POST /saving-goals/:id/close {to: spare | wallets}`. Every part goes to spare or back to its own wallet, written as move / withdraw entries.
   - `archived`
   - Restore → active.
   - Reaching the target is `pace: reached`; the goal stays active.
-- Delete or archive while the goal holds money → 409 GOAL_HAS_SAVINGS (close first). A deleted goal stays in other buckets' history as a goal with `id` / `name` null.
+- Delete while the goal holds money → 409 GOAL_HAS_SAVINGS (close first). A deleted goal stays in other buckets' history as a goal with `id` / `name` null.
+- Archive works while the goal holds money (0.4.0-1, owner 2026-10-17). The goal keeps its money, but an archived goal and its savings count in no calculation: list summary, Home / More `SavingTotals`, wallets' saved / available / buckets. Restore brings them back. The delete preview is unchanged.
 - Saving into a goal that isn't active → 409 GOAL_NOT_ACTIVE.
 - Figures (user timezone):
   - progress_pct = saved / target (not capped)
@@ -71,6 +72,16 @@ Global conventions (base URL, error envelope, data types, HTTP verbs) are in [`o
 - Per goal: `month_plan` (its auto-saving amount, else `needed_monthly`; null when closed or neither), `month_saved` (net into the goal so far this month), `month_short` = max(0, plan − saved), `status` = reached | on_track | behind | none (+ `behind_months`), `auto_save`. List `summary` adds `saved_total` (goals + unallocated, wallet-less money included), `month_short_total`, `unallocated`.
 - **Auto-saving lives on the goal** (and on unallocated: `goal_id` NULL), table `saving_auto` (migration 062): amount, day of month (31 = last day), source wallet or none. `PUT|DELETE /saving-goals/:id/auto-save` and `/saving-goals/spare/auto-save` (answer = the goal / spare page). The recurring due check makes ONE saving draft (🐷, source `auto_save`) a month on the day; confirming it saves from that wallet, or with no wallet (outside any wallet). Old recurring ออม settings were moved here by migration 062; creating new ones in recurring stays possible until the recurring rework (M4).
 - `auto_save` is now an object or null on the goal (and on the spare page); the goal page's separate `auto_save` list is gone.
+### 0.8 Goals with no target (0.4.0-1)
+
+Owner 2026-10-17: open-ended saving, e.g. for a child. `target_amount` is nullable (migration 065). Create without it (or `null`) = no target; `PUT` with `null` clears it, a number sets it (> 0).
+
+- With no target: `progress_pct`, `remaining_amount`, `needed_monthly`, `eta_date` and `month_short` are null, `milestones` is empty, `pace` / `status` are `none`. `month_plan` comes only from auto-saving. The history has no plan line.
+- `group: "ongoing"` (null for goals with a target): the list puts these goals in their own group **ออมต่อเนื่อง**, whatever this month.
+- The list summary leaves them out of the month card (`month_short_total`, `month_plan_total`, `month_saved_total`). They still count in `saved_total`.
+- Sorting by progress / remaining puts them last.
+- App: "ยอดเป้าหมาย" is optional in create / edit (empty = no target). The list row has no bar: the saved amount on the right, "ออมต่อเนื่อง · เดือนนี้ +฿X" below. The detail hero shows the [ออมต่อเนื่อง] chip, description, ออมแล้ว, and two tiles: saved this month and the auto-saving amount. There is no bar, ticks, due date or behind badge. ออม / ถอน / ย้าย, auto-saving and ปิดเป้าหมาย work as usual.
+
 ## Phase summary
 
 | Concern | Phase 1c | Phase 2 | Phase 3 |
