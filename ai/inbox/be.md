@@ -1,3 +1,130 @@
+## 2026-10-17 — FE-pages recurring + events asks (Lead approved 1-8)
+DONE · commit on feat/0.4.0-be · recurring: `monthly_amount` on the setting; `GET /recurring/:id` embeds `upcoming` (first page) and `?include=delete_preview` → {items, linked_transactions, pending_drafts}; item writes (create-now, update/batch, archive/restore, delete, link, unlink) carry `setting` (the owning setting after the write; null when several); `GET /recurring?kind=` · events: `GET /projects?status=unsettled|receivable|ended` (derived, never archived; receivable = someone owes me, a subset of unsettled, cheap so kept) · board `payer_member_id` filter · `GET /projects/:id/detail?include=delete_preview` → {bills, members, linked_tx_count} · recurring / projects / apidoc tests ok.
+
+## 2026-10-17 — FE-core M4/M5 follow-ups
+DONE · commit c80c5d1 on feat/0.4.0-be · pending POST answer {data, summary}, PUT answer = draft + `summary` · accounts invite accept/reject + contacts link-request answers carry the notification `summary` (project link-request answers return the event, unchanged) · GET /me/archived items: `can_restore` (wallets and events: owner only) + `secondary {kind: balance|limit|target|planned|amount, amount}` (null for contacts) · GET /recurring picker hints `category_id` / `amount` (with for_type) give `likely: true` (same category, or amount within 5 pct), likely rows first · `POST /recurring-items/:id/unlink` returns {item}, open again · pending / recurring / accounts / contacts / me / notifications / apidoc tests ok.
+
+## 2026-10-17 — FE-core M4/M5 follow-ups
+DONE · pending POST answer {data, summary}, PUT answer = draft + `summary` · accounts invite accept/reject + contacts link-request answers carry notification `summary` (project link-request answers return the event, unchanged) · GET /me/archived items: `can_restore` (wallets/events owner only) + `secondary {kind: balance|limit|target|planned|amount, amount}` (null for contacts) · GET /recurring picker hints `category_id` / `amount` (with for_type) → `likely: true` (same category or amount ±5## 2026-10-17 — goals asks (FE-pages)
+DONE · summary.month_plan_total / month_saved_total · history[].plan (cumulative plan line = min(target, k × goal month_plan); null without plan / on the spare) · `GET /saving-goals?sort=created|deadline|progress|remaining|name` (400 otherwise) · `GET /saving-goals/:id?include=delete_preview` → {entries, saved_amount, can_delete} · month_short is null when the goal has no plan (0 when the plan is met) · split `wallet_id: null` = the part in no wallet · saving_goals + apidoc tests ok.
+
+## 2026-10-17 — budgets: pace_pct on list rows + delete_preview (FE-pages)
+DONE · `period.pace_pct` on every period (list rows included; null for open-ended / non-current) · `GET /budgets/:id?include=delete_preview` → `delete_preview {periods, overridden_periods, categories, wallets}` (null otherwise; transactions are never touched) · budgets/apidoc/dashboard/me tests ok · commit on feat/0.4.0-be. Noted: the detail tile uses `forecast.daily_allowance`.
+
+## 2026-10-17 — page-ready follow-ups: summaries on writes, notification filter, contacts (FE-core / FE-pages / Lead)
+DONE · BE commits df0ba85 + next on feat/0.4.0-be · own tests green (notifications, pending, users, recurring, contacts, personal_debts, apidoc); strict Dart YAML parse OK.
+
+**Contract (all additive unless noted):**
+- Pending `submit` / `submit-ready` / `{id}/submit` / `discard` / `DELETE {id}` answers carry `summary` (same PendingSummary as the list, computed after the write).
+- Notifications `read` / `actioned` / `dismiss` / `restore` / `read-all` / `DELETE` answers carry `summary` {all, needs_answer, unread, dismissed}; `GET /notifications` summary gained `all` (= not dismissed); new filter `?awaits_answer=true` (exactly the rows `summary.needs_answer` counts).
+- `GET /users/me` → `notification_summary {on, auto}` (on = mutable types not muted, auto = types running automatically).
+- BREAKING (pre-release): `/notifications/settings` no longer has `auto_resolve_own_in_projects` (use `/users/me` `auto_copy_own_event_bills`).
+- `recurring_ending` payload now `{recurring_id, name, left, start_date, end {kind, date?, count?}}` (for ต่ออีก); `POST /recurring/:id/extend` now marks that notice actioned.
+- Contacts: `linked_user.username`; contact detail always has `unlinked_total {names, records}`; `?include=delete_preview` → `delete_preview {debt_records, event_members, linked}` (null otherwise). Comma list works with `unlinked_names`.
+
+**x-used-by note for Lead:** the app ratchet ignores the spec's `x-used-by` (it takes usage from `page_flows.dart`), so adding it in the yaml does nothing. The 13 operations it flags need entries in the FE's page_flows.dart: deleteAccount, setGoalAutoSave, clearGoalAutoSave, setSpareAutoSave, clearSpareAutoSave, getMyArchived, restoreNotification, submitReadyPending, submitOnePending, archiveProject, restoreProject, linkRecurringItem, duplicateRecurring.
+
+**Decisions taken:** #30 notification summary counts hidden rows only in `dismissed`; #31 delete_preview counts personal_debts + project_members rows (records keep the name as text); #32 `notification_summary.on` counts only mutable types.
+
+## 2026-10-17 — debts people list `sort` (FE-pages request)
+DONE · `GET /personal-debts/people?sort=oldest|amount|recent` (default oldest: days_outstanding desc, none last, then |net| desc; amount: |net| desc; recent: last activity desc; 400 on other values) · totals / `*_people` counts cover ALL people (they ignore q / side / all / paging, as assumed) · test `TestPeopleSort`, personal_debts + apidoc ok · spec 12 · commit on feat/0.4.0-be.
+
+## 2026-10-17 — 0.4.0 M5 close (BE, feat/0.4.0-be)
+DONE M5 · `go vet ./...` clean and `go test -count=1 ./...` green on my own DB `chubi_test_040` (migrations 001–064; all 24 test packages ok, 0 failures) · docs: api-document "Delete / archive / restore matrix", specs 02 / 03 / 04 / 05 / 08 / 09 / 10 / 11 / 12 / 13 updated per milestone. Branch `feat/0.4.0-be` in `../chubi-pocket-be-040`, not merged / pushed / tagged. Apply migrations 062, 063, 064 (and 061 from 0.3.3) on the real local DB when you rebuild docker from the merge.
+
+**Delete / archive audit (the matrix is in api-document):** every entity with an archive state has archive + restore + delete routes with the final state in the answer. One gap found and closed: **events** had `status: archived` (PUT only) but no routes → added `POST /projects/:id/archive` and `/restore` (owner; restore = active; same answer as PUT, the EventPatch). Not changed, for Lead / the owner to rule on:
+- **Saving goals:** archive is refused while the goal holds money (409 GOAL_HAS_SAVINGS) and delete only when empty. The rule "archive = hide, always allowed" would let an archived goal keep counting its money; today the app must close the goal (ปิดเป้าหมาย) first. Left as built in 0.3.1-10.
+- **Event restore** always returns to `active` (the previous status is not kept).
+- Categories / tags / transactions / debt entries / pending drafts are delete-only by design.
+
+**FE contract delta** (additive): `POST /projects/:id/archive` and `/restore` → EventPatch (FE-pages: the event end zone).
+
+**Decisions taken**
+28. Event restore = active (no previous-status memory) · no column for it · add `status_before_archive` later.
+29. I ran the whole BE suite once at the end on my own DB (not only changed packages) because nearly every package changed; the Docker engine + `chubi_pocket_db` were started by me after the overnight stop.
+
+**State for Lead:** all BE work of the 0.4.0 brief is done (M1–M5). Commits on `feat/0.4.0-be` (oldest first): merge of 0.3.3 → wallets → debts → goals + auto-saving (062) → categories → budgets → events → transactions list → pending → M3 bundle (063) → recurring (064) → events archive routes.
+## 2026-10-17 — 0.4.0 M4 recurring (BE, feat/0.4.0-be)
+DONE M4 · migration 064 (`kind`, `trial_until`, amount ≥ 0, type check without saving; old rows migrated) · tests (changed packages, `chubi_test_040`): recurring, pending, dashboard, budgets, transactions, apidoc ok · docs: spec 11, api-document. Two M3 regressions found by this run and fixed: `needs_input` was null on the update answer; the dashboard attention test used `project_invite` as "plain info" (it now awaits an answer).
+
+**FE contract delta (forward-ready)**
+- **Kinds (→ FE-pages)** `POST /recurring` takes `kind: subscription | installment | income | reminder` (+ `trial_until` for a subscription); `type` is optional (the kind implies it; reminder may be `transfer`); `amount` is optional ONLY for a reminder (0 / absent). An installment needs `end {kind: count, count}`. `PUT /recurring/:id` takes `kind`, `trial_until` ("" clears). Every setting: `kind`, `trial_until`, `yearly_cost`, `saved_count`, `pending_count`, `next_date`, `next_amount`, `current_occurrence`. `amount` (setting + item) and `summary.next.amount` are now **nullable** (null = a reminder with no amount). The `saving` type is gone (goal auto-saving replaces it).
+- **Reminder drafts** (→ FE-core pending) the draft made on the day has no amount: `needs_input: [amount…]`, `can_confirm: false`, confirm answers `MISSING_AMOUNT` until it has one.
+- **Summaries (→ FE-pages)** `GET /recurring` `summary` + `due_30d_total`, `awaiting_amount_count`, `by_kind {subscription, installment, income, reminder: {count, monthly, yearly}}`.
+- **Calendar (→ FE-pages)** `GET /recurring-items?month=YYYY-MM` (items of the month, every status, oldest first, `per_page` 100). **Occurrence edits:** `PUT /recurring-items/:id {date, amount}` (one occurrence); skip = `POST /recurring-items/:id/archive`. **Duplicate:** `POST /recurring/:id/duplicate` → 201 with the copy's page.
+- **Picker / link (→ FE-core quick create + tx detail)** `GET /recurring?for_type=expense|income|transfer` = active settings a transaction of that type can link to, each with `current_occurrence {item_id, date, days_until, amount|null, status}`. `POST /recurring-items/:id/link {transaction_id}` → `{item, transaction, amount_differs, rule_amount, transaction_amount, account_balances}`; on `amount_differs` ask "อัปเดตยอดรายการประจำด้วยไหม?" and on yes `PUT /recurring/:id {amount}` (no separate amount route). Linking a reminder sets that period's real amount and leaves the setting without one. 409 `ITEM_ALREADY_LINKED` (done / skipped / tx already linked), 400 type mismatch.
+
+**Decisions taken**
+21. "No amount" on a reminder is stored as 0 (column `amount NUMERIC NOT NULL CHECK (amount >= 0)`) and shown as null · avoids a nullable column through the generator · switch to NULL later.
+22. Old rows: expense → subscription (installment when it had an end count), income → income, transfer → reminder · the brief's "migrate old rows" · easy to re-map by SQL.
+23. Calendar = `?month=` on the existing items list (not a new endpoint) · ground rule 6 · a dedicated route later if grouping by day is wanted.
+24. Skip an occurrence = the existing archive action; move / edit-amount = the existing item PUT · already there · documented.
+25. Picker = `for_type` filter + `current_occurrence` on the existing list; "current period" = the earliest not-done, not-skipped occurrence within one cycle of today (daily 1 day, weekly 7, monthly 31, yearly 366 × interval) · defines "current period" · change `windowDays`.
+26. Updating the setting's amount after a link = the existing `PUT /recurring/:id` (scope upcoming) · rule 1 · a dedicated route only if FE needs one.
+27. Creating a `saving` recurring is rejected now (400); the old saving code paths stay only for existing items' saving_entry links · removal is M5 cleanup.
+
+## 2026-10-17 — 0.4.0 M3 + ground rule 6 review (BE, feat/0.4.0-be)
+DONE M3 · migration 063 (data fix: old event deep links) · tests (changed packages, `chubi_test_040`): pending, notifications, users, me, accounts, categories, personal_debts, apidoc ok · docs: spec 02 / 03 / 05 / 12 / 13, api-document.
+
+**FE contract delta (forward-ready)**
+- **Pending (→ FE-core)** each draft: `needs_input: [amount|type|date|wallet|wallet_to|category]` (empty = ready) and `can_confirm` (false while a hard key — amount, type, date, a transfer's wallets — is missing: confirm answers it in `failed[]`, the draft stays). `GET /pending-transactions` + `summary {count, expense_total, income_total, needs_input_count, ready_count, by_source {recurring, manual, other_people, slip, other}}`. New actions: `POST /pending-transactions/submit-ready` (confirms every draft with empty needs_input) and `POST /pending-transactions/:id/submit`; both answer like `submit`.
+- **Notifications (→ FE-core)** `GET /notifications` + `summary {needs_answer, unread, dismissed}` (over all, not narrowed by the filter). `awaits_answer` now true for `project_invite` (accept / reject: `POST /projects/link-requests/:id/accept|reject`, deep link already that route) and `recurring_ending` (ต่ออีก = `POST /recurring/:id/extend`; ปล่อยให้จบ = mark actioned). `recurring_due` deep-links `/pending`. Event-bill notifications deep-link `/projects/:id` (the app has no per-bill route). Settings: `split_paid` / `split_received` not settable; `recurring_due` / `recurring_ending` mutable (already).
+- **/users/me (→ FE-core)** `default_account` (AccountRef | null) + `auto_copy_own_event_bills`; `PUT` takes `default_account_id` (uuid | null | absent) and `auto_copy_own_event_bills`. The old `auto_resolve_own_in_projects` is still accepted / returned by `/notifications/settings` (same stored value) until FE-core confirms the move.
+- **Archived hub (→ FE-core)** `GET /me/archived` → `{total, wallets, budgets, goals, events, contacts, recurring}` each `{count, items[{id, name, icon_code, archived_at}]}`; `GET /me/counts` `counts.archived` = total.
+- **Categories (→ FE-core)** `GET /categories/:id` `path` = ancestors root→parent each `{id, name, icon_code}` (list rows too); a duplicate sibling name on create / update / move = **422 `CATEGORY_NAME_DUPLICATE`**, `details: {field: "name"}` (was 400 DUPLICATE_NAME).
+- **Wallets (→ FE-pages)** `totals` + `cash_split [{type, pct}]` (bank, cash, e_wallet order, only types that have wallets; 0 each when cash_total ≤ 0) and `card_remaining` (limits − card_debt, ≥ 0). Delete confirm: `GET /accounts/:id?include=delete_preview`.
+
+**Ground rule 6 review — folded**
+- Debt person page: `GET /personal-debts/people/:key` now carries `summary_message {text, entries, net}` and its `items` default to the CURRENT cycle (`?cycle=earlier|all` and `/entries` page the rest). The `…/summary-message` route is gone.
+- Wallet delete preview: now `delete_preview` in `GET /accounts/:id?include=delete_preview`; the `/accounts/:id/delete-preview` route is gone.
+- Kept as separate routes: actions (`submit-ready`, `:id/submit`, auto-save PUT/DELETE, archive / restore / delete) and the paged "load more" (`/entries`, `/periods`, `/items`); `GET /me/archived` is a page with no existing answer to extend (its count rides on `/me/counts`).
+- Already inline: wallets / debts / goals / categories / budgets / events / transactions / recurring numbers and summaries.
+
+**Decisions taken**
+15. Pending `ready` = no `needs_input` key at all (soft keys wallet / category count): submit-ready skips a draft without category or wallet · the owner's "needs_input (no amount / category / wallet)" · treat soft keys as ready by filtering on `can_confirm` instead.
+16. Pending `by_source`: recurring = recurring / upcoming / auto_save, manual = manual / chat, other_people = project_update / project_copy / split / partner, slip = ocr / slip, rest = other · maps today's free-text sources.
+17. `auto_resolve_own_in_projects` stays in notification settings next to the new `/users/me` field (one stored value) · removing it breaks the current app · drop it from notification settings when FE-core confirms.
+18. Debt person page default = current cycle only (was all entries) · the "earlier cycles" fold loads on demand · `?cycle=all`.
+19. Category duplicate = 422 (was 400) with the field · FE-core asked.
+20. The Docker engine was off after the overnight stop; I started Docker Desktop and `chubi_pocket_db` only (not the app container) to run tests.
+
+## 2026-10-17 — 0.4.0 M2 (BE, feat/0.4.0-be)
+DONE M2 · 3 more commits (budgets, events, transactions list) · no migration · tests (changed packages, `chubi_test_040`): budgets, projects, transactions, dashboard, accounts, apidoc ok · docs: spec 04 / 08 / 10, api-document.
+
+**Item 6 (contacts):** checked, nothing to change: archive only hides (no 409 anywhere), contact delete snapshots the shown name and falls back to level 1; both covered by tests on the 0.3.3 branch that are merged.
+
+**FE contract delta (forward-ready)** — all additive.
+- **Budget detail (→ FE-pages)** `forecast` + `available` (limit − used), `projected_end` (= forecast_end), `days_left` (today included), `pace_pct` (elapsed / total, the pace tick); last three null for open-ended / non-current periods. Every budget item has `reason` (all | category | sub_category | tag | wallet). Periods list: `GET /budgets/:id/periods` (exists); per-period limit override = the existing `PUT /budgets/:id/periods/:period_id` (partial; `amount` null = back to base), no PATCH added.
+- **Events (→ FE-pages)** Event row: `my_paid`, `my_share`, `my_receivable`, `my_payable` (both ≥ 0), `remaining` (planned − (expense − income)); positions (`summary.members[]`, `my_position`): `receivable`, `payable`. List `summary`: `my_share_total`, `paid_total`, `receivable_total` (active events) + `counts {active, unsettled, ended}`; same whatever the filter. Event tags: owner + every contributor may create / rename / restyle / delete (viewers read-only) and bills filter with `?tag_id` (already so; verified).
+- **Transactions list (→ FE-pages)** `GET /transactions` + `avg_daily_spend` and `daily: [{date, income, expense}]` (my share, zero-filled, whole range): range = `from`/`to`, with only `from` that month, with neither the current month (user tz, `X-Timezone`). `avg_daily_spend` = range expense / days that have happened. `totals` unchanged.
+
+**Decisions taken**
+11. Budget per-period override stays PUT (no PATCH alias) · same behaviour, one route fewer to keep · add a PATCH route if FE insists.
+12. Event tag permissions: viewers stay read-only (contributors + owner write) · "every member" read as every member who can write; viewers cannot add bills either · allow viewers by relaxing `tagWriteGate`.
+13. Event list `summary.counts.unsettled` counts active AND ended events where my receivable / payable ≠ 0 (not archived) · the card says "ยังไม่เคลียร์" · restrict to ended if wanted.
+14. Transactions list: `avg_daily_spend` / `daily` sit at the TOP of the list answer, not inside `totals` · `totals` has a positional struct in tests and is shared · move later.
+
+## 2026-10-17 — 0.4.0 M1 (BE, branch feat/0.4.0-be, worktree chubi-pocket-be-040)
+DONE M1 · 5 commits on top of main 1b5dfe0 (the 0.3.3 merge is clean: no conflicts, build + vet green) · migration 062 (`saving_auto`, up + down; data move of old recurring ออม rules) · tests (changed packages, DB `chubi_test_040` at migrations 001–062): accounts, personal_debts, saving_goals, recurring, pending, categories, apidoc, me, dashboard ok · docs: spec 03 §2.5b, 05 §3.2, 09 §0.7, 12 §0, api-document. Never pushed / merged.
+
+**FE contract delta (forward-ready)**
+- **Wallets (→ FE-pages)** `GET /accounts` + every wallet answer: `month_in`, `month_out` (this month's income / expense cash on the wallet, user tz; transfers and opening / adjustment rows excluded), `due_date_next`, `days_until_due` (cards with a due day). Existing: `savings.{saved, available}`, `credit_limit`, `statement_date`, `payment_due_date`, `minimum_payment`. List `totals` adds `total`, `cash_total`, `card_debt`, `card_used_pct`, `saved_total`, `available_total` (`by_type[].count` = the group header counts). `GET /accounts` honours `X-Timezone`.
+- **Debts (→ FE-pages)** person: `cleared_at`, `days_outstanding`; `GET /personal-debts/people/:key` and `/entries` take `cycle=current|earlier`; entries in those lists have `in_current_cycle`; `counts.{current, earlier}`; people `totals` adds `owed_to_me_people`, `i_owe_people`, `over_30_days_people`; new `GET /personal-debts/people/:key/summary-message` → `{text, entries, net}`.
+- **Goals (→ FE-pages)** goal: `month_plan`, `month_saved`, `month_short`, `status` (reached | on_track | behind | none), `behind_months`, `auto_save: {amount, day, wallet|null, next_date} | null`. List summary adds `saved_total`, `month_short_total`, `unallocated`. New `PUT|DELETE /saving-goals/:id/auto-save` and `/saving-goals/spare/auto-save` (body `{amount, day 1–31, account_id|null}`; answer = goal / spare page). **Breaking inside the goal pages:** the detail's `auto_save` LIST is gone (now `goal.auto_save`, an object); `SpareDetail.auto_save` is an object | null. A confirmed auto-save draft with no wallet saves with no wallet.
+- **Categories (→ FE-core)** every category (list + detail): `month_spent`, `month_count` (this month, sub-categories included; my share).
+
+**Decisions taken** (what · why · how to undo)
+1. Wallet card fields keep the existing names `statement_date` / `payment_due_date` (the brief's `due_day` / `statement_day`) · they already exist with the same meaning, a rename would break the app for nothing · add aliases if FE prefers.
+2. Wallet `total` = `net`, `cash_total` = `assets`, `card_debt` = `liabilities` (redundant aliases as briefed) · FE reads the briefed names · drop the aliases later.
+3. Wallet `month_in` / `month_out` count the wallet's cash rows of ALL authors (a shared wallet's flow), not my share · it is the wallet's cash · restrict to my rows if wanted.
+4. Debts: `days_outstanding` = oldest entry of the CURRENT cycle not labelled paid, in the user's STORED timezone (not the header) · every `person_balance` in write answers needs it without a header · pass the header through later.
+5. Debt totals keep `owed_to_me` / `i_owe` as numbers and add `*_people` counts (the brief's `{amount, people}` objects would break the existing contract) · additive · reshape later.
+6. Debt cycle boundary = the last entry where the running balance (book order) is ≈ 0; a person with an unsettled start has a single cycle.
+7. Goal `month_plan` = auto-saving amount, else `needed_monthly`; `status` maps the old `pace` (late → behind) · FE gets the briefed names, `pace` stays · drop `pace` later.
+8. Auto-saving: one setting per goal / unallocated, table `saving_auto`, ONE draft per month on the day (31 = last day); source `auto_save`; old recurring ออม rules moved by migration 062 (data disposable) · creating new ออม rules in recurring stays accepted until M4 · remove in M4.
+9. Categories: names `month_spent` / `month_count` (brief: spent / count) · clearer next to the existing counts; write answers carry 0.
+10. Test DB: own throwaway `chubi_test_040` (never `chubi_test` / `chubi_pocket_db`).
+
 ## 2026-10-17 — saving entry with no wallet = NO wallet (owner correction, 0.3.3 branch)
 DONE (9th local commit on feat/0.3.3-delete-archive) · the write-time default-wallet stamp is removed: `POST /saving-entries` `kind: save` with no `wallet_id` stores `account_id` NULL (`defaultWallet` helper deleted); explicit `wallet_id` unchanged. NULL = outside any wallet: counts for the goal / unallocated, never for a wallet's available / spare. Spec: openapi `SavingEntryRequest.wallet_id`, spec 09 §0.6, api-document; test `TestSavingsWithoutWallet` now sets a default wallet and asserts it is ignored · saving_goals tests ok on `chubi_test_033`.
 FE: `wallet_id` is optional on save; a save with no wallet never touches any wallet's numbers. (Not yet: recurring / pending saving drafts still need a wallet; recurring loses ออม later per Lead.)

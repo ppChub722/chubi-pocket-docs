@@ -13,16 +13,16 @@ _Last updated: 2026-10-17 by Lead._
 - Prod is the old Happy-Host box and is probably down (2026-10-16). **No new VPS until 0.3.3** (owner 2026-10-16): until then everything is local only; releases are tags + local builds, no deploys. The new server runbook: `engineering/new-vps-runbook.md`.
 
 ## In progress (2026-10-17, Lead handoff)
-- **0.4.0 briefs are written and waiting for the owner's OK**: ai/briefs/0.4.0-plan.md (team, worktrees, milestones M1–M5) · 0.4.0-be.md · 0.4.0-fe-core.md · 0.4.0-fe-pages.md. Not sent yet. Once the owner says go, send each session its brief (one short message pointing at the file).
-- Sessions (idle, waiting): BE chubi-pocket-e7 · FE-core chubi-pocket-7b · FE-pages chubi-pocket-b2 (greeted, set up, no code changes).
+- **0.4.0 M1–M5 DONE + GREEN on local main (2026-10-17 ~16:30)**: be main `2d50b22` (migrations 061–064) · app main `3ca3539` · Lead final run: analyze clean, go vet clean, flutter test 1077 pass then the 9 reds fixed (re-run of those files: 70/70). Nothing pushed / tagged / built; local DB not migrated. Next = owner review: decisions + 2 questions in ai/inbox/lead.md, then the owner orders a local build.
+- Plan (sent 2026-10-17 by Lead, owner's go): ai/briefs/0.4.0-plan.md · 0.4.0-be.md · 0.4.0-fe-core.md · 0.4.0-fe-pages.md. Run straight through M5 while the owner is away. The team decides non-breaking choices itself ("Decisions taken" in each inbox); Lead confirms / overrides and collects them for the owner. Pending page: UI frozen, logic in scope. No local build / tag / push until the owner orders it.
+- Sessions (after the 06:08 crash, 2026-10-17): BE chubi-pocket-98 · FE-pages chubi-pocket-8c · FE-core chubi-pocket-31 · Lead chubi-pocket-2d.
+- Lead's collected decisions for the owner: ai/inbox/lead.md "0.4.0 decisions for the owner".
 - Design reference artifact (approved): https://claude.ai/artifact/EJq2vwbaKkYmMu27ZtZPZ7 . To change it in a new session, read it with the Artifact tool (action read) and republish to the same url.
 - Committed: be 1b5dfe0 · app 4c6ce78 · docs (this commit). BE 0.3.3 branch feat/0.3.3-delete-archive (worktree chubi-pocket-be-033) not merged: BE M1 item 1 merges it.
 - Owner decisions today are in ai/decisions.md (note label stays โน้ต, 0.4.0 scope, kit freeze lifted, edit mode, sections, hero anatomy, รอรับ/รอจ่าย, ผูกกับ, เตือนจ่าย, event tags, shell swipe, page indicator).
 
 ## Waiting on the owner
-- UI library: package name / repo location (the library AI asks the owner).
-- Feature-widget audit (`ai/inbox/fe-a.md`): A≈18 · B≈111 · C≈25, ~29 dev-days. Lead proposed a ratchet test + moving widgets during the page reworks.
-- Short text values in detail boxes: one row (Lead's pick) vs stacked.
+- Review the 0.4.0 result + the collected decisions (owner back 2026-10-18). UI library package name: parked.
 
 ## How the team works
 - The owner talks ONLY to **Lead**. Team sessions load their role skill (`ai/skills/chubi-*`), read this file, then wait for Lead's brief.

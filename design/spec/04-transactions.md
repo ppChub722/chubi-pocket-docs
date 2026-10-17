@@ -554,3 +554,7 @@ Implementable but adds edge cases. Deferred to Phase 2 as "Move transaction to d
   - Removed edit-after-resolve guards (`SPLITS_HAVE_SETTLEMENTS`, `HAS_SETTLEMENTS`) — the owner can freely edit/delete; settlement is per-caller computed
   - Notification side effects on split create / split delete documented
 - **Version 0.1** — initial draft; 3-type model with transfer-via-category, two-row transfers, per-account currency, no photo storage, atomic balance updates, `settles_split_id` for settlement linkage
+
+## 0.4.0 list numbers
+
+`GET /transactions` also returns `avg_daily_spend` and `daily`: both follow the list's date range (`from` / `to`; with only `from`, that month; with neither, the CURRENT month in the user's timezone) and every other filter. `daily` = one `{date, income, expense}` per day of the range (my share, zero-filled, the whole range even past today; empty when the range is over 366 days). `avg_daily_spend` = the range's expense / the days of it that have happened (up to today, at least 1). `totals` is unchanged (it follows the filters as before).

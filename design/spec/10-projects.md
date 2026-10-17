@@ -1253,3 +1253,9 @@ event page later reuses the same list-shaped add):
   - **`transactions.project_id` is now auto-managed** — only set on rows that mirror a project (claim or split-resolve). Bare personal transactions never carry `project_id`. Personal-context splits cannot target `project_member_id`; splitting with project members requires creating a `project_transaction`.
 - **Version 0.2** — added `project_transactions` ledger for non-personal-book actors; polymorphic split + resolution sources; `/resolve/claim`; revised §4.1
 - **Version 0.1** — initial draft; two-books model, shared-visibility tag, three member types, invite-based linking, ownership transfer in Phase 1, two-sided settlement
+
+## 0.4.0 numbers
+
+- **Event row** (list and detail): `my_paid` (what I paid on the expense bills), `my_share` (my part of them; a bill without splits is all its payer's), `my_receivable` / `my_payable` (`my_net` split by sign, both ≥ 0), `remaining` (= `planned_amount` − (expense − income), null without a plan). **Positions** (`summary.members[]`, `my_position`) add `receivable` / `payable` the same way.
+- **List `summary`** (same whatever the filter; over MY events: active member, not archived): `my_share_total`, `paid_total`, `receivable_total` over the ACTIVE events, and `counts {active, unsettled, ended}` (unsettled = events where I am owed or owe; ended = completed + cancelled).
+- **Event tags** are one shared set per event: the owner and every contributor may create / rename / restyle / delete (a viewer is read-only); bills filter by tag with `GET /projects/:id/transactions?tag_id`.

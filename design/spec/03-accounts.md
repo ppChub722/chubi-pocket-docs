@@ -260,6 +260,10 @@ Manually adjust the balance to a target value. Backend computes the delta and cr
 
 Archive = hidden + ignored + read-only (owner only; 409 `ACCOUNT_HAS_MEMBERS` while other members are active; idempotent). An archived wallet is out of the default list (`?status=archived|all`), out of EVERY calculation (wallet totals, transaction summaries, budgets, dashboard: `shared.ReportScopePredicate` skips its rows; `GET /transactions` hides its rows unless `include_archived=true` or `account_id` is that wallet), and read-only: any write on it (new / edit / delete a row, transfer in or out, debt entry, recurring setting, saving entry) answers 409 `ACCOUNT_ARCHIVED` until `POST /restore`. Recurring settings on an archived wallet are auto-paused (recurring module). `DELETE /v1/accounts/:id` is the real delete (§2.6).
 
+### 2.5b Page numbers (0.4.0)
+
+`GET /v1/accounts` and every answer that returns a wallet carry, per wallet: `savings.{saved, available}` (already; available = balance − saved, null when untracked), `month_in` / `month_out` (this month's cash income / expense rows on the wallet, any author; transfers and opening / adjustment rows are not money in / out; month in the user's timezone), and for credit cards / pay-later with a `payment_due_date`: `due_date_next` (next due date on or after today, day 31 = last day of the month) and `days_until_due`. The card fields keep the names `credit_limit`, `statement_date`, `payment_due_date` (the 0.4.0 brief's due_day / statement_day are these two). List `totals` adds `total` (= net), `cash_total` (= assets: non-credit wallets), `cash_split` (`[{type, pct}]`, share of cash_total by bank / cash / e_wallet, only types with wallets), `card_debt` (= liabilities), `card_used_pct` (credit used / limits), `card_remaining` (limits − card_debt, ≥ 0), `saved_total` (money set aside in the tracked, non-archived wallets; unallocated goal money not included), `available_total` (= cash_total − saved_total); `by_type[].count` gives the group header counts.
+
 ### 2.6 `DELETE /v1/accounts/:id` and `GET /v1/accounts/:id/delete-preview` (0.3.3)
 
 **A real delete** (this replaces the old "DELETE = archive"; archive = `POST /:id/archive`, §2.5a). Owner only; 409 `ACCOUNT_HAS_MEMBERS` while other members are active. One DB transaction:
@@ -271,7 +275,7 @@ Archive = hidden + ignored + read-only (owner only; 409 `ACCOUNT_HAS_MEMBERS` wh
 5. `user_notification_settings.default_account_id` → NULL; budget wallet scopes and memberships cascade; pending drafts that name the wallet get a `last_error` on submit;
 6. the wallet row is deleted.
 
-`GET /:id/delete-preview` → `{ transactions, transfers, system_rows_deleted, recurring, saving_entries: { count, amount } }` so the confirm can say what happens. The delete answers `{ id, deleted: <same shape> }`.
+The confirm reads `GET /:id?include=delete_preview` → `delete_preview: { transactions, transfers, system_rows_deleted, recurring, saving_entries: { count, amount } }` (null unless the caller is the owner with no other active member). The delete answers `{ id, deleted: <same shape> }`.
 
 **Errors:** `401`, `403 NOT_OWNER`, `404`, `409 ACCOUNT_HAS_MEMBERS`.
 

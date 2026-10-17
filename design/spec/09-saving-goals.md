@@ -66,6 +66,11 @@ Global conventions (base URL, error envelope, data types, HTTP verbs) are in [`o
 `saving_entries.account_id` is nullable (`ON DELETE SET NULL`, migration 061). NULL = **unallocated**: the money counts for its goal (`saved_amount`, progress, history, `by_wallet` shows one share with `wallet: null`) and for NO wallet: it never enters a wallet's available / spare / saved numbers, and there is no balance to compare with. The no-negative rule still applies to the wallet-less pool (a bucket cannot go below 0). Two ways to get such money: deleting a wallet that holds goal money keeps it (spec 03 §2.6; `delete-preview` reports it as kept and unlinked), and `POST /saving-entries` `kind: save` with no `wallet_id` (owner 2026-10-16: no wallet means NO wallet; the user's default wallet is never used). A withdraw / move without `splits` takes largest-first across wallets and the wallet-less pool alike. `SavingEntry.wallet`, `SavingWalletShare.wallet` and the wallet bucket ref are nullable.
 
 
+### 0.7 Month numbers and auto-saving (0.4.0)
+
+- Per goal: `month_plan` (its auto-saving amount, else `needed_monthly`; null when closed or neither), `month_saved` (net into the goal so far this month), `month_short` = max(0, plan − saved), `status` = reached | on_track | behind | none (+ `behind_months`), `auto_save`. List `summary` adds `saved_total` (goals + unallocated, wallet-less money included), `month_short_total`, `unallocated`.
+- **Auto-saving lives on the goal** (and on unallocated: `goal_id` NULL), table `saving_auto` (migration 062): amount, day of month (31 = last day), source wallet or none. `PUT|DELETE /saving-goals/:id/auto-save` and `/saving-goals/spare/auto-save` (answer = the goal / spare page). The recurring due check makes ONE saving draft (🐷, source `auto_save`) a month on the day; confirming it saves from that wallet, or with no wallet (outside any wallet). Old recurring ออม settings were moved here by migration 062; creating new ones in recurring stays possible until the recurring rework (M4).
+- `auto_save` is now an object or null on the goal (and on the spare page); the goal page's separate `auto_save` list is gone.
 ## Phase summary
 
 | Concern | Phase 1c | Phase 2 | Phase 3 |

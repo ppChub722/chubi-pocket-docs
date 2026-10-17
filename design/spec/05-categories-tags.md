@@ -185,6 +185,7 @@ Create a category.
 | 401 | `UNAUTHORIZED` | |
 
 ### 3.2 `GET /v1/categories`
+**Month numbers (0.4.0):** every category (list and detail) carries `month_spent` (this month, user timezone: the money in the category AND its sub-categories, my share, the reports rule; an income category sums income) and `month_count` (the transactions behind it). Write answers carry 0.
 
 List categories owned by the user. Returns a flat list by default; client builds the tree using `parent_id`.
 
@@ -551,3 +552,7 @@ System categories have `is_system = true` but `name` is editable. Users might wa
   - **0.3 (2026-10-11)** — §4.14b: every level shows its own icon (glyph + colour); the L1-inheritance rule is dropped (owner decision, QA S4).
   - **0.2 (2026-04-29)** — Added `sort_order`, `include_in_report`, `description`, `note` to `categories`; added `icon` to `tags`. Added `PATCH /v1/categories/reorder` (§3.13). Added §4.14a–c notes covering single-atomic-save, color inheritance, and `include_in_report` defaults.
   - **0.1 (2026-04-24)** — Initial draft (3-layer tree, system categories + seed, soft-delete with display-skip).
+
+## 0.4.0 category page
+
+`GET /categories/:id` carries `path` (ancestors root → parent, each `{id, name, icon_code}`) so the page needs no list lookup. A duplicate sibling name (same parent + type, case-insensitive) on create / update / move is `422 CATEGORY_NAME_DUPLICATE` with `details: {field: "name"}` (was 400 DUPLICATE_NAME).

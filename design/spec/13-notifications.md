@@ -391,3 +391,9 @@ The data model is the same in both phases; Phase 2 just adds a separate dispatch
   - In-app inbox + 7 trigger types covering Phase 1b shared-expenses + project flows
   - Per-user settings table with 4 auto-toggles + default account
   - Push delivery scoped to Phase 2+
+
+## 0.4.0 inbox
+
+- `GET /notifications` carries `summary {needs_answer, unread, dismissed}` over ALL the user's notifications (not narrowed by the filter).
+- `awaits_answer` also covers `project_invite` (accept / reject at `POST /projects/link-requests/:id/accept|reject`) and `recurring_ending` (ต่ออีก = `POST /recurring/:id/extend`, ปล่อยให้จบ = mark actioned). `recurring_due` links to `/pending`. Event-bill rows (`project_tx_recorded_for_you`, `project_tx_changed`) deep-link to `/projects/:id` (the app has no per-bill route; migration 063 fixed old rows).
+- Settings: `split_paid` / `split_received` are not settable (retired); `recurring_due` / `recurring_ending` are mutable. `auto_resolve_own_in_projects` is also on `/users/me` as `auto_copy_own_event_bills` (the notification setting still accepts it for now).

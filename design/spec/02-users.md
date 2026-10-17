@@ -402,3 +402,7 @@ Per global convention ([`overview.md §3`](overview.md)). All `PUT /v1/users/me`
 - **Phase** — spec; Phase 0 implementation pending
 - **Last updated** — 2026-04-24
 - **Version** — 0.2 (user_preferences JSONB table; status column; avatar upload moved to Phase 3; timezone design documented)
+
+## 0.4.0 profile additions
+
+`GET|PUT /users/me` also carry `default_account` (ref | null; set with `default_account_id`: an active wallet you are a member of, `null` clears, absent leaves it) and `auto_copy_own_event_bills` (a bill I record in an event also lands in my own book). Both are stored in `user_notification_settings`. `GET /me/counts` has `counts.archived` and `GET /me/archived` is the archived hub (`total` + wallets / budgets / goals / events / contacts / recurring, each `{count, items[{id, name, icon_code, archived_at}]}`).

@@ -426,3 +426,7 @@ Caveat: if the budget was edited mid-period (amount changed from ฿5,000 to ฿
 - **Last updated** — 2026-09-11
 - **Version** — 0.2 (project scope documented as the personal lens vs `projects.planned_amount` group total; fixed "฿10,000 total" examples that contradicted the period enum; added permissions-vs-lens open question)
 - **Version** — 0.1 (initial draft; user + project scopes, 3-level hierarchy rollup, advisory-only, fresh rollover)
+
+## 0.4.0 detail numbers
+
+`GET /budgets/:id` `forecast` also carries `available` (limit − used), `projected_end` (= `forecast_end`), `days_left` (today included) and `pace_pct` (elapsed / total days, the pace tick); the last three are null for an open-ended or non-current period. Every item row has `reason`: why it counts here (first match of `all` / `category` / `sub_category` / `tag` / `wallet`). The periods list (`GET /budgets/:id/periods`, one row per period with used / amount) and the per-period override (`PUT /budgets/:id/periods/:period_id`, `amount` null = back to the base amount) already exist; the override is a PUT with partial semantics, not a PATCH.

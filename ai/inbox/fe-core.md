@@ -1,5 +1,91 @@
 # fe-core inbox (newest on top)
 
+## 2026-10-17 — wired BE c80c5d1 + label split · feat/0.4.0-fe-core (local)
+- แบ่งกับคน (txSplitPeopleLabel) in quick create + tx detail; แบ่งยอด stays on the pending batch-add layout (note: the pending draft EDIT sheet is the quick-create sheet, so it shows แบ่งกับคน).
+- Pending create/update answers carry `summary` (no stale chips). Inbox: wallet-invite accept/reject and contact link-request answers patch the inbox summary, NO re-fetch (project invites still re-fetch: their answers are the event, no summary).
+- Archived: กู้คืน only when `can_restore`; helper line "คงเหลือ/วงเงิน/เป้าหมาย/งบ/ยอด ฿x · เก็บถาวรเมื่อ …" from `secondary`.
+- Recurring picker: hints category_id + amount, `likely` rows first in an "น่าจะใช่" group (each row in exactly one group); tx detail ✕ unlinks (POST /recurring-items/:id/unlink, 1 call, local row patched); quick create's draft chip ✕ stays local. Flow `unlinkRecurringItem` added.
+- Decisions: secondary + archived date merged in one helper string (DetailRow has one slot; split by extending DetailRow); ✕ hidden while busy; wallet accept uses AccountsCubit upsert instead of load(); AcceptedInvite lives in accounts_repository.
+- Tests run: only the changed files (pending, notifications, archived, transactions/recurring_link); the remaining api_spec_ratchet red = flows owned by FE-pages (goal auto-save ×4, projects archive, recurring duplicate).
+
+
+## 2026-10-17 — 0.4.0 M4 + M5 (FE-core) · feat/0.4.0-fe-core (local, last commit after e4ad5df)
+Last full run: 1002 pass / 1 fail (api_spec_ratchet: BE x-used-by / flows — BE side). No more full runs from me (owner: test less). analyze clean.
+
+**M4 — ผูกกับ + recurring picker (item 16)**: quick create + tx detail section is "ผูกกับ" with แบ่งยอด · อีเวนต์ · รายการประจำ. New kit: `AskCard` (inline question card), `SplitRecurringSlot` / `RecurringLinkRow` (in split_event_section.dart; `SplitEventSection(recurring:)`), `RecurringPickerSheet` / `RecurringPickGroup` / `RecurringPickRow` / `RecurringPickChoice` (lib/ui/domain/recurring, on PickerSheet). Feature: `RecurringLinkRepository` (candidates GET /recurring?for_type=, link POST /recurring-items/:id/link, updateAmount PUT /recurring/:id {amount, scope:upcoming}), `recurring_link.dart` wrapper. Quick create: pick held in the draft, ONE extra link call right after the tx is created; tx detail: link on tap (1 call, patchRow, balances patched into AccountsCubit); amount_differs → ไม่ต้อง (no PUT) / อัปเดต (1 PUT); 409 ITEM_ALREADY_LINKED message. Hub demos in domain_recurring + domain_transactions. Page flows added (linkRecurringItem, listRecurring for_type, updateRecurring).
+**M5 — archived hub (item 17)**: `/archived` (settings tab group; `tab_nav._segments` + router), `lib/features/archived/**`: ONE GET /me/archived, groups per kind, กู้คืน = one POST per kind (restoreAccount/Budget/SavingGoal/Project/Contact/Recurring), row leaves from the success, rows open the entity detail, EmptyView at total 0. Page flows added.
+**Patched to BE 3aa81da page-ready answers (rule 6, supersedes decisions 7/9/10)**: pending write answers carry `summary` (chips from it, row-count fallback removed); notifications write answers carry `summary {all,needs_answer,unread,dismissed}` — hide / restore / read-all / read / actioned patch the held rows, NO re-fetch; ทั้งหมด tile = summary.all; server `awaits_answer` filter only; settings home row "เปิด n เรื่อง · อัตโนมัติ m เรื่อง" from `/users/me notification_summary`; ต่ออีก reads `payload.end` + `payload.start_date` (count×2, date + same span).
+
+**Decisions taken** (what · why · undo)
+14. Tx detail: removed the separate "🔁 Netflix · 3/12" section; the linked chip in ผูกกับ shows it · one place · re-add the `sections:` entry in transaction_detail_page.dart.
+15. Quick create asks the amount_differs question in a dialog (sheet closes right after save) · inline card only fits tx detail · keep the sheet open after save.
+16. Picker leaves out settings with `current_occurrence == null` and has no "น่าจะใช่" group (BE returns no ranking flag; not derived on the client) · rule 6 · add the group when BE sends a flag.
+17. Archived: restore calls live in `ArchivedRepository`; tapping a row opens its detail; page title reuses settingsArchived · only new files allowed · route each kind to its feature repo.
+18. Inbox: failed hide puts the row back locally; restore inserts by createdAt desc; mark-read/actioned keeps the row under unread/needs-answer filters until the next load · no re-fetch · see each undo in code comments.
+19. `/archived` route lives in the ShellTab.settings group (edit in tab_nav.dart `_segments`) · lands in the right tab for openPage · give it a settings-prefixed path.
+
+**Open for BE / FE-pages**
+- BE: pending POST/PUT answers lack `summary`; notification domain actions (invite accept/reject, link requests) may need `summary`; per-item `can_restore` in /me/archived; row secondary text (wallet balance / event status) in /me/archived; `for_type` ranking flag for "น่าจะใช่"; an unlink-from-recurring call (no ✕ on a saved link).
+- FE-pages: the recurring create page must read `type`, `amount`, `category`, `name` (+`account`) from the query string so "+ สร้างรายการประจำใหม่จากรายการนี้" prefills (it only reads type=saving / goal / account today; the route is in app_router.dart ~540).
+- Label "แบ่งยอด" (txSplitRowLabel) stays shared with pending drafts; rename app-wide to "แบ่งกับคน" if wanted.
+
+
+## 2026-10-17 — 0.4.0 M2 + M3 (FE-core) · feat/0.4.0-fe-core e4ad5df (local only)
+Full flutter test: 978 pass, 2 fail — both from the BE spec file (`../chubi-pocket-be/internal/apidoc/openapi.yaml` line ~4087: `parameters:` key missing above the `cycle` param of listDebtEntries; BE 98 told): test/hub/api_spec_ratchet_test + page_flows_test. analyze clean.
+
+**Done**
+- Categories: client list lookups gone — parent chip from the detail `path`, duplicate name = server 422 CATEGORY_NAME_DUPLICATE (also old 400) shown on the name field; `/browse` takes `type=income|expense` so an income category's number label opens its month.
+- Pending (logic only, UI untouched): `needs_input` / `can_confirm` / `summary` / `by_source` parsed; list chips use the summary; drafts with can_confirm=false are never sent (selected → existing sheet opens; mixed selection sends only the ready ones in one call); sheet confirm = POST /:id/submit; `submitReady()` in repo+cubit (no UI caller: the page has no confirm-all button); amount-less เตือนจ่าย draft opens the existing sheet and can't be confirmed before an amount is typed.
+- Notifications inbox rebuilt (ListSummaryCard tiles ทั้งหมด/ต้องตอบ/ยังไม่อ่าน/ซ่อนไว้ as server filters, ✓✓ + ⚙️ in the card slot, swipe = hide with undo, restore from ซ่อนไว้, one tile anatomy, project_invite accept/reject routes, recurring_ending extend / let-end, recurring_due → /pending, split_paid/split_received removed).
+- Notification settings: 3-state control (new kit piece `SegmentedChoice<T>` / `ChoiceSegment` in `molecules/segmented_choice.dart`, hub molecules-pickers-inputs) ปิด/แจ้ง/อัตโนมัติ (2-state when nothing can be automated), wallet picker inline only for auto, recurring_due / recurring_ending added, split_paid removed, auto_resolve_own_in_projects no longer read or sent.
+- Settings home: profile card ›, แอป (ธีม row → sheet, การแสดงผล, ภาษา, ฟอนต์), เงิน (สกุลเงิน with the not-converted dialog, กระเป๋าหลัก = default wallet, one PUT each), การแจ้งเตือน row, ข้อมูล (ที่เก็บถาวร → /archived, CSV greyed 0.4), เกี่ยวกับ, ออกจากระบบ. Profile: card + email + ความปลอดภัย; edit = avatar, name, email (currency moved off it). User model: `defaultAccount`, `autoCopyOwnEventBills` (no UI: event settings = FE-pages).
+
+**Decisions taken** (what · why · how to undo)
+7. Pending chips fall back to row counting after a local change (BE write answers carry no summary) · keeps counts correct · BE adds `summary` to submit/discard answers, then drop the fallback.
+8. Pending "manual" filter includes chat (matches BE by_source.manual) · counts agree with rows · use isManual again in `_visible`.
+9. Inbox hide / restore / read-all re-fetch the list afterwards · card numbers must come from BE · patch numbers locally instead.
+10. Inbox ทั้งหมด tile shows the cached unfiltered pagination.total ("—" before the first unfiltered load) · BE has no summary.all (asked) · read summary.all when it lands.
+11. Notification settings: control on its own line under the label, wallet picker only under project_tx_recorded_for_you; Thai names "รายการประจำถึงกำหนด" / "รายการประจำใกล้จบ" (reference wording) · undo = edit arb values / pass walletRow to other rows.
+12. Settings home: theme = one row opening the existing sheet; การแสดงผล keeps ThemeModeChips (not the mini segmented of the reference) · no new piece needed · say if you want the segmented control (SegmentedChoice now exists).
+13. Profile security section sits in the DetailLayout `settings` slot; email field in a SectionCard (InfoBox can't hold an edit field) · no free slot / no edit row in InfoBox · move when InfoRow gets an edit mode.
+
+**For BE (sent to 98):** `awaits_answer=true` list filter + `summary.all` on /notifications; extend body / does it mark actioned; `/users/me` `notification_summary {on, auto}` (settings home row shows a static hint today); submit/discard answers carry `summary`; openapi.yaml line ~4087 missing `parameters:`.
+
+
+## 2026-10-17 — 0.4.0 M1 (kit + reference page) · branch feat/0.4.0-fe-core (e82f467 on 12e5f55)
+Status: M1 done. Full flutter test was running at report time (result in the DONE ping). Not pushed / merged.
+
+### Kit APIs added (for the library AI) — all exported via lib/ui/ui.dart, hub pages in parentheses
+- HeroCard / HeroNumber / HeroAmountField / HeroBar(+.split) / HeroAlert — `lib/ui/organisms/hero_card.dart` (hub organisms/hero-card). Rows A chips+slot (links → 🔍 → ✏️) · B identity (icon + description; people: name + fact) · C number · D bar · E tiles · F alert · G embedded · settingsLine; `editing: true` = the edit variant (A only editable dropdown chips, B icon + underlined name/description, C outlined amount field, D–G hidden). ✏️ is `CardActionButton`.
+- DetailLayout / DetailSections — `lib/ui/templates/detail_layout.dart`: fixed slot order hero → tags → actions → info → settings → people → note → records → endZone → meta; DetailSections = same slots without hero/meta (inside an overview tab).
+- InfoBox/InfoRow (`molecules/info_box.dart`, one row vs stacked is automatic), SettingsSection/SettingToggleRow/SettingSummaryRow, PeopleStrip/PeopleStripMember/PeopleTone, NoteSection, EndZone/EndZoneAction/EndZoneKind (extends DangerRow with `consequence`), TagRow (hub templates/detail-sections).
+- ListSummaryCard / SummaryTile / SummaryTileTone / SummaryCta (`organisms/list_summary_card.dart`, hub organisms/list-summary-card): tiles as filters, alert line, info line, CTA, action slot.
+- PageDots / PageDotsScope / PageDotsFooter (`molecules/page_dots.dart`): swipe-tab page indicator at the END of each tab's content, in the flow (AppTabPager / TabbedListPageBody / TabbedDetailBody `showPageDots`, default on; ListPageBody appends the footer).
+- ProgressRow `ticks` (25/50/75), earlier `marker`; ProgressTone.normal; CardActionButton 40px (standard action slot).
+- PagePopObserver (`organisms/page_pop_observer.dart`): counts popped PAGES (not sheets/dialogs); registered on the GoRouter and every shell branch.
+- **Refresh on show (owner rule 7)** — built ONCE in `PullToRefresh` (used by ListPageBody, DetailPageBody, DetailLayout, DashboardPageBody, AsyncStateView): when the page's shell tab comes back to front (TickerMode) or a PAGE above it is popped, it silently re-runs its `onRefresh` (same call as a pull; no skeleton, data kept; skipped while editing/saving; guarded against overlap; also on reconnect as before). Pages get it by passing `onRefresh` (DetailPageBody/DetailLayout/…) or `onRetry` (ListPageBody). Ratchet: `test/ui/page_refresh_ratchet_test.dart` (baseline 4: account_detail_page, home_page, project_form_page, change_password_page). Test: `test/ui/refresh_on_show_test.dart`.
+- Shell swipe: only on the roots of the 4 bottom + 3 top tabs (`main_shell.dart` `_swipesBetweenTabs`).
+- Ratchet `test/ui/feature_visuals_test.dart` (+ `feature_visuals_baseline.txt`, heuristic count of non-page layout widget classes in lib/features + lib/app: 68 in 35 files at start; may only shrink). A-duplicates not done yet.
+- l10n words (th): รอรับ/รอจ่าย (debtsOwedToMe/IOwe, debt strings, moreLiveDebts, txShare*), projectTabDashboard → ภาพรวม, txSplitSectionTitle → ผูกกับ, เก็บเข้าคลัง → เก็บถาวร; en equivalents.
+- New dep: `flutter_timezone` ^5.1.1 (pubspec) — device IANA timezone.
+
+### Reference page: categories detail (view / edit / create)
+Rebuilt on HeroCard + DetailLayout + InfoBox + SettingsSection + NoteSection + EndZone: type chip (dropdown only in create), icon, description, number "ต.ค. ใช้ไป · N รายการ ›" (month_spent / month_count; label → /browse drill-down for expense), parent row, instant-save รวมในรายงาน toggle in view mode, fee-category toggle, note box, EndZone delete only; zero raw widgets. Model: Category.monthSpent / monthCount. Tests: test/features/categories/category_detail_page_test.dart.
+
+### Decisions taken (what · why · how to undo)
+1. Global `X-Timezone` header from the device IANA name (new interceptor field in api_client.dart, `flutter_timezone`) · BE computes "this month" in the user's zone and the client sent nothing (Lead 2d approved) · remove the `_timezone` lines + dependency.
+2. Refresh-on-show lives in `PullToRefresh` + `PagePopObserver` (no per-page code) · one place, every template gets it; sheets don't trigger it · set `enabled:false` per page or delete the show-trigger block in pull_to_refresh.dart.
+3. Categories: "hidden from report" chip dropped from the hero (reference shows only the type chip) · layout reference · re-add an AppChip to `chips`.
+4. Categories: รวมในรายงาน toggle saves instantly in view mode via the cubit update (optimistic, reverts + snackbar on failure) · reference "live toggles" · switch back to draft editing in `_page`.
+5. feature_visuals ratchet is a text heuristic (non-page StatelessWidget/State classes with Row/Column/Container/… in lib/features + lib/app; Page/Sheet/Dialog exempt), baseline 68 · no analyzer needed · delete the test + baseline.
+6. Divider/section gaps: DetailLayout puts one HeroSpacing.after gap before every slot; section pieces take `first:` for the case where they sit first elsewhere.
+
+### Open for BE / others
+- BE (asked, shape confirmed by 98): categories detail `path`, CATEGORY_NAME_DUPLICATE 422 {field:name} → FE drops the client list lookup (next step, small).
+- `/browse` route hard-codes type=expense, so an income category's number label is not tappable; needs a `type` query param in app_router.dart (mine, M2 help item).
+- Smoke: hub page templates/detail-sections used a ListView inside the smoke host's scroll view (fixed to Column).
+
+
 ## 2026-10-16 — Wallet detail hero ✏️ → standard slot
 Full analyze/test: see ping. No commit. Only file: `lib/features/accounts/presentation/pages/account_detail_page.dart` (hero top-row ✏️ is now `CardActionButton(AppIcons.edit)`, same as HeaderCard / TxHeroCard). No lib/ui change. Every hero ✏️ is now the same 40px slot.
 

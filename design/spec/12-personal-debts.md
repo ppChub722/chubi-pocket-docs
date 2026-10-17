@@ -10,6 +10,14 @@ References: `transactions` (origin + settlement), `contacts`, `projects`
 
 Global conventions in [`overview.md`](overview.md).
 
+## 0. 0.4.0 — cycles, ages and the summary message
+
+- **Cycle.** A person's entries in book order (date, created) carry a running balance; a cycle ends where it hits 0. `cleared_at` = the date of the last such entry (null if it never did); entries after it are the **current cycle**, the rest are earlier cycles. `GET /people/:key` and `/entries` take `cycle=current|earlier` (omitted = all); every entry in those lists has `in_current_cycle`; `counts` has `current` / `earlier`.
+- **Age.** `days_outstanding` = days (user timezone) since the oldest entry of the CURRENT cycle that is not labelled paid; null when none. Computed from the user's stored timezone (not the request header).
+- **Order:** `GET /personal-debts/people?sort=oldest|amount|recent` (default oldest: days_outstanding desc, none last, then |net|). `totals` and the `*_people` counts always cover ALL people (they ignore `q` / `side` / `all` / paging) so the tiles stay put while a filter is on.
+- **List summary.** `totals` adds `owed_to_me_people`, `i_owe_people`, `over_30_days_people` (people with days_outstanding > 30) next to `owed_to_me`, `i_owe`, `net`, `open_count`.
+- **Summary message.** `GET /people/:key` carries `summary_message` `{text, entries, net}` (the page is ONE call; its `items` default to the current cycle, `cycle=earlier|all` pages the rest): Thai text, the current-cycle entries oldest first (`+` I paid for them, `−` they paid me, with description) and the total (they owe me / I owe them / cleared). The FE only shares it.
+
 ---
 
 > **0.3.1-10 — the person ledger (migration 054) supersedes §1–§4 where they disagree.** Shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`, tag **Debts**.
