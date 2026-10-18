@@ -4,6 +4,11 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
 
 Release scope comes from `product/roadmap-1.0.md` (owner 2026-10-15). Items here that the roadmap puts out of scope (Play Store, monetization, web / admin, receipt photos, multi-currency) are dropped.
 
+## 0.4.0-1 review leftovers (2026-10-18)
+- The other detail pages (budget, goal, wallet, category, …) still need the new edit rules (`ai/decisions.md` → Editable look): no ✏️ when the page can't be edited, long-press to edit, dashed = editable, no 🔒.
+- An `EditAccess` enum (editable / locked / hidden per field) was not created; the rules live in `EditModeMixin`'s doc for now.
+- Rows with mini (20) chips are not on the dashed rule yet.
+
 ## 0.3.1-11: currency auto from the user setting (owner 2026-10-15; rules in decisions.md → Currency)
 - BE: fill every record's currency from the user's setting; allow changing the user currency (relabel, no conversion).
 - FE: remove hard-coded THB / ฿ (events create, budgets create, goals list, …) → the user's currency with its decimals; profile setting becomes editable with a warning.
@@ -18,8 +23,6 @@ Release scope comes from `product/roadmap-1.0.md` (owner 2026-10-15). Items here
 - **Contact detail "doesn't open"** (2026-10-13, prod build 55). FE-D checked it: NOT a code bug. The VPS went offline again ~21:55, and the page sits on the skeleton for 10–25 s (connect 10 s + receive 15 s) before the error + retry shows. Fix proposal (Lead: do it in the template, all detail pages):
   - any load failure, not only ApiException, → full-page error + retry (today a non-Api exception leaves the skeleton forever; contact_detail_page `_load` ~line 86)
   - show the error / retry sooner (shorter detail-load timeout)
-  - add test/features/contacts/contact_detail_page_test.dart (prod-shaped JSON + a failing load); contacts has no page tests at all
-- **Change password back to a separate page** (2026-10-13): undo the collapsible section in Profile settings; the entry row "เปลี่ยนรหัสผ่าน ›" goes in a section right under the username row (decisions.md updated).
 - Seen in the same screenshot (not reported by the owner): on Profile settings, scrolled content shows through under the status bar at the top ("ชื่อที่แสดง" drawn behind the clock), and a filled email shows stacked (the one-row question is still open).
 
 ## Note for the scheduled / recurrence round (owner 2026-10-12)
@@ -29,9 +32,7 @@ Release scope comes from `product/roadmap-1.0.md` (owner 2026-10-15). Items here
 ## 0.3.1-10: debts rework (after the API cleanup, owner 2026-10-12)
 - Debts UI gets finished ONCE in 0.3.1-10, together with the model rework (owner 2026-10-13). No more debts UI tweaks in 0.3.1-9: today's state is the hub-adopted minimal one; cancel sits in การจัดการ until the model removes it.
 - API item C (`/personal-debts/people` + `/people/:key`, paged, live names) built together with the new debt model.
-- The debts list builds its own search + chips outside ListToolbar (`personal_debts_page.dart:102`). Move it onto ListToolbar in the rework so it gets the 28 chips and the toolbar layout (FE-E 2026-10-13).
 - Bugs held for that round:
-  - "อัปเดตตาม" URL (`personal_debts_repository.dart:99`)
   - scheduled detail "not found" (the scheduled round)
 
 ## (done) App hub (design system), BOTH FEs, before any feature work (owner 2026-10-12: "design first, then features")
@@ -76,10 +77,8 @@ Release scope comes from `product/roadmap-1.0.md` (owner 2026-10-15). Items here
 - **BE work:** repayment tx linked to a counterparty instead of `source_personal_debt_id`; `settled_amount` semantics retired; person net endpoint; repayment history in the API. Debt PUT may change identity/amount only for manual debts (split debts are edited on the transaction).
 - **Bugs:**
   - **B1–B7** (BE survey; most disappear with the new model)
-  - the **"อัปเดตตาม" URL bug** on prod (`/personal-debts/split-changes//apply`)
   - FE debt survey issues: overpaid edit blocked, mixed currencies summed, stale caches, the "ค้างอยู่" label on settled
 - **QA explore 2026-10-11** (`ai/inbox/qa.md`; scripts `ai/qa/`, `node run-debts.mjs`):
-  - FAIL: "บันทึกเป็นผู้ติดต่อ" on the new-debt form creates no contact
   - FAIL: a deleted debt's URL shows a generic error, not "not found"
   - notes:
     - a cancelled debt still shows คงค้าง
@@ -97,7 +96,6 @@ Release scope comes from `product/roadmap-1.0.md` (owner 2026-10-15). Items here
   - THB hard-coded on a new event
   - type maxLength 50 vs BE 30
   - planned-on-create double call
-  - the resolve tab is "coming soon"
   - the resolve sheet's category chip has no icon / colour (the model it gets has no getter; FE-D 2026-10-13)
   - multi-select add from the event page
   - member picker → PickerSheet
@@ -122,7 +120,7 @@ Release scope comes from `product/roadmap-1.0.md` (owner 2026-10-15). Items here
   - BE archived-wallet snapshot conflicts with the hide rule
 
 ## UI kit (pending owner decision)
-- Chip sizes 3 tiers (mini 20 / chip 28 / control 32) + migrate every chip onto AppChip (steps 2–3: role chips on AppChip, then delete the old chips and the 4 Material chips).
+- Every chip on AppChip: one Material `ActionChip` is left (`lib/ui/organisms/app_date_range_picker.dart`). The sizes are decided (mini 20 / chip 28 / control 36).
 - Detail patterns: pick one design for 7 divergences (✏️ placement, status placement, scheduled _VariantPill / goal AppBadge, archive colour, meta line, empty note on event/wallet, PickerTile vs DetailRow ›).
 - Date picker is still Material (calendar): own picker later?
 
