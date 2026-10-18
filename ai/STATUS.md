@@ -13,7 +13,7 @@ _Last updated: 2026-10-18 (owner's main session)._
 - Prod is the old Happy-Host box and is probably down (2026-10-16). **No new VPS until 0.3.3** (owner 2026-10-16): everything is local only; releases are tags + local builds, no deploys. New server runbook: `engineering/new-vps-runbook.md`.
 
 ## 0.4.0-1 (tagged 2026-10-18)
-- **Tags `v0.4.0-1`:** be `34692d8` · app `ea1c124` (`version: 0.4.0-1+112`) · docs (this commit), pushed by the owner. Not deployed, no local build yet. Local DB at migration 065 (066 comes with the BE rebuild).
+- **Tags `v0.4.0-1`:** be `34692d8` · app `55d67ad` (`version: 0.4.0-1+126`, build 126 = app commit count) · docs (this commit), pushed by the owner. Not deployed, no local build yet. Local DB at migration 065 (066 comes with the BE rebuild).
 - Previous tag: `v0.4.0` (be `2d50b22` · app `28ded39` · docs `55d8622`, 2026-10-17).
 - **In 0.4.0-1** (everything on main since v0.4.0):
   - goals: archive a goal holding money, goals with no target (migration 065; spec 09 §0.2 / §0.8)
@@ -23,7 +23,7 @@ _Last updated: 2026-10-18 (owner's main session)._
   - contact picker rules (`ai/decisions.md` → Contact picker)
   - BE: tags batch save, amount filters on the tx list, embedded tzdata, CORS `X-Timezone`, comment trim
   - **sync & cache** (plan: artifact https://claude.ai/artifact/LvQtDt6PGydRkQiF3iw7QE): BE `POST /sync`, the `X-Sync-Versions` header and sync fingerprints (migration 066); the app keeps shared datasets on the device. The old-backend fallback (`tablesForWrite`) is gone, so **the app needs a BE with `/sync`**. Built on `feat/sync-cache` and merged into `main` of both repos.
-- **Tests:** app full suite green (1,099) at app `9a52a8f` before the sync merge; after the merge a full run and its fixes landed in app `ea1c124` and be `34692d8`.
+- **Tests:** app full suite green (1,099) at app `9a52a8f` before the sync merge; after the merge a full run and its fixes landed in app `ea1c124` and be `34692d8` (the app tag commit `55d67ad` only bumps the version).
 
 ## Next (in order)
 1. **BE rebuild** on the owner's order only (`docker compose up -d --build` in chubi-pocket-be): migration 066 + `/sync` (required by the app now), debt `create_transaction`, multi-select and amount filters, money preferences.
