@@ -215,19 +215,33 @@ Added people get the ordinary `split_created`. If the partner hasn't added the s
 
 Phase 2+. (Phase 1b: the cancel happens silently on the debtor's side; the creditor finds out at next sync.)
 
-### 2.9 `recurring_due` (0.3.1-10, migration 057)
+### 2.9 `recurring_due` (0.3.1-10, migration 057; updated 2026-10-20, 0.4.0-2, migration 068)
 
-**When:** the recurring due check turned items into pending drafts (spec 11 §4). The due check runs inside `GET /me/counts`, `GET /dashboard`, `GET /notifications`, `GET /notifications/unread-count` and every recurring read.
+**When:** the recurring due check (spec 11 §4) finds occurrences that came due since the last due notice. Recurring makes no pending drafts any more: "due" is a state of the occurrence, handled in the ต้องจัดการ card on the recurring page. The due check runs inside `GET /me/counts`, `GET /dashboard`, `GET /notifications`, `GET /notifications/unread-count`, every recurring read and sync, and looks at each setting once a day. The count starts from the migration day, so old due occurrences do not flood on day one.
 
-**Grouped:** ONE notice while it is unread — new drafts add to its `count` and move it to the top; once read, the next batch makes a new one.
+**Grouped:** ONE notice while it is unread — newly due occurrences add to its `count` and move it to the top; once read, the next batch makes a new one.
 
-**Payload:** `{"count": 3}`. **Deep-link:** `/pending`.
+**Payload:** `{"count": 3}`. **Deep-link:** `/recurring?focus=due` (was `/pending`; migration 068 repointed old unread notices, and a bumped one gets the new link too).
 
-### 2.10 `recurring_ending` (0.3.1-10, migration 057)
+**App:** "รายการประจำถึงกำหนด {count} งวด รอจัดการ", button "ไปจัดการ ›" → the deep link (the recurring list, scrolled to ต้องจัดการ). Settings: a row under รายการประจำ, off / notify ("อยู่ใน ต้องจัดการ หน้ารายการประจำเสมอ | ปิด = ไม่แจ้ง").
 
-**When:** an active recurring setting has 2 or fewer upcoming items left. Once per setting; "ต่ออีก" (extend) re-arms it.
+### 2.10 `recurring_ending` (0.3.1-10, migration 057; updated 2026-10-20, 0.4.0-2)
+
+**When:** an active recurring setting WITH an end has 2 or fewer occurrences left (counted from the rule; a setting with no end never sends it). Once per setting; "ต่ออีก" (extend: pushes the end, generates nothing) re-arms it.
 
 **Payload:** `{"recurring_id": "...", "name": "Netflix", "left": 2}`. **Deep-link:** `/recurring/{id}`.
+
+### 2.11 `recurring_auto_created` (2026-10-20, 0.4.0-2, migration 068)
+
+**When:** auto-create ("บันทึกอัตโนมัติเมื่อถึงวัน", spec 11) recorded transactions for occurrences that came due.
+
+**Grouped per day:** ONE notice per user per day (by user + type + date). Its `count` adds up over that day's due checks; a new day makes a new row. It stays one row whether read or not (a read one stays read).
+
+**Quiet:** no button, not moved to the top, not in the attention / needs-answer lists. Tap = mark read + open the deep link.
+
+**Payload:** `{"count": 2, "date": "2026-10-20"}`. **Deep-link:** `/recurring` (ภาพรวม opens on this month; auto-made rows carry the บันทึกอัตโนมัติ tag).
+
+**App:** "บันทึกอัตโนมัติ {count} รายการ". Settings: a row under รายการประจำ, "บันทึกอัตโนมัติ", off / notify, no auto ("แจ้งวันละครั้ง ว่าบันทึกให้กี่รายการ | ปิด = ไม่แจ้ง"). Muted = nothing is written.
 
 ### 2.5a `project_tx_changed` on a bill made from my transaction (0.3.1-10)
 
@@ -395,5 +409,5 @@ The data model is the same in both phases; Phase 2 just adds a separate dispatch
 ## 0.4.0 inbox
 
 - `GET /notifications` carries `summary {needs_answer, unread, dismissed}` over ALL the user's notifications (not narrowed by the filter).
-- `awaits_answer` also covers `project_invite` (accept / reject at `POST /projects/link-requests/:id/accept|reject`) and `recurring_ending` (ต่ออีก = `POST /recurring/:id/extend`, ปล่อยให้จบ = mark actioned). `recurring_due` links to `/pending`. Event-bill rows (`project_tx_recorded_for_you`, `project_tx_changed`) deep-link to `/projects/:id` (the app has no per-bill route; migration 063 fixed old rows).
-- Settings: `split_paid` / `split_received` are not settable (retired); `recurring_due` / `recurring_ending` are mutable. `auto_resolve_own_in_projects` is also on `/users/me` as `auto_copy_own_event_bills` (the notification setting still accepts it for now).
+- `awaits_answer` also covers `project_invite` (accept / reject at `POST /projects/link-requests/:id/accept|reject`) and `recurring_ending` (ต่ออีก = `POST /recurring/:id/extend`, ปล่อยให้จบ = mark actioned). `recurring_due` links to `/recurring?focus=due` (it was `/pending` until 0.4.0-2, §2.9). Event-bill rows (`project_tx_recorded_for_you`, `project_tx_changed`) deep-link to `/projects/:id` (the app has no per-bill route; migration 063 fixed old rows).
+- Settings: `split_paid` / `split_received` are not settable (retired); `recurring_due` / `recurring_ending` / `recurring_auto_created` (0.4.0-2) are mutable. `auto_resolve_own_in_projects` is also on `/users/me` as `auto_copy_own_event_bills` (the notification setting still accepts it for now).

@@ -2,6 +2,8 @@
 
 > **0.3.1-10 — Saving goals v2 (migration 060, owner mockup `design/mockups/goals-v2.html`, 2026-10-13).** Section 0 replaces everything below: the wallet link, the % allocation, ALLOCATION_EXCEEDED, free % and `/accounts/:id/saving-allocations` are gone. Shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`, tag **Saving goals**.
 
+> **0.4.0-2 (updated 2026-10-20).** A goal (and ยังไม่จัดสรร) has MANY auto-saves, each with its own wallet, amount and repeat rule (migration 067). `?month=` gives any month's `month_plan` / `month_saved` / `month_short`. The saving goals list hero is rebuilt with a month stepper. All in §0.9. The recurring "saving" type is retired (§0.4). Fields: [`api-document.md` §09](../api/api-document.md#09--saving-goals).
+
 ## 0. Saving goals v2
 
 ### 0.1 A notebook, never transactions
@@ -44,8 +46,10 @@
 - `POST|PUT|DELETE /saving-goals[/:id]`, `/archive`, `/restore`.
 - Home `/dashboard.saving_goals` and `/me/counts.goals` = SavingTotals {count, saved, in_goals, spare, available}. available = Σ (balance − saved) over the wallets that track their balance.
 
-### 0.4 Recurring ออม (spec 11 §9)
-A recurring setting of type `saving` (wallet + `goal_id`, null = spare) produces pending drafts of kind `saving` (🐷). Submitting one makes a saving entry (`source: recurring`), linked to the item (`saving_entry_id`, status done). The goal page lists it under `auto_save`.
+### 0.4 Auto-saves, not recurring ออม (updated 2026-10-20, 0.4.0-2)
+Automatic saving lives on the goal itself: each goal has its own set of auto-saves (many per goal, §0.9), and the ยังไม่จัดสรร (spare) pool has a set of its own. Each auto-save makes 🐷 saving drafts in pending; confirming one writes a saving entry. Recurring settings play no part.
+
+Retired: the 0.3.1-10 path where a recurring setting of type `saving` (wallet + `goal_id`) produced the saving drafts. Its settings moved onto the goals in migration 062 (§0.7), and the type left recurring in migration 064. History only: [spec 11](11-scheduled-transactions.md) §9 (marked retired).
 
 ### 0.5 Migration 060
 Goals keep their texts / target / deadline with 0 saved (wallet and % dropped). New `saving_entries`. `recurring_rules.type` gains saving + `goal_id`. `recurring_items.saving_entry_id`. Pending kind `saving`.
@@ -70,17 +74,44 @@ Global conventions (base URL, error envelope, data types, HTTP verbs) are in [`o
 ### 0.7 Month numbers and auto-saving (0.4.0)
 
 - Per goal: `month_plan` (its auto-saving amount, else `needed_monthly`; null when closed or neither), `month_saved` (net into the goal so far this month), `month_short` = max(0, plan − saved), `status` = reached | on_track | behind | none (+ `behind_months`), `auto_save`. List `summary` adds `saved_total` (goals + unallocated, wallet-less money included), `month_short_total`, `unallocated`.
-- **Auto-saving lives on the goal** (and on unallocated: `goal_id` NULL), table `saving_auto` (migration 062): amount, day of month (31 = last day), source wallet or none. `PUT|DELETE /saving-goals/:id/auto-save` and `/saving-goals/spare/auto-save` (answer = the goal / spare page). The recurring due check makes ONE saving draft (🐷, source `auto_save`) a month on the day; confirming it saves from that wallet, or with no wallet (outside any wallet). Old recurring ออม settings were moved here by migration 062; creating new ones in recurring stays possible until the recurring rework (M4).
-- `auto_save` is now an object or null on the goal (and on the spare page); the goal page's separate `auto_save` list is gone.
+- 0.4.0-2: "this month" in these fields means the month asked with `?month=` (default this month), and `month_plan` of a goal with auto-saves is Σ amount × occurrences in that month (§0.9).
+- **Auto-saving lives on the goal** (and on unallocated: `goal_id` NULL), table `saving_auto` (migration 062): amount, day of month (31 = last day), source wallet or none. `PUT|DELETE /saving-goals/:id/auto-save` and `/saving-goals/spare/auto-save` (answer = the goal / spare page). The recurring due check makes ONE saving draft (🐷, source `auto_save`) a month on the day; confirming it saves from that wallet, or with no wallet (outside any wallet). Old recurring ออม settings were moved here by migration 062. **Superseded 2026-10-20 (0.4.0-2, migration 067):** many auto-saves per goal, each with a full repeat rule; the old one-item calls still work (§0.9).
+- `auto_save` is now an object or null on the goal (and on the spare page); the goal page's separate `auto_save` list is gone. Since 0.4.0-2 it is the first of `auto_saves[]` (§0.9).
 ### 0.8 Goals with no target (0.4.0-1)
 
 Owner 2026-10-17: open-ended saving, e.g. for a child. `target_amount` is nullable (migration 065). Create without it (or `null`) = no target; `PUT` with `null` clears it, a number sets it (> 0).
 
 - With no target: `progress_pct`, `remaining_amount`, `needed_monthly`, `eta_date` and `month_short` are null, `milestones` is empty, `pace` / `status` are `none`. `month_plan` comes only from auto-saving. The history has no plan line.
-- `group: "ongoing"` (null for goals with a target): the list puts these goals in their own group **ออมต่อเนื่อง**, whatever this month.
+- `group: "ongoing"` (null for goals with a target). Since 0.4.0-2 the list has no group sections: the row shows its kind (ออมต่อเนื่อง) itself, and the "ไม่มีกำหนด" filter chip gathers these goals with the ones that have no plan (§0.9).
 - The list summary leaves them out of the month card (`month_short_total`, `month_plan_total`, `month_saved_total`). They still count in `saved_total`.
 - Sorting by progress / remaining puts them last.
-- App: "ยอดเป้าหมาย" is optional in create / edit (empty = no target). The list row has no bar: the saved amount on the right, "ออมต่อเนื่อง · เดือนนี้ +฿X" below. The detail hero shows the [ออมต่อเนื่อง] chip, description, ออมแล้ว, and two tiles: saved this month and the auto-saving amount. There is no bar, ticks, due date or behind badge. ออม / ถอน / ย้าย, auto-saving and ปิดเป้าหมาย work as usual.
+- App: "ยอดเป้าหมาย" is optional in create / edit (empty = no target). The list row has no bar: the saved amount on the right, the kind and this month's saving below. The detail hero has no ring: the saved amount and facts (saved this month; the auto-save when there is exactly one monthly one). There is no bar, ticks, due date or behind badge. ออม / ถอน / ย้าย, auto-saving and ปิดเป้าหมาย work as usual.
+
+### 0.9 Many auto-saves, any month's plan, the list page (0.4.0-2, updated 2026-10-20)
+
+Fields: [`api-document.md` §09](../api/api-document.md#09--saving-goals) and its 2026-10-20 note under §08 (migration 067).
+
+**Many auto-saves per goal (migration 067).**
+- A goal, and the ยังไม่จัดสรร pool, can have many auto-saves. Each has its own wallet (or none), amount and a full repeat rule: start date, frequency, end (the `/recurring` rule shapes).
+- Pages carry `auto_saves[]` (oldest first; `next_date` is null once one has ended). `auto_save` stays as the first item, in the old shape.
+- `PUT /saving-goals/:id/auto-saves` and `/saving-goals/spare/auto-saves` replace the whole set with `{items: [...]}`: an item with `id` is updated in place, one without is added, one left out is deleted, `[]` clears; at most 20. The old one-item `/auto-save` calls keep working (one monthly item starting today).
+- The producer: for each item, every occurrence from its start to today (inside its end, after the last one it made) becomes ONE 🐷 saving draft in pending, at most the newest 12 per item per run. A goal must be active; the spare pool is always on. Confirming a draft writes the saving entry (from its wallet, or with no wallet).
+- App, goal create / edit: one "แผนการออม" card holding วันที่ครบกำหนด; เงินออมเริ่มต้น (create only: amount + wallet, saved right after the goal is made); the ออมอัตโนมัติ switch with one row per auto-save (wallet, amount, ✕, a round chip that opens the repeat sheet, a next-date chip); then "+ เพิ่มรายการออม". No dashboard numbers on the edit page (owner). View mode lists the auto-saves as read-only rows. The ยังไม่จัดสรร page still edits a single auto-save in the app.
+
+**Any month's plan: `?month=YYYY-MM`** on `GET /saving-goals` and `GET /saving-goals/:id` (default = this month in the user's timezone; not `YYYY-MM` → 400 VALIDATION_ERROR).
+- `month_plan`, `month_saved` and `month_short` of every goal, and the list summary's `month_plan_total` / `month_saved_total` / `month_short_total`, follow that month. `month_saved` = the net saved in that month.
+- `month_plan` for a goal with auto-saves = Σ amount × each item's occurrences in that month: a daily rule counts every day; a rule not started yet, or already ended, counts 0. Without auto-saves it is `needed_monthly` whatever the month. A closed goal stays null.
+- Not month-aware: `saved_total`, `unallocated` and every balance ("now"). The spare page takes no month. Writes answer with this month.
+- The list's month stepper uses it. The goal detail page keeps this month on purpose (it sends no `month`).
+
+**Saving goals list page (app)** (owner 2026-10-19/20):
+- Hero head: the piggy-bank module tile (40, card color) beside "เงินออมทั้งหมด" over the big `saved_total`; 🔍 on the right. No faint caption, and no divider between the total and the plan.
+- The plan part starts with the month stepper + "แผนการออมเดือนนี้" ("แผนการออม" on another month). The stepper has no limit either way: a past month shows what was saved against its plan, a future month shows the plan. Leaving the page resets it to this month.
+- The ring: "ออมแล้ว" ฿`month_saved_total` "จาก ฿`month_plan_total`" of that month.
+- Facts with icons: ยังขาดอีก (hourglass) = `month_short_total`, in warning when > 0 and shown only when there is a plan; ยังไม่จัดสรร › (wallet) = `unallocated`, it opens the spare page; เป้าหมาย (flag) = the number of goals.
+- Filter chips that count and filter: ทั้งหมด | ยังขาด | ครบแล้ว | ไม่มีกำหนด (no plan + ออมต่อเนื่อง).
+- Rows: no group sections, all in ONE SectionCard; each row shows its kind itself. The default sort is "ต้องออมก่อน" (short → done → no deadline → ongoing); any other sort orders the whole list. On another month the rows follow it too ("เดือนนี้" becomes the month name), and the pace tick with its "ควรมีตอนนี้ ฿x" bubble shows only on this month.
+- Goal detail hero facts have icons too: เดือนนี้ออมแล้ว = piggy bank, ยังขาด = hourglass, ควรมีตอนนี้ = trend up, เหลืออีก / เป้าหมาย = target, ถึงเป้าเมื่อ = calendar; an ongoing goal: saved this month = piggy bank, the auto-save = repeat.
 
 ## Phase summary
 
@@ -377,5 +408,5 @@ Phase 2+ could add virtual sub-accounts if demand.
 ## 6. Status
 
 - **Phase** — Phase 1c shipped (BE migration 000034 + Flutter `/saving-goals` routes). `required_monthly` is FE-computed per §2.6.
-- **Last updated** — 2026-05-07
+- **Last updated** — 2026-05-07; 0.4.0-2 notes 2026-10-20 (auto-saves instead of recurring ออม §0.4, many auto-saves + `?month=` + list page §0.9)
 - **Version** — 0.1 (initial draft; account-linked, percentage allocation, computed progress, non-sticky completion)

@@ -20,6 +20,9 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
   - any tag can be redeployed or rolled back; the team keeps working during a release
 - Versioning `0.3.1-N`; build = app commit count. **From 0.3.1-9 every release forces the update (`MIN_APP_BUILD` = the new build, owner 2026-10-12)**, so old app builds never constrain the API: breaking changes are fine.
 - Data is disposable (DB wipe OK); migration squash is planned.
+- **Shared AI notes (owner 2026-10-20):** several AI sessions work at once, so notes, decisions, status and reports go into `chubi-pocket-docs/ai` (STATUS / decisions / backlog / inbox). A session's private memory is not enough.
+- **Edits (owner 2026-10-19):** change code with the Read + Edit tools, not python / sed scripts. A script is OK only for a 100+-site mechanical sweep, and it must be announced first.
+- **Hub first (owner 2026-10-19, repeated):** use what is in the hub; a new piece goes into `lib/ui` + a hub demo + `hub_registry` covers before any page uses it.
 
 ## Product
 - **Ledger, not sync:** never auto-change another user's book. Notifications are prompts with one-tap actions.
@@ -95,6 +98,103 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - name / description / note on every record (labels ชื่อ / คำอธิบาย / โน้ต); TextLimits 100 / 200 / 500.
 
 ## UI
+- **0.4.0-2 polish rules (owner 2026-10-19/20):**
+  - **Separator:** the text separator is " | ", never " · ", everywhere. Gaps inside and between cards are all equal (12).
+  - **No absence labels:** rows and cards show only what an item HAS. Never a line like "ไม่มีกำหนดเวลา" / "ไม่มีเป้า" / "ไม่มีหนี้บัตร". A ฿0 amount still shows; the kind's own name (e.g. "ออมต่อเนื่อง") is fine.
+  - **Hero colors:**
+    - A page sets only the card's color, and everything inside the card takes its colors from it (`HeroColors`: accent / soft / line / track / muted / warning / danger / success, from `HeroColorScope`).
+    - A card with no color of its own uses the theme primary, and its background stays white.
+    - Pieces never pick theme tokens themselves; status colors (over / near / income) still win.
+  - **Ring hero (budget detail, goal detail):**
+    - Next to ✏️ sits a small `HeroInfoBox` (the round or due date + days left). The name is one line ending in "…".
+    - Below it, `HeroRingRow`: a ring with the number inside and `HeroFactList` on the right. The facts get at least half the row (room for ฿1,000,000).
+    - The plan status chip goes LAST, at chip size.
+    - The empty ring is a base ring plus a shade that starts at a round head at 12 o'clock (about 25%) and is gone by half way.
+    - The expected part (รอจ่าย) is drawn only when it is at least 2% of the ring, as a round-ended arc. Smaller amounts show only in the facts list (owner 2026-10-20: a ฿10 expected amount read as a hairline or a stray dot).
+  - **List summary cards (budgets, goals):**
+    - a ring + facts
+    - `HeroFilterChips`: count chips that filter, replacing summary tiles
+    - the rows all in ONE `SectionCard` (2px gaps)
+    - a progress row's pace tick carries an always-on bubble in the bar's color ("แผนถึงวันนี้ ฿X" / "ควรมีตอนนี้ ฿X")
+  - **Saving goals list:**
+    - NO group sections; each row shows its kind itself.
+    - The default sort is "ต้องออมก่อน" (short → done → no deadline → ongoing); any other sort orders the whole list.
+  - **Wallets list hero:**
+    - The big net, a 3-color split bar (available | saved | card debt) and facts with matching dots (ออมไว้ › opens goals).
+    - Filter chips with icons appear only when there are cards.
+    - NO fold / compact mode on this page.
+  - **Day-grouped lists** (transactions list, budget items tab, saving entries tab): each day's rows sit in one SectionCard (`ListPageBody(rowCards: true)`), with the day header above it.
+  - **Budget items:** drop "นับเพราะ…" and the "ปกติ" chip; KEEP the chips for รายการประจำ / อีเว้นท์ / รอจ่าย (for now).
+  - **Budget scope:** categories AND wallets AND tags (within one list, any entry). "นับรายจ่ายไหนบ้าง" is the first row's label, not a card heading.
+  - **Repeat sheet:**
+    - Every frequency has its picker: weekdays อา–ส, a day of the month, a day + month.
+    - On a budget, picking the day MOVES the start to the next matching date (UI only).
+    - The sheet says so ("วันเริ่มจะเลื่อนเป็น …").
+  - **Money privacy:** the money-visibility toggle (eye) is not used in the real app yet. Leave it out of new designs.
+  - **Work flow (owner 2026-10-20):**
+    - Sessions do not assign work to each other. All work goes through นายA-fe, who splits it (plan: https://claude.ai/artifact/FVDEMEHAML6xc7YaLZV5tP).
+    - For each task list: the owner of the task SCANS its code first, writes a plan, and sends it to นายA. นายA shows the plans to the owner. Nobody codes until the owner says "จัด".
+  - **Module icons (owner 2026-10-20):** budgets get a pie / donut icon app-wide (today `AppIcons.budget` = `Icons.savings_outlined`, a piggy bank). The piggy bank belongs to savings (the goals list hero's "เงินออมทั้งหมด"). Saving goals keep the flag.
+  - **Hero facts get icons (owner 2026-10-20):** every `HeroFact` label has a small leading icon in the card color. On the wallets hero the icon replaces the dot and takes that split-bar segment's color, so it still works as the legend (ใช้ได้จริง = coin, ออมไว้ = piggy, หนี้บัตร = card).
+  - **List hero heads (owner 2026-10-20, mock https://claude.ai/artifact/R7CXzkzoCGj1j31ucaox3j):**
+    - The faint caption goes.
+    - EVERY list page hero starts with its module icon tile at the top-left, in the card color:
+      - budgets: pie / donut
+      - goals: piggy bank, beside เงินออมทั้งหมด
+      - recurring: `AppIcons.recurring`, before the month chip
+      - wallets: `AppIcons.wallet`, beside "ยอดสุทธิของฉัน | N กระเป๋า" and the big net
+      - transactions: `AppIcons.transactions`
+    - Tile size is 40 everywhere (owner). The goals hero has no divider between the total and the plan section.
+    - Budgets list:
+      - NO round / month stepper, because each budget's round differs.
+      - Top-left: the budget module icon tile, then a bold summary chip.
+      - The chip compares total used with the sum of every budget's plan-to-date, in the detail status words: ตามแผน (card color) | ใช้เร็วกว่าแผน ฿x (warning) | เกินงบ ฿x (danger).
+      - Wording "รวม" → "ทั้งหมด" (เหลือทั้งหมด, ใช้ไปทั้งหมด).
+    - Goals list:
+      - "เงินออมทั้งหมด" sits big at the top beside a piggy-bank icon tile.
+      - Below it, `StepperPill.month` + "แผนการออมเดือนนี้" head the ring, and stepping shows that month's plan.
+      - The facts keep ยังไม่จัดสรร › and เป้าหมาย.
+- **One-off upcoming is CUT (owner 2026-10-20; replaces "a normal tx with a FUTURE date becomes a ONE-OFF upcoming" in Recurring + upcoming):**
+  - A transaction created from quick create (or edited) with a future date is a normal, committed transaction in the transactions table. It never goes through pending, and it shows in the transactions list and tx detail like any other.
+  - Reports, the dashboard, wallet balances and budget "used" leave out future-dated transactions (date after today). For a budget, showing them as รอจ่าย / expected is proposed, not confirmed.
+  - In lists, a future transaction is dimmed with a "อีก N วัน" tag. You reach it by stepping the period into the future.
+  - The recurring module keeps ONLY recurring items. Its upcoming table loses the one-off rows (they move into transactions), and the logic that moved a tx out of transactions when its date became future goes away.
+- **Recurring occurrences, new model (owner 2026-10-20; plan https://claude.ai/artifact/FVDEMEHAML6xc7YaLZV5tP, BE plan v3.2 in `ai/inbox/be.md`):**
+  - **Storage:**
+    - The BE computes occurrences from the rule on every request; they are NOT stored.
+    - A row is stored only when the user edits an occurrence (amount / date / skip / name) or settles it (confirm / paid / link).
+    - A rule edit moves every untouched future occurrence. Edited ones stay and replace the computed one of the same period.
+    - There is no horizon and no Extend.
+    - Sync keeps only the rules list + next occurrence; the user's today goes into its fingerprint. The app syncs at local midnight and on resume after a date change.
+  - **States:** upcoming / due (overdue, computed) / paid with tx / paid without tx ("จ่ายแล้ว", e.g. someone else paid) / skipped.
+    - Occurrences before the rule was created in the app count as paid without tx.
+    - Pause / resume (owner 2026-10-20): due occurrences from before the pause stay due; the occurrences inside the paused gap count as skipped (not paid, not due).
+  - **Recurring is NOT in pending any more.**
+    - Due occurrences are handled in the recurring page's ต้องจัดการ card: ยืนยัน (creates the tx dated on the OCCURRENCE date) | ใส่ยอด | จ่ายแล้ว | ข้าม | ผูกกับรายการที่มีอยู่, plus all-at-once per rule.
+    - Reminders: the home card + a badge + a "due" notification (grouped once a day, opens /recurring?focus=due) + an "ending" notification for rules with an end.
+    - Old recurring pending drafts are left alone; the pending page is unchanged this round.
+  - **Linking:**
+    - One occurrence ↔ one tx, and the app asks before a swap. The tx keeps its own date / amount.
+    - Quick create picks in two steps: rule (nearest due first) → occurrence (top option "งวดใกล้เคียง").
+    - Linking can happen later from tx detail or the recurring page.
+    - Unlink / delete the tx → the occurrence goes back to due / upcoming (or paid if it was marked paid).
+    - Deleting either linked side asks whether to delete the other.
+    - No auto-match suggestion yet.
+  - **Rule edit:** one question, only when name / category / wallet / tags / note change and recorded tx exist: "apply to the N recorded tx too?". It never touches their date / amount.
+  - **Auto-create (owner 2026-10-20, this round):** a rule setting "บันทึกอัตโนมัติเมื่อถึงวัน".
+    - Allowed only for a fixed amount with a wallet.
+    - When an occurrence comes due, the BE creates its tx on the occurrence date, without confirmation. An edited occurrence uses its edits; a skipped one creates nothing.
+    - Only occurrences that come due after the switch is on; earlier due ones stay in ต้องจัดการ.
+    - A deleted auto tx is never re-created.
+    - A quiet grouped daily notice, and a "บันทึกอัตโนมัติ" chip on the detail hero.
+- **Cleanup pass (owner 2026-10-20):** when this round's work is done, delete the unused l10n keys and dead code listed in `ai/backlog.md` (and any new leftovers each session reports) in the same round. No separate go is needed.
+- **Recurring list page (owner 2026-10-20, mock https://claude.ai/artifact/96eCKWTzYmNHySepKXewaC):**
+  - Big top tabs ภาพรวม | ปฏิทิน; nothing folds, the page scrolls.
+  - The month chip is StepperPill.month; the month pay / receive totals sit in 2 boxes.
+  - ภาพรวม = this month's occurrences in date order (a "today" line; past ones dimmed, pending ones in warning) + ต้องจัดการ (ใส่ยอด / ยืนยัน) + every recurring item by kind (per month / per year, installments remaining, paused last). A row opens the recurring detail.
+  - ปฏิทิน = the month grid + the selected day's occurrences.
+  - ต้องจัดการ shows the rule's due occurrences (computed by the BE, `status=due`), not pending drafts: recurring left the pending page (owner 2026-10-20, see "Recurring occurrences, new model").
+  - The old เตือนจ่าย and ปฏิทิน tabs go away.
 - **Shell swipe (owner 2026-10-17):** swiping between shell tabs works ONLY on the roots of the 4 bottom tabs (Dashboard / รายการ / กระเป๋า / เพิ่มเติม) and the 3 top tabs (pending, notifications, profile / settings). Every page opened on top of them has no shell swipe, so in-page tabs (wallet detail, event detail, recurring) swipe freely.
 - **Artifact = layout only (owner 2026-10-17):** follow the reference for arrangement; every look comes from the hub / kit, never built per page. Where the mockup's look differs from the kit, reuse how existing app pages arrange the same thing (spacing, sizes, frames), then check it still fits the reference. New pieces = kit extensions of the existing patterns, hub first.
 - **Design reference (owner 2026-10-17):** the final page designs live in the artifact "Chubi Page Reference" https://claude.ai/artifact/EJq2vwbaKkYmMu27ZtZPZ7 (per page: list → detail → edit mode → other → spec; the WHOLE reference was approved by the owner 2026-10-17: hero anatomy A–G, section order by kind of data, note placement, edit-mode rules, pending, app settings, notifications). AI devs follow it when changing these pages.

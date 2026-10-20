@@ -4,6 +4,60 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
 
 Release scope comes from `product/roadmap-1.0.md` (owner 2026-10-15). Items here that the roadmap puts out of scope (Play Store, monetization, web / admin, receipt photos, multi-currency) are dropped.
 
+## 0.4.0-2 leftovers (2026-10-20, waiting on the owner's go)
+- **Tests (run 2026-10-20, see STATUS "Where it stands"):** all green except นายD's folders: 13 failures waiting for the owner's "fix" in his session (12 stale `saving_goals_pages_test` cases + `core/data/sync_coordinator_test`, likely pre-existing / flaky, since the sync code is unchanged this round).
+- **Cleanup pass: DONE 2026-10-20** (นายA, A18; details in `inbox/fe-a.md` "A18 cleanup pass DONE"). Left for later:
+  - TEST-ONLY code, to drop when its stale tests are fixed after the first run: `TxPeriod.canStepForward`, `RecurringRepository.calendar`.
+  - The old-BE fallback on the recurring detail (`_occurrenceMenu`, repo `editOccurrence` / `setItemArchived` / `updateItem`, `editRecurringItem`): drop it once the BE with C3 is deployed.
+  - Temporary claude.ai mock artifacts: only on the owner's word.
+- **BE:** budget item tag colors: DONE (C5 `tag_refs`).
+- **Found while documenting (2026-10-20, not verified by a run):**
+  - BE: future-dated EVENT bills counted as budget `used`. FIXED by นายC (they now count as expected until their day; test TestBudgetFutureEventBillIsExpected; spec 08 §0.2 updated). The local BE needs a restart to pick it up, on the owner's word.
+  - App: the spare pool (ยังไม่จัดสรร) page still edits ONE auto-save, while the BE takes many.
+  - App: the budgets list chip sums each budget's `used`, while the ring uses the BE `total_used`, which counts each row once. With overlapping budgets the two can differ. The owner chose "sum every budget" for the chip.
+  - Docs: stale history left in 04 (`is_recurring` / `scheduled_transaction_id`), 03 §3.11 and 09 §1–§4 (kept as history by the files' own headers).
+- **Docs debt:** `design/api/api-document.md` was updated for this round by นายD (2026-10-20). Still open: spec 09 / 10 for the new list / detail layouts, if wanted.
+- **Cut one-off upcoming (decided 2026-10-20, not briefed; see decisions.md):**
+  - BE:
+    - future-dated tx stay in transactions
+    - balances, reports, dashboard and budget "used" cut at today
+    - migrate the existing one-off upcoming rows into transactions
+    - drop the one-off path and the move-out-of-transactions logic
+    - api-document + spec updates
+  - App:
+    - quick create: the future-date hint says it is a future transaction (no "goes to the recurring page")
+    - tx list / detail: dimmed rows with "อีก N วัน"
+    - the recurring page no longer lists one-offs
+  - Open: count future tx as รอจ่าย in budgets?
+- **Recurring redesign (list OK; detail drafted 2026-10-20; not coded):** mock https://claude.ai/artifact/96eCKWTzYmNHySepKXewaC.
+  - นายA surveyed the FE and BE. Both are L.
+  - 7 owner questions are open:
+    1. Wallet balance with future tx: subtract at read time, or a deferred apply + daily job.
+    2. Existing one-off rows: convert or delete.
+    3. No-end occurrences past the horizon: computed live, or an auto-rolling horizon.
+    4. Keep edited / skipped occurrences when a rule changes.
+    5. Batch select in the history tab.
+    6. Drop `RecurringItemPage`.
+    7. Occurrence names for the special frequencies.
+  - The BE tree has uncommitted work: `internal/shared/recurrence/`, migration 000067. Find out whose before touching it.
+- **Pending page, later (owner 2026-10-20, not this round):**
+  - Recurring is no longer in pending; due occurrences are handled on the recurring page.
+  - Add a link row "รายการประจำ: ค้าง N งวด ›" on the pending page.
+  - Old recurring pending drafts are left as they are.
+- **Hero / icon prep (decided 2026-10-20, not coded; see decisions.md → Module icons, Hero facts get icons, List hero heads):**
+  - Kit:
+    - `HeroFact(icon:)` + a hub demo. The icon mapping is in the R7CX mock note (ใช้ไป = receipt, รอจ่าย = clock, แผนถึงวันนี้ = trending up, ใช้ได้วันละ = calendar, รอบใหม่เริ่ม = repeat, ยังไม่จัดสรร = wallet, เป้าหมาย = flag / target, …).
+    - The module icon tile for list heroes. It goes on every list hero: budgets, goals, recurring, wallets (the net moves up beside it) and transactions (no mock yet).
+  - `AppIcons.budget` → a pie / donut. Check every use: Home / More tiles, menus, pickers, hub.
+  - Budgets list hero:
+    - Icon tile + summary chip (sum each budget's plan-to-date; reuse `bgStatusOnPlan` / `bgStatusAhead` / `bgStatusOverBy`).
+    - Drop `bgSummaryUsedCaption`.
+    - Values: `bgRingTotalLeft` → เหลือทั้งหมด, `bgFactUsedTotal` → ใช้ไปทั้งหมด.
+  - Goals list hero:
+    - Piggy tile + big เงินออมทั้งหมด + `StepperPill.month` for the plan ring.
+    - BE: the month plan for months other than the current one (today only the current month).
+- **Open question:** less air between the hero amount field's label and the number (`AppInputSize.hero`, geometry tests). Not decided.
+
 ## 0.4.0-1 review leftovers (2026-10-18)
 - The other detail pages (budget, goal, wallet, category, …) still need the new edit rules (`ai/decisions.md` → Editable look): no ✏️ when the page can't be edited, long-press to edit, dashed = editable, no 🔒.
 - An `EditAccess` enum (editable / locked / hidden per field) was not created; the rules live in `EditModeMixin`'s doc for now.

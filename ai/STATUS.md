@@ -1,6 +1,61 @@
 # STATUS — read this first (rewritten, not appended)
 
-_Last updated: 2026-10-18 (owner's main session)._
+_Last updated: 2026-10-20 (นายA-fe, 0.4.0-2 polish round)._
+
+## 0.4.0-2: UI polish round (committed 2026-10-20, not pushed, not tagged)
+The owner sends screenshots and short asks; sessions fix them on `main` of app / be, uncommitted. The version is not bumped yet (`0.4.0-2+127` only when the owner says). Reports: `ai/inbox/fe-a.md` (นายA) and each session's own inbox file. Mock artifacts: budgets / goals / wallets lists + goal detail https://claude.ai/artifact/R7CXzkzoCGj1j31ucaox3j · budget detail ring hero https://claude.ai/artifact/RyV6Pg9fbAmczFnxABErtT · hero color set https://claude.ai/artifact/BFRZPA8kvEzgLJcu3aPBJU.
+
+### Where it stands (2026-10-20, end of day)
+- **Code:** everything is coded, plus the A18 cleanup pass. `flutter analyze` (lib + test) and `go build` / `go vet` are clean.
+- **Committed** by นายA on the owner's word ("commit ทั้งหมด"): app `c25af30`, be `feed165`, docs (this commit). Not pushed. The version is still `0.4.0-1+126`.
+- **Tests:** run on the owner's go ("สั่งให้แก้เทสได้เลย แบ่งๆ กัน"). Each session ran its folders with the fix loop (max 3). Details are in each inbox file.
+
+  | Area | Who | Result |
+  |---|---|---|
+  | test/ui + test/hub | นายA | green: 347 + 7 failures → fixed in 2 loops; 1 real kit bug fixed (SavingGoalRow badge overflow) |
+  | transactions, recurring, pending, notifications, home, pickers | นายB | green: 275 + 18 failures → fixed in 2 loops; 1 real bug fixed (B1 list page showed an empty month on a failed load) |
+  | budgets, accounts, test/app, test/shared | นายE | green: 228 + 11 failures → fixed in 2 loops; the shell / recurring files were re-run after B's fix and pass |
+  | saving_goals, auth, debts, projects, settings, tags, categories, contacts, archived, app_version, core | นายD | **233 pass / 13 fail, NOT fixed yet.** The owner said "run", not "fix", in that session. 12 are stale saving_goals_pages_test cases (D1–D3 redesign). 1 is core/data/sync_coordinator_test: the sync code is unchanged this round, so it's likely pre-existing or flaky. |
+  | Go, all packages (separate test DB = a clone of the dev DB at 068; the DB tests really ran) | นายC | green: 1 stale apidoc fixture fixed |
+- **Local BE:** deployed by นายC on the owner's go. The dev DB went 067 → 068 after a pg_dump backup (recurring_items 17 → 1, pending 3 → 1); the smoke check passed (be.md "local deploy 068").
+  - Since then นายC fixed one BE gap: future-dated EVENT bills now count as budget expected (รอจ่าย), not used, with a new test; the budgets tests pass. **The local BE needs a restart to pick it up; that waits for the owner's word.**
+- **Docs:** updated this round.
+  - api-document.md (นายD)
+  - spec 03 / 04 / 08 / 09 / 11 / 13 and business-rules
+  - schema.md (it was stuck at 051; now covers up to 068) and data-model.md
+  - Follow-ups the doc work found are in `backlog.md` ("Found while documenting").
+- **Waiting on the owner:**
+  1. "fix" in นายD's session, for his 13 failures.
+  2. Restarting the local BE (the event-bill fix).
+  3. The on-device check against the local BE.
+  4. Push, the version bump to 0.4.0-2+127 + tags, and the VPS (migrations 067 + 068 + a redeploy).
+
+### What this round built
+- **Coded:**
+  - **Hero color set `HeroColors`:** the card hands its colors to everything inside it.
+  - **Hero ring kit:** `HeroRing` / `HeroRingRow` / `HeroFactList` / `HeroInfoBox` / `HeroFilterChips`.
+  - **Bars and rows:** `ProgressRow.markerBubble` (pace bubble), and `ListPageBody(rowCards:)` (rows in one SectionCard per day group).
+  - **Repeat sheet:** a picker for each frequency (weekday / day of month / day + month).
+  - **Budget detail:** ring hero, scope AND, a new period card (นายB).
+  - **Lists:**
+    - budgets list: ring + filter chips + SectionCard rows + pace bubble (นายE)
+    - budget items tab and transactions list: day groups in SectionCards (นายE)
+    - saving goals list: no sections, new sort "ต้องออมก่อน" (นายD)
+  - **Goal detail:** ring hero and entries tab (นายD).
+  - **Wallets list hero:** net + split bar + filter chips with icons, no fold (นายA).
+  - **Wallet detail redesign:** นายD built the kit pieces (HeroFlowBox, HeroBar.split amounts); นายE built the page (Part 2, report in `inbox/fe-e.md`).
+  - **Saving goals with many auto-saves:** app by นายB, BE by นายC.
+  - **Plan round (owner "ลุย" on the plan artifact, tasks A / B / C / D / E):**
+    - นายA: kit A1–A4 and A7–A10 (module icons, fact icons, HeroSummaryHead, HeroFlowRow, HeroInsetBox, MemberChip, PointerBubbles, OccurrenceChain, AmountLineChart); A14 wallets hero; A17 midnight / new-day sync.
+    - นายA: A13 recurring detail (hero next box + chain / line chart + stats + chips, flat tabs, year paging, auto-create switch, R20 question). Its ต้องจัดการ card waits for นายB's occurrence actions.
+    - A15 review of B / D / E is done and fixed.
+    - Others: progress in `inbox/fe-b.md`, `fe-d.md`, `fe-e.md`, `be.md`.
+    - ALL coded (2026-10-20): app A / B / D / E; BE C1–C5, C7, C8 + review fixes; C6 (openapi by นายB, readers tests by นายE, api-document by นายD). Then the A18 cleanup pass. Analyze is clean; go build / vet are clean; NO tests run.
+    - LOCAL BE deployed 2026-10-20 by นายC (owner's go):
+      - The dev DB went 067 → 068 after a pg_dump backup: recurring_items 17 → 1, pending 3 → 1.
+      - The build is the whole uncommitted tree. The smoke check passed (be.md "local deploy 068").
+    - For the tests, the open items and the local BE, see "Where it stands" above.
+- **Commits:** all sessions share one working tree, so commit only on the owner's word, as one coordinated pass.
 
 ## Plan
 - **0.4.0 = the UI round** (owner 2026-10-17), tagged 2026-10-17. **0.4.0-1 = everything on `main` since v0.4.0** (owner 2026-10-18), listed below; tagged 2026-10-18. Versions after that get re-planned; the plan still ends at 1.0 (`product/roadmap-1.0.md`).
@@ -42,6 +97,14 @@ _Last updated: 2026-10-18 (owner's main session)._
 - Rules and owner decisions: `ai/decisions.md`. Discussed but not started: `ai/backlog.md`.
 - Releases are tag-based: Lead commits, bumps, tags `v<version>` in be / app / docs and pushes; DevOps runs `chubi-pocket-be/scripts/release.sh <brief-dir>` from the tags (brief template: `ai/templates/release-brief/`). Local env: `scripts/local-deploy.sh --web` (only when the owner orders).
 - Never rebuild or restart the BE on your own (chubi-pocket-be `CLAUDE.md`); say it needs one and wait.
+
+## Team in 0.4.0-2 (2026-10-19/20; session names change, check ListAgents)
+- **นายA-fe:** kit / hero / hub owner, budget detail hero, recurrence sheet, wallets list hero; splits the work when the owner asks.
+- **นายB-fe:** pickers, budget period card, saving goal edit (many auto-saves).
+- **นายC-be:** BE, many auto-saves.
+- **นายD** (`chubi-pocket-e2`): saving goals list / detail / entries, wallet detail kit pieces.
+- **นายE** (`chubi-pocket-ea`): budgets list, budget items tab, transactions list, wallet detail page.
+- The owner talks to several sessions directly this round, with no single Lead. Shared notes live HERE (STATUS / decisions / backlog / inbox), not in a session's private memory.
 
 ## Team (session names change; check ListAgents)
 - Lead · **fe-core** (kit / hub / shell / router / templates, auth, tx / quick create, settings, wallets / categories / tags / contacts) · **fe-debt** · **fe-event** · **fe-budget** · **fe-recurrent** · **fe-saving**. Inboxes: fe-core.md / fe-debts.md / fe-events.md / fe-budget.md / fe-recurrent.md / fe-saving.md. BE / QA / DevOps sessions are started when needed.

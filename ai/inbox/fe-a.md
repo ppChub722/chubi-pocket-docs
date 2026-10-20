@@ -613,3 +613,295 @@ Report only; nothing edited. Scan of lib/features/** + lib/app by 3 sub-agents. 
 6. **Hub coverage:** every gate-exported piece (`lib/ui/ui.dart`) must be in some hub page's `covers` (`hub_registry.dart`) and demoed; stale covers fail. A new kit piece with no hub page turns the suite red for everyone — add the page in the same change.
 7. **Tests/theme:** pump with `ThemeData(extensions:[sweetTheme.lightColors])`; avoid `ThemeBuilder` in tests (google_fonts can't load offline). Use a pixel scan on a `RepaintBoundary` (not widget rects) for alignment bugs; fractional heights blur 1px lines — keep tokens whole-pixel.
 8. **Shell edits by script:** big edits via Write'd node scripts + Read-before-Edit; the shell here chokes on heredocs with apostrophes; never `cat >> file` with no stdin (it hangs).
+
+## 2026-10-20 — 0.4.0-2 polish round (นายA-fe = FE-A, kit / hero / hub owner)
+DONE · analyze: `flutter analyze lib` clean on my files (others' work in progress excluded) · tests: NONE run (owner's go needed) · nothing committed
+files (main): lib/ui/tokens/hero_colors.dart (new) · lib/ui/organisms/hero/{hero_ring, hero_facts, hero_info_box, hero_filter_chips (new), app_hero_card, hero_number, hero_bar, hero_identity, hero_note, hero_alert, hero_amount_field, status_amount_line, summary_tile} · lib/ui/molecules/{hero_style, progress_row, day_of_month_picker, month_picker, hero_description} · lib/ui/atoms/{app_icon_button, list_break} · lib/ui/organisms/divided_rows.dart · lib/ui/templates/list_page_body.dart · lib/ui/domain/{progress/progress_card, saving/saving_goal_row, money/money_list_tile, recurring/recurrence_sheet} · features: budget_detail_page (hero / scope), budget_draft, budget_labels, accounts_page (summary), several pages' hero `color:` sweep · hub pages + hub_registry · l10n th/en + gen.
+
+What landed, in short:
+- **HeroColors:** `HeroSurface` puts a `HeroColorScope` around every hero.
+  - The roles are accent / soft / line / track / text / muted / warning / danger / success, made from the card color (theme primary on a plain card).
+  - HeroNumber, ProgressRow / HeroBar, SummaryTileView, captions, HeroAlert, HeroAmountField, StatusAmountLine, the fold button and AppIconButton read it when inside a hero.
+  - Pages no longer pass a color that only repeats the card's own.
+- **Ring kit:**
+  - `HeroRing`: used + expected, a pace tick and a warn tick. The base ring has a shade from a round head at 12 o'clock that fades out by half way.
+  - `HeroRingRow`: the facts get half the row, at least 176; the ring gets the rest, at most 160.
+  - `HeroFactList` / `HeroFact`: dashed rows, with `dot` and an `onTap` that adds ›.
+  - `HeroInfoBox`: the small box beside ✏️.
+  - `HeroFilterChips` / `HeroFilter`: count chips with `tone` (dot) or `icon`.
+- **Bars and rows:**
+  - `ProgressRow.markerBubble`: an always-on bubble in the bar's color, clamped inside the row with its arrow on the tick. `ProgressCard.paceBubble` passes it through.
+  - `SavingGoalRow`: caption, trailingCaption, color, marker and bubble; the badge sits by the name.
+  - `ListPageBody(rowCards: true)` + `cardedRows()`: one SectionCard per run of rows between ListBreaks. `CardedListBreak` makes DateGroupHeader start its label md in from the card edge.
+- **Repeat sheet:** a picker for each frequency.
+  - weekly: weekday chips (single on a budget)
+  - monthly: DayOfMonthGrid, plus nth + weekday for recurring items
+  - yearly: `MonthOfYearGrid` + DayOfMonthGrid(days:)
+  - A budget's start moves to the next matching day, and a caption says so. `BudgetDraft.withKitRule` copies the start.
+- **Budget detail:**
+  - The ring hero (`_viewHero`): info box, ring, facts, a plan StatusChip last.
+  - The scope card has no header; "นับรายจ่ายไหนบ้าง" is the first row's label.
+  - The period rows were later rebuilt by นายB.
+- **Wallets list hero (accounts_page `_summary`):**
+  - no fold; big net + `HeroBar.split` (available / saved / card debt) + dotted facts (ออมไว้ › goals)
+  - icon filter chips only when there are cards
+  - new keys `fpWalletsFilterAll` / `Cash` / `Card`
+- **Split the list / detail redesign:**
+  - นายE: budgets list, budget items tab, transactions list
+  - นายD: saving goals list / detail / entries
+  - I reviewed both and fixed the kit header inset.
+deviations / notes:
+- Unused keys and dead code are listed in `ai/backlog.md` → "0.4.0-2 leftovers".
+- The budget detail `_tiles` and `_ruleText` (นายB's) were removed because nothing used them after the hero rewrite.
+- Stale tests: see backlog. Nothing is committed; all sessions share one tree.
+
+## 2026-10-20 นายA-fe: A-plan for 0.4.0-2 (scan only, NO code yet)
+Plan page: https://claude.ai/artifact/FVDEMEHAML6xc7YaLZV5tP. I read code only: no edits, no tests. Every new piece gets a hub demo + `covers` first.
+
+Order after "จัด" (unblock D / E first, then B, then my pages):
+1. A1, A2, A3, A7, A9, A10
+2. A5, A6, A11, A12, A16
+3. A4, A8
+4. A13, A14
+
+**A1 `HeroFact` icon (S).**
+- `hero_facts.dart`: add `IconData? icon` + `Color? iconColor`. It is drawn as `AppIcon` sm where the dot is today. The colour falls back to `dot`, then the hero accent.
+- `dot` stays for old calls; the wallets hero moves to icon + iconColor.
+- New `AppIcons`: `receipt`, `trendingUp`, `pie`, `layers`, `coin`, `hourglass`, `target`, `savings` (piggy).
+- Reused: `scheduled` (clock), `date` (calendar), `recurring` (repeat), `creditCard`, `wallet`, `savingGoal` (flag).
+- Call sites: accounts_page, budgets_list_page, budget_detail_page, saving_goals_list_page, saving_goal_detail_page, the hub app-hero-card page.
+
+**A2 module tile + budget icon (S/M).**
+- No new tile widget: `IconTile(size: 40, shape: rounded, style: solid)` already exists.
+- I add a thin `HeroModuleTile(icon)` that takes `HeroColors.accent`, so pages pass no colour.
+- I also add `HeroSummaryHead(icon, label, amount, actions)` = [tile | label over big number | actions]. นายD asked for it (goals list), and my A14 (wallets list) uses it.
+- `AppIcons.budget` → `Icons.donut_large` (or `pie_chart_outline`). Uses:
+  - more_page L93, home_page L678, archived_page L57
+  - budgets_list_page L150 / L287, budget_detail_page L671 / L738 / L1347
+  - hub atoms_card, badge_avatar, blocks, bars, section_hero
+- Hard-coded `Icons.savings_outlined` in progress_card L142 and saving_goal_row L86: check what each one means, budget → AppIcons.budget, saving → stays.
+- icon_registry 'savings' is a user icon and stays.
+
+**A3 summary chip (S).**
+- `HeroHeader` already wraps its row in `ChipSizeScope(control)`, so a `StatusChip` there is 36 with a dot.
+- Missing: bold. I add `StatusChip(emphasis: true)` (→ AppChip label weight w700).
+- นายE uses StatusKind active / warning / over.
+
+**A4 `OccurrenceChain` (L).**
+- New, in `ui/domain/recurring`.
+- Params: `total?`, `current`, per-index state (paid / wait / skipped), labels for first / current / last, `open` (no end: month labels + a fading tail), colour from HeroColors.
+- The tier comes from LayoutBuilder width: numbers on all → numbers on 3 → dots + popovers → bar + popovers.
+- Popovers: ProgressRow's private `_MarkerBubble` + `_ArrowPainter` become a public `PointerBubble`, so the pace bubble and the chain share one bubble.
+- The current bubble wins when bubbles collide.
+
+**A5 date tiles (S/M).** Nothing exists today. New `CalendarTile(date)`: month band / day / weekday, for the hero. New `DateTile(date, showYear)`: day + month, plus "ม.ค. 27" in another year, for rows.
+
+**A6 occurrence row (M).**
+- `TxRow` gets `titleMaxLines` (default 1).
+- New `OccurrenceRow` in ui/domain/recurring = TxRow + DateTile leading + 2-line title + tag + sub + amount.
+- นายE's "อีก N วัน": pass `DueText` into the existing `statusChip` slot, no new param.
+
+**A7 `HeroInsetBox` (S).** The soft-fill + line box shared by HeroInfoBox / HeroFlowBox, pulled out as a public piece. The recurring next-occurrence box uses it.
+
+**A8 `AmountLineChart` (M).**
+- A CustomPainter like SavingHistoryChart (no chart package).
+- Points with amount labels, a dashed average, the next one a hollow "?" in warning.
+
+**A9 `HeroFlowRow` (M).**
+- นายE's API is accepted: (monthLabel, income, expense, onPrev, onNext (null on this month), onTapIncome, onTapExpense, selected).
+- The keys stay heroFlow*.
+- `HeroFlowBox` is deleted once E3 stops using it (only account_detail_page uses it).
+
+**A10 `MemberChip` (S).** A chip-height pill around `MemberAvatarStack` + "+N", with onTap. It cannot go in `AppChip.leading`, because that slot's FittedBox shrinks the stack.
+
+**A11 tabs / calendar (S).**
+- Big tabs: full-width `SegmentedChoice` (exists) rather than a new AppTabBar style. The owner's mock is a pill pair.
+- `MonthCalendar(showStepper: false)` (today it always draws its own stepper, L137).
+- New `TodayDivider`, built like `OrDivider` with the accent.
+
+**A12 quick create shell (S/M).**
+- `QuickCreateSheetShell`: add `subtitle` (the "แก้เฉพาะงวดนี้" caption) and `extraActions` (ข้าม / ยกเลิกการข้าม).
+- `showEntrySheet`: relax the 1–2 actions assert.
+- Tests: entry_sheet_test.
+- quick_create_sheet.dart order: นายD's D3 deletions first, then A12, then นายB's B2 / B3.
+
+**A16 (new) `NeedsActionCard` (M).**
+- The ต้องจัดการ card in both the recurring list (B1) and detail (A13).
+- The pending row moves into the kit. Today it is private `_PendingCard` in pending_page.
+- B1 and A13 filter PendingCubit by recurring source / id (BE C3 adds `?recurring_id=`).
+
+**A13 recurring DETAIL page (L).**
+- `_viewHero` is rebuilt top to bottom:
+  - HeroIdentity + HeroInfoBox (rule | start / end) + ✏️
+  - HeroInsetBox with CalendarTile + "ครั้งถัดไป | อีก N วัน" + the amount + แก้ยอด / ใส่ยอด | เลื่อนวัน | ข้าม
+  - OccurrenceChain, or AmountLineChart for variable amounts
+  - HeroTiles (3 stats)
+  - a chip row: StatusChip ▾ (pause / resume) | kind | category | wallet (| tags)
+- `_infoBox` and the settings strip go. NoteSection stays.
+- Tabs ประวัติ | ล่วงหน้า become one flat SectionCard each:
+  - no month groups
+  - OccurrenceRow, auto paging (no "เพิ่มเติม ›" / OccurrenceDates)
+  - a tap opens นายB's B2 (past) or B3 (upcoming) sheet
+- `NextOccurrenceCard` / `OccurrenceDates` become unused → cleanup list.
+- Needs C2 (names), C3 (stats, pending filter, horizon).
+- Questions: Q3, Q4, Q5 (batch select: today `_batch` / selection mode in `_pastTab`).
+
+**A14 wallets list hero (S).** `HeroSummaryHead` (wallet tile + "ยอดสุทธิของฉัน | N กระเป๋า" + net) + facts with icon + iconColor in place of dots.
+
+**A15:** review B / D / E + docs/ai.
+
+Kit guard tests likely touched (paths only, not run):
+- test/ui/hub_coverage_test.dart, feature_visuals_test.dart (+ baseline: more_page, account_detail_page, home_page), raw_widgets_test.dart, layering_test.dart, hub_duplicates_test.dart
+- test/ui/tx_row_marker_test.dart, saving_kit_test.dart, page_dots_test.dart
+- test/shared/app_tab_bar_test.dart
+- test/features/recurring/recurring_pages_test.dart, test/features/transactions/entry_sheet_test.dart
+
+## 2026-10-20 — 0.4.0-2 plan round: A13 recurring detail + A15 review (นายA-fe) — CODED, analyze clean (lib + test), NO tests run
+**A13 recurring detail page** (recurring_detail_page.dart):
+- Hero, top to bottom:
+  - HeroIdentity with HeroInfoBox (the round + "ตั้งแต่ {month}" or the end) and ✏️.
+  - HeroInsetBox: CalendarTile + "ครั้งถัดไป | อีก N วัน" (installment: "งวดถัดไป (n/N)") + the amount or รอใส่ยอด, then แก้ยอด / ใส่ยอด | เลื่อนวัน | ข้าม.
+  - OccurrenceChain: the BE `chain`, else from progress; a no-end rule gets an open chain from history + the next 3. A no-amount rule with ≥ 2 recorded amounts gets AmountLineChart instead.
+  - HeroTiles, by kind:
+    - installment: จ่ายแล้ว / เหลือ / งวดสุดท้าย
+    - no amount: เฉลี่ย / ครั้งก่อน / สูงสุด
+    - otherwise: ต่อเดือน / ปีละ / บันทึกแล้ว
+  - Chips: status ▾ | kind | category | wallet(s) | tags | บันทึกอัตโนมัติ.
+- Gone: HeroHeader, the pending tile, HeroAlert, the view info box, the tag row, batch select, and the one-off "add item" tile (C1 removes that API).
+- Tabs: one card of OccurrenceRow each (DateTile, the occurrence name, tags รอยืนยัน / ครั้งถัดไป / เลื่อนแล้ว / แก้แล้ว / ข้าม / สุดท้าย / จ่ายแล้ว, amountWaiting). Upcoming for a no-end rule = `window` mode with ดูปีถัดไป + ไปที่เดือน buttons under the card; rules with an end page to the end.
+- Occurrence writes go by rule + slot when the item has one (updateOccurrence / skipOccurrence / restoreOccurrence), else the old item-id calls.
+- Edit mode:
+  - "บันทึกอัตโนมัติเมื่อถึงวัน" switch: enabled only with a fixed amount and a wallet, with a hint line.
+  - R20 = one EditScopeChoice. It only appears when name / note / wallet / category / tags change and `recorded_tx_count > 0`, and it sends `also_update_tx`. The old 2-question scope + linked prompt is gone.
+- Model:
+  - Recurring gains avgAmount, chain (ChainSlot), recordedTxCount, autoCreate / Since.
+  - CurrentOccurrence gains slot and a synthetic id (for นายB).
+  - RecurringStats comes from top-level `stats` (contract confirmed by นายC).
+  - ItemPage gains windowed / nextFrom.
+  - RecurringWrite gains auto_create. repo.update gains also_update_tx, and items gains `from` (`months=12`).
+- 29 new l10n keys (fpRecurringSince … fpRecurringTxScopeAll), in th + en + the 3 gen files.
+- recurring_pages_test detail group rewritten for the new layout (not run).
+- Waiting: the ต้องจัดการ card on the detail page + row taps → นายB's occurrence_actions.dart (B3).
+
+**A15 review** (read-only agent, then each owner fixed their own): B 6/6, D 4/5, E 9/10. The unfixed ones are `HeroStyle.tinted(color:)`, which can't drop the color (it is required), so it is kept. Mine: HeroFlowRow ‹ › tooltips, MemberChip semantics label, and `HeroFlowSelection` moved into hero_flow_row.dart.
+Owner calls still open: `fpGoalsFilterFree` "ไม่มีกำหนด" as a filter chip; the ended / archived budgets hero still uses HeroCaption; Σused counts spend in overlapping budgets twice; old recurring drafts in pending show as "อื่นๆ" (owner said leave them, so it's accepted).
+
+**A18 cleanup list additions** (now unused):
+- l10n: fpRecurringNextTitle, fpRecurringNextCaption, fpRecurringThenTitle, fpRecurringMoreDates, fpRecurringChipSkipped, fpRecurringChipEdited, fpRecurringTilePending, fpRecurringTileInstallment, fpRecurringAlertAwaiting, fpRecurringNextInline, fpRecurringInfoSpan, fpM5bRecurringAmountPerTime, recurringSelectAll, fpRecurringSelectDone.
+- code: groupItemsByDate, addRecurringItem, RecurringDraft.valuesDiffer, TxPeriod.canStepForward. NextOccurrenceCard / OccurrenceDates go if no page uses them after B1.
+
+### 2026-10-20 — A13 follow-up: ต้องจัดการ card on the recurring detail (นายA-fe) — CODED, analyze clean (lib + test), NO tests run
+- The card sits under the hero. It lists this rule's due occurrences plus this month's coming rows that need an amount (R1), up to 3 rows.
+  - Each row: a DateTile, a warning tag (รอยืนยัน, or "อีก N วัน"), amount | wallet, and นายB's `occurrenceActionsFor`.
+  - With ≥ 2 due: a DueGroupHeader "ค้างตั้งแต่ {month}" with `settleAllActions` (ยืนยัน / จ่ายแล้ว / ข้ามทั้งหมด).
+  - More than 3: a DueMoreRow "ดูทั้ง N งวด" that switches to the ประวัติ tab.
+- Row taps in both tabs → `openOccurrenceSheet` (แก้เฉพาะงวดนี้). An old-BE row with no slot and no tx keeps the old menu until the BE rebuild.
+- New keys: occurrenceDueTitle, occurrenceDueSince, occurrenceDueMore (B1 reuses them).
+- Test: "a due occurrence: ต้องจัดการ card above the tabs" (not run).
+- A18 additions, now unused: RecurringItemActions, askCreateTarget, addRecurringItem, createFromRecurringItem (+ its page_flows entry), askItemScope, askDeleteLinked.
+- After the BE rebuild, the old-BE fallbacks can go as well: `_occurrenceMenu`, repo.editOccurrence / setItemArchived on the detail page, and editRecurringItem.
+- Owner answers (2026-10-20, in chat):
+  - The budgets list Σused stays the sum of every budget.
+  - The ended / archived budgets hero loses its HeroCaption (done by นายE).
+  - นายA OK'd the future_tx chip "ล่วงหน้า".
+- Later the same day:
+  - `Recurring.tryParse` / `ItemPage` use tryParse, so a BE `saving`-type row no longer breaks a list (นายB's ask; the directory cubit switches on B's side).
+  - The detail chain reuses B's `endChainDots` for rules with an end.
+- A18 also: drop the duplicate `fpRecurringDuplicateConsequence` line in app_th.arb / app_en.arb. นายB's list in fe-b.md "B1 recurring list page" is merged into the pass.
+
+### 2026-10-20 — BE split progress (นายA-fe)
+- Done (build / vet clean, NO tests run):
+  - item 1 `Spec.Between` (นายD, see fe-d.md)
+  - item 2 occname.go + 27 cases (นายB)
+  - item 4 notifications (นายB): due link `/recurring?focus=due`; new `recurring_auto_created`, grouped per user per day; the 068 CHECK lines were sent to นายC
+- App follow-up assigned to นายB: the `recurring_auto_created` tile + notification-type lists.
+- My C6 list so far:
+  - openapi NotificationType gets `recurring_auto_created`
+  - tests for per-day grouping and the due deep link
+  - tests for items 1–5
+  - api-document
+- Owner (2026-10-20): "เอาเลย", so budget detail recurring_item rows open their occurrence (นายE: BudgetItem rule_id / slot, then `openOccurrence`, then reload the budget).
+- The app tile for `recurring_auto_created` is done, and recurring_due moved off pending to "ไปจัดการ ›" → /recurring?focus=due (นายB).
+- A18 additions:
+  - `notifActionOpenPending`
+  - make `openOccurrence(itemId:)` nullable and drop นายE's `''`
+- Stale test to check: notifications_inbox_page_test:460 "Open pending ›".
+
+### 2026-10-20 — C3 + C8 landed; C6 split (นายA-fe)
+- นายC landed C3 + C8 + the C2 integration: build / vet clean, tests NOT run. 068 is final and was tried up / down / up on a COPY of the dev DB; the dev DB is still at 067.
+- App-side updates for the final contract (analyze clean):
+  - `autoCreateSince` dropped (the BE dropped `auto_create_since`).
+  - `RecurringDetail.txUpdateFailed` (from `tx_update.failed`), so an R20 save warns "อัปเดตรายการที่บันทึกแล้วไม่ได้ N รายการ" (new key fpRecurringTxUpdateFailed).
+  - นายB: findOccurrence now reads the month list, since there is no GET of one slot.
+- C6 split by นายA (coordinator):
+  - นายB: openapi.yaml (the whole C3 / C8 list + NotificationType + tx delete skip_occurrence; operationIds into นายC's recurring_test.go) and the notifications tests.
+  - นายE: readers Go tests.
+  - นายD: api-document.md.
+  - นายA: review, including a read-only review of the C3 / C8 code.
+- Then ask the owner: BE tests + dev DB migrate to 068 + local rebuild, and the app tests.
+
+### 2026-10-20 — C3 / C8 review + C6 progress (นายA-fe)
+- Read-only review of นายC's rewrite (no runs). Sent to นายC to fix:
+  - Bugs:
+    1. DueCheck UPDATEs bump updated_at on every read, so the sync fingerprint never matches.
+    2. Resume turned the earlier due occurrences into paid.
+    3. Manual items can't be addressed by slot.
+  - Risks:
+    - "same period" replacement isn't by calendar month
+    - the tx delete hook misses the other transfer leg / a shared-wallet member
+    - confirm / skip on a legacy pending row keeps the draft
+    - due lists include paused rules
+    - ConfirmReady is all-or-nothing
+    - 068: the tracked_from backfill runs before the deletes, the down comment is wrong, the DB TZ is used
+  - Nits: pushToRecorded's old wallet balance, partial PUT null, HeaderTZ, perf.
+  - Tests: TestBulkOccurrences / TestRecurringKinds depend on the date.
+- Owner decision (2026-10-20): on resume, due occurrences from before the pause stay due, and the paused gap = skipped.
+- C6:
+  - openapi done (นายB: 12 new occurrence ops, removed batch / create, NotificationType, 78 op ids in recurring_test.go, notifications tests).
+  - readers tests done (นายE; plus TestBudgetRecurringCategory to fix for 068).
+  - api-document done (นายD; an alignment pass against openapi is running).
+
+## 2026-10-20 — A18 cleanup pass DONE (นายA-fe) — analyze clean (lib + test), NO tests run
+A read-only agent built and verified the list (every candidate was grepped for uses in lib + test, gen files left out).
+- **l10n:**
+  - 188 unused keys removed from app_th.arb, app_en.arb and the 3 gen files (scripted, announced: scratchpad a18_l10n.py; both arb files re-parse as JSON).
+  - The keys come from the backlog lists, the fe-a / b / d / e reports, plus "extra dead" keys found by a prefix sweep (old bg* tiles / sections, recurringSummary*, recurringTab*, recurringKindSaving / Tx, accountsSummary* …).
+  - The duplicate `fpRecurringDuplicateConsequence` line is gone too.
+- **Code removed:**
+  - recurring_item_actions.dart: RecurringItemActions + ItemMenuAction, createFromRecurringItem, addRecurringItem, askCreateTarget, askDeleteLinked (kept: editRecurringItem / askItemScope = the old-BE fallback).
+  - repo: addItem, deleteItem, createFromItem, batch, ItemBatchAction, RecurringList.
+  - domain: ItemTarget, RecurringFilter.
+  - recurring_rows.dart: RecurringItemRow, ItemDateGroup / groupItemsByDate.
+  - RecurringDraft.valuesDiffer.
+  - budgetReasonText (+ the 6 fpBudgetsReason* keys).
+  - the view branch of budget_detail `_scopeSection` / `_scopeRow` (edit-only now).
+- **Kit:**
+  - next_occurrence_card.dart (NextOccurrenceCard / Action, OccurrenceDates / Date / Kind) and hero_flow_box.dart (HeroFlowBox) deleted, with their ui.dart exports, hub covers and hub demos.
+  - HeroBar.split lost its big-legend params (leftAmount / rightAmount / *Color, `_BigLegend`).
+- **Hub page flows:**
+  - recurring-detail now matches the new page.
+  - The old duplicate `recurring-occurrence` flow is gone.
+  - นายB's `FlowCall.unspecified` occurrence calls now use the new operationIds (updateRecurringOccurrence, confirmRecurringOccurrence, … listRecurringOccurrences).
+- **API tidy:** `openOccurrence(itemId:)` is nullable now, and budgets passes `recurringItemId` with no `''`.
+- **Kept on purpose:**
+  - TEST-ONLY (go when their stale tests are fixed after the run): `TxPeriod.canStepForward`, `RecurringRepository.calendar`.
+  - The old-BE fallback (`_occurrenceMenu`, repo.editOccurrence / setItemArchived / updateItem, editRecurringItem): it goes after the BE rebuild.
+  - `HeroIdentity.below` (a general slot, no user now) and `OccurrenceStateChip` (hub-only kit chip).
+  - The claude.ai mock artifacts: not deleted (owner's call).
+
+## 2026-10-20 — tests: test/ui + test/hub GREEN (นายA-fe, owner: "สั่งให้แก้เทสได้เลย แบ่งๆ กัน")
+- Run 1: 347 pass, 7 fail. Fixed in 2 loops; re-run of the 6 failing files: 79 / 79 pass.
+- Stale tests fixed:
+  - recurrence_sheet_test monthly ×2: the by-day / by-weekday chips + DayOfMonthGrid; the summary is matched by textContaining.
+  - progress_kit_test RecurrenceEditor simple: it now picks the period-start weekday, with no by-weekday choice.
+- feature_visuals baseline shrunk (draft_form 3 → 2).
+- Hub flows:
+  - recurring-detail lists the old-BE fallback archive / restore.
+  - goals-detail lists setSpareAutoSaves.
+  - api_unused_baseline gains DELETE /recurring-items/{id} and POST /recurring-items (no longer called by the app).
+- REAL BUG fixed (kit): SavingGoalRow's badge chip didn't shrink, so a long badge overflowed the title row (63 / 204 px in the hub demo; it would overflow on a phone too). The badge is now Flexible (AppChip ellipsizes). Found by the hub_pages_smoke_test hang (an overflow error under the overridden FlutterError.onError); a temporary probe test was used and then deleted.
+- Team status:
+  - Go: all ok (นายC). He also fixed future event bills, which now count as expected rather than used; that needs a BE restart (owner's word).
+  - นายE: green.
+  - นายD: 233 pass / 13 fail, waiting for the owner's fix go in his session.
+  - นายB: not reported yet.

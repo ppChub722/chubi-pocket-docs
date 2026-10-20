@@ -2,11 +2,16 @@
 
 > **0.3.1-10 — Budgets v2 (migration 059, owner mockup `design/mockups/budget-v2.html`, 2026-10-13).** Section 0 replaces everything below (kept for history: one category, fixed periods, user / project scope, `/budgets/overview` are gone). Shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`, tag **Budgets**.
 
+> **0.4.0-2 (updated 2026-10-20).** The scope is AND across categories / wallets / tags (§0.1). Sources: `upcoming` is now a computed recurring occurrence only, and the new `future_tx` is a future-dated expense, both expected (§0.2). Item rows carry `tag_refs`, `rule_id` and `slot`. The app pages are in §0.7. Fields: [`api-document.md` §08](../api/api-document.md#08--budgets).
+
 ## 0. Budgets v2
 
 ### 0.1 A named personal tracker
 - `name`, `description`, `note`, `icon_code`, a base `amount` per period, `warn_pct` (default 80; null = ไม่เตือน).
-- **Scope** (free; budgets may overlap): `all` (every expense), or any mix of categories (each with or without its sub-categories), tag NAMES and wallets. A row counts when it matches ANY of them.
+- **Scope** (free; budgets may overlap): `all` (every expense), or any mix of categories (each with or without its sub-categories), tag NAMES and wallets.
+  - **AND across the lists (0.4.0-2, owner 2026-10-19/20):** a row counts when it matches EVERY list that is set: categories AND wallets AND tags. Within one list any entry will do, and a list left empty does not narrow. Example: category อาหาร + wallet KBank = food paid from KBank only. Before 0.4.0-2 a row counted when it matched ANY of them.
+  - The same filter applies to every source in §0.2, computed recurring occurrences included.
+  - App (edit mode): the scope card's first row is labelled "นับรายจ่ายไหนบ้าง" (not a card heading), with the hint "นับรายการที่ตรงกับทุกแถวที่เลือก (ในแถวเดียวกัน อันไหนก็ได้)".
 - **Time**:
   - recurring ("งบระยะยาว"): `rule {freq daily|weekly|monthly|yearly, interval}` from `start_date` (a month period starts on the start's day, clamped), end `none | date | count`;
   - one range: `start_date` → `end.date`, or open (`end.kind none`) until ปิดงบ.
@@ -15,14 +20,16 @@
 ### 0.2 What counts (expense side, my share; owner 2026-10-13)
 | Source | Counts as | What |
 |---|---|---|
-| `normal` | used | my expense transactions (`my_share`, report scope), not a debt entry's wallet side, not a system / non-report category |
-| `recurring` | used | the same, when the transaction is linked to a recurring item (the row carries `recurring` n/N) |
-| `event` | used | my share of an event bill (payer: amount − every split; else my splits; events not cancelled), ONCE: the transaction a bill was made from, or a copy of my share, is not counted again |
-| `upcoming` | expected | recurring items not made yet, dated in the current period (open-ended: the next 30 days) |
+| `normal` | used | my expense transactions dated up to today (`my_share`, report scope), not a debt entry's wallet side, not a system / non-report category |
+| `recurring` | used | the same, when the transaction records a recurring occurrence (the row carries `recurring` n/N) |
+| `event` | used | my share of an event bill (payer: amount − every split; else my splits; events not cancelled), ONCE: the transaction a bill was made from, or a copy of my share, is not counted again. (0.4.0-2, 2026-10-20) A bill dated after today counts as **expected** (รอจ่าย) until its day, inside the current period, like `future_tx`; then as used |
+| `upcoming` | expected | (0.4.0-2) a recurring OCCURRENCE of an active setting, not recorded yet: computed from the setting's rule, or a stored one the user edited (it replaces the computed one of its period). Expense only, with a known amount > 0, dated in the current period (open-ended: the next 30 days). A paid (cleared) or skipped occurrence does not count. The one-off upcoming items are gone. |
 | `pending` | expected | pending drafts dated in the current period |
+| `future_tx` | expected | (0.4.0-2) my expense transaction dated after today, inside the current period (open-ended: the next 30 days), same filters as `normal`. On its day it becomes `normal` / `recurring` and counts as used. |
 
 - An event bill takes the category / wallet / tags of my transaction behind it when there is one. A tag name also matches the bill's event tags and my tags on the event.
-- Expected is the current period only: it is in the forecast, never in %, remaining or status.
+- Expected is the current period only: it is in the forecast, never in %, remaining or status. In the detail ring the expected part (รอจ่าย) is drawn only when it is at least 2% of the ring; a smaller amount shows only in the facts.
+- Rows (0.4.0-2): `tag_refs [{name, icon_code}]` sits next to `tags` (same order). `icon_code` is the user's own tag of that name, or null for an event / recurring tag name. An occurrence row (`kind: recurring_item`) carries `rule_id` + `slot` and a `recurring` link whose `item_id` is null while the occurrence is only computed. Its row `id` stays stable (made from the rule + slot).
 
 ### 0.3 Periods (instances)
 - Every period that has started is stored with its own `amount` and `note`. A new one begins on read. Later periods follow the setup.
@@ -49,7 +56,7 @@
   - **Summary card (0.3.1-11)**, same whatever `status` / `health`: `summary` also carries `total_limit`, `total_used`, `total_remaining`, `used_pct`, `counts: {all, ok, near, over}` over the ACTIVE budgets (state active or upcoming = `active_count`) at their CURRENT period. `total_limit` = the plain sum of the current periods' amounts (an overridden period counts its override). `total_used` counts each counted row (transaction / event share) ONCE even when budgets overlap (named budgets with overlapping scopes), so it can be less than the sum of the budgets' `used`. `total_remaining` = limit − used (negative when over); `used_pct` rounded, not clamped, 0 when the limit is 0. `counts`: over = status over; near = status warn (at / above the budget's own `warn_pct`); ok = the rest (ok or pace); ok + near + over = all.
   - `?health=normal|near|over` narrows the ROWS to that group (normal = ok + pace), never the summary (a tile tap = one call). Each `period` has `on_pace_to_exceed` (the forecast says the current period ends over; independent of `status`: the "on pace" row badge).
 - `GET /budgets/:id?period_id` → the page in one call: forecast, by_source, by_category (used, share of used), the 6 newest periods, the first 20 items (expected first).
-- Paging: `GET /budgets/:id/periods`, `GET /budgets/:id/items?period_id&source`.
+- Paging: `GET /budgets/:id/periods`, `GET /budgets/:id/items?period_id&source` (`source` and `by_source` take the §0.2 values, `future_tx` included).
 - `POST /budgets`, `PUT /budgets/:id`, `PUT /budgets/:id/periods/:period_id`, `POST /budgets/:id/close | archive | restore`: each returns the page. `DELETE` → `{id}`.
 - Errors: 400 VALIDATION_ERROR / INVALID_RULE / INVALID_CATEGORY / ACCOUNT_NOT_FOUND, 404 NOT_FOUND, 409 INVALID_TRANSITION.
 - Home `/dashboard` budgets tile and `/me/counts` `budgets_summary` keep their shapes, summed over active budgets' current periods.
@@ -57,6 +64,42 @@
 
 ### 0.6 Migration 059
 Personal v1 budgets become recurring budgets on their category (+ sub-categories), with the same period (anchored on the start of the period they were created in). Event-scope budgets are dropped. Deleting a category takes it out of a budget's scope; `Category.budget_count` = budgets tracking it.
+
+### 0.7 App pages (0.4.0-2, updated 2026-10-20)
+Layout only; every look comes from the kit. Budgets use a pie / donut module icon app-wide; the piggy bank belongs to savings (owner 2026-10-20).
+
+**Budgets list hero**
+- No round / month stepper (every budget's round differs) and no faint caption. Head: the budget module tile (40, card color), then a bold summary chip; 🔍 on the right.
+- The summary chip uses the detail page's status words:
+  - **เกินงบ ฿x** (danger) when the total is over: `total_used` > `total_limit`, x = the overage (the same number as the ring).
+  - Otherwise **ใช้เร็วกว่าแผน ฿x** (warning) when Σused > Σ plan-to-date, with x = the difference.
+  - Otherwise **ตามแผน** (card color).
+  - Σ plan-to-date = Σ amount × the elapsed share of the current period, over the active budgets that have such a share (an open-ended budget has no plan and is left out). Σused = the plain sum of the same budgets' `used`. Owner 2026-10-20: it stays the sum of every budget, so a spend inside two overlapping budgets counts in both. The app works it out on the device clock.
+- The ring: "เหลือทั้งหมด" ฿`total_remaining` with "จาก ฿`total_limit`". Over the limit it reads "เกิน" with the overage, in danger.
+- The facts, each with an icon: ใช้ไปทั้งหมด (receipt) = `total_used`; ใช้แล้ว (pie) = `used_pct` %; งบในรอบนี้ (layers) = "N งบ" (`active_count`).
+- The filter chips are count chips that filter (`?health=`): ทั้งหมด | ปกติ | ใกล้เต็ม | เกินงบ.
+- The ended / archived tabs: the head is only the module tile + 🔍 (no caption).
+- Rows: all in ONE SectionCard. A row's pace tick carries an always-on bubble "แผนถึงวันนี้ ฿x" (amount × the elapsed share).
+
+**Budget detail ring hero** (view mode)
+- Identity row: icon + name (one line, ends in "…") + description. Beside ✏️ sits a small info box: the round (e.g. ทุกเดือน), or ครั้งเดียว / ไม่มีกำหนดจบ, with "เหลือ N วัน | elapsed/total days" under it.
+- The card color is the budget icon's tint; a warning / over period paints over it.
+- Ring + facts (the facts get at least half the row):
+  - The ring shows used, the expected part (§0.2, 2% rule), the pace tick and the warn tick. In the centre: "ยังใช้ได้" ฿remaining "จาก ฿amount"; over: "เกิน" ฿overage.
+  - Facts with icons: ใช้ไป (receipt); รอจ่าย (clock, only when something is expected); แผนถึงวันนี้ (trend up, when the period has a pace); then ใช้ได้วันละ (calendar), or รอบใหม่เริ่ม {date} (repeat) when a recurring budget is already over.
+- Last, at chip size: the plan status chip (active budgets): เกินงบ ฿x → ใช้เร็วกว่าแผน ฿x → ใกล้เต็ม → ตามแผน, first match. Plus "เฉพาะรอบนี้" when the period is overridden. A budget that is not active shows its state chip in the header instead.
+- Under the hero in view mode the scope is shown as chip strips (categories, wallets, tags). The scope and period cards appear in edit mode only.
+- The period card: เริ่ม, then ทำซ้ำ ☑ with the round chips and the end, or สิ้นสุด. Picking a weekday / day in the repeat sheet moves the start to the next matching date, and the sheet says so ("วันเริ่มจะเลื่อนเป็น …").
+
+**Budget items tab**
+- Grouped by day. Each day's rows sit in one SectionCard, with the day header above it. The header total = −(the day's sum, expected rows included).
+- No "นับเพราะ…" line (the API's `reason` is not shown) and no "ปกติ" chip.
+- A source chip shows only for the other sources: รายการประจำ (`recurring`), อีเวนต์ (`event`), "รายการประจำ | ล่วงหน้า" (`upcoming`), รอยืนยัน (`pending`), ล่วงหน้า (`future_tx`). Expected rows are dimmed.
+- The wallet chip and the #tags look like the transaction rows. Each #tag is colored from `tag_refs[].icon_code`; a name with no own tag uses the primary color.
+- Taps:
+  - a transaction row (normal / recurring / future_tx) → tx detail;
+  - an occurrence row (`kind: recurring_item`) → the occurrence sheet ("แก้เฉพาะงวดนี้", spec 11), found by its stored id, or by `rule_id` + `slot` while only computed; a confirm / skip / link there reloads the budget;
+  - event bill and pending rows don't open.
 
 ---
 
@@ -423,10 +466,10 @@ Caveat: if the budget was edited mid-period (amount changed from ฿5,000 to ฿
 ## 6. Status
 
 - **Phase** — Phase 1c shipped (BE migration 000035 + Flutter `/budgets` routes). User-scope budgets live; project-scope still wired via project detail page (Phase 1c plan).
-- **Last updated** — 2026-09-11
+- **Last updated** — 2026-09-11; 0.4.0-2 notes 2026-10-20 (AND scope §0.1, sources `upcoming` / `future_tx` + row fields §0.2, app pages §0.7)
 - **Version** — 0.2 (project scope documented as the personal lens vs `projects.planned_amount` group total; fixed "฿10,000 total" examples that contradicted the period enum; added permissions-vs-lens open question)
 - **Version** — 0.1 (initial draft; user + project scopes, 3-level hierarchy rollup, advisory-only, fresh rollover)
 
 ## 0.4.0 detail numbers
 
-`GET /budgets/:id` `forecast` also carries `available` (limit − used), `projected_end` (= `forecast_end`), `days_left` (today included) and `pace_pct` (elapsed / total days, the pace tick); the last three are null for an open-ended or non-current period. Every item row has `reason`: why it counts here (first match of `all` / `category` / `sub_category` / `tag` / `wallet`). The periods list (`GET /budgets/:id/periods`, one row per period with used / amount) and the per-period override (`PUT /budgets/:id/periods/:period_id`, `amount` null = back to the base amount) already exist; the override is a PUT with partial semantics, not a PATCH.
+`GET /budgets/:id` `forecast` also carries `available` (limit − used), `projected_end` (= `forecast_end`), `days_left` (today included) and `pace_pct` (elapsed / total days, the pace tick); the last three are null for an open-ended or non-current period. Every item row has `reason`: why it counts here (first match of `all` / `category` / `sub_category` / `tag` / `wallet`). The app no longer shows it (0.4.0-2, §0.7). The periods list (`GET /budgets/:id/periods`, one row per period with used / amount) and the per-period override (`PUT /budgets/:id/periods/:period_id`, `amount` null = back to the base amount) already exist; the override is a PUT with partial semantics, not a PATCH.

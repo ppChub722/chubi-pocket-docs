@@ -103,9 +103,24 @@ Both rows inserted atomically (single DB transaction with row locks on both acco
 
 Transactions with `project_id` set are visible to all linked members of that project via the shared-book view (see [`10-projects.md §2.1`](10-projects.md)). The transaction is still **owned** by `user_id` (creator only edits).
 
-### 2.6 Recurring items and future dates (0.3.1-10, replaces the scheduled origin)
+### 2.6 Future dates and recurring links (0.4.0-2, updated 2026-10-20)
 
-`scheduled_transaction_id` is gone (migration 057). A transaction may be the linked side of a recurring item (`recurring_item {item_id, recurring, seq, total}` on the row, author only); edits with `also_update_link: true` reach the item, `DELETE ?also_delete_link=true` deletes it. The transactions table holds only what happened: a **future-dated create** makes an upcoming item (`rows: []`, `upcoming`), and **an edit to a future date moves the row out** (400 `FUTURE_DATE_NOT_ALLOWED` for transfers, debt entries, event bills, others' rows). See [`11-scheduled-transactions.md`](11-scheduled-transactions.md) §7.
+Replaces the 0.3.1-10 flow, where a future date made or moved the row into a one-off "upcoming" item of the recurring module. Owner 2026-10-20: the one-off upcoming is cut. `scheduled_transaction_id` is still gone (migration 057). Fields: [`api-document.md` §04](../api/api-document.md#04--transactions).
+
+**A future-dated transaction is a plain transaction.**
+- Saved from quick create, or edited in tx detail, with a date after today (user's timezone), it is a normal committed row in `transactions`: no pending step, no upcoming item, no `upcoming` field on the write result and no error. Transfers, debt entries and event bills may carry a future date too.
+- Editing a row to a future date just saves it; the detail page stays open. Quick create shows no note under a future date.
+- What counts stops at today. Until its day the row is in no wallet balance (spec 03 §3.2a, the effective balance), `month_in` / `month_out`, list `totals` and `daily` (§3.2, 0.4.0 list numbers), `GET /transactions/summary` (dashboard, reports), category month figures or budget `used`. On its day it counts by itself (no job, no second write).
+- Budgets show a future expense inside the current period as expected: source `future_tx`, chip "ล่วงหน้า" (spec 08 §0.2).
+- The list shows it (§3.2), and the pagination `total` counts it.
+- App: in the transactions list a future row is dimmed and carries "อีก N วัน" ("พรุ่งนี้" for tomorrow; no tag on today's rows). The list's period can step into future months (the period pill's › and swipe), so a future row is reached by stepping forward. With the default newest-first sort the future rows sit on top.
+- The recurring module keeps only recurring settings. The old one-off upcoming items and their pending drafts were removed by migration 068.
+
+**Recurring links.** A row may record ONE occurrence of a recurring setting (`recurring_item {item_id, recurring, seq, total}` on the row: a recorded occurrence is always a stored row). One occurrence ↔ one transaction; the transaction keeps its own date and amount. The occurrence model is in [`11-scheduled-transactions.md`](11-scheduled-transactions.md).
+- Linking from quick create takes two steps: the setting (nearest due first), then its occurrence. The top group is "งวดใกล้เคียง", then ค้าง / งวดถัดไป / งวดที่ผ่านมา. An occurrence that another transaction holds asks "สลับรายการที่ผูก?" before the swap. Linking can also happen later, from tx detail or from the recurring page.
+- Edits with `also_update_link: true` also reach the occurrence the row records.
+- Deleting the transaction always releases its occurrence (§3.5). The app asks "ลบรายการนี้?" with two choices plus cancel: "ลบรายการอย่างเดียว (งวดกลับเป็นค้าง)" → `DELETE /v1/transactions/:id`, the occurrence goes back to due / upcoming by its date (to paid if it had been marked paid before); "ลบรายการและข้ามงวดนี้" → `?skip_occurrence=true`, the occurrence becomes skipped in the same DB transaction. Unlinking keeps the transaction and releases the occurrence the same way.
+- `DELETE ?also_delete_link=true` stays for event bills; for a recurring link `skip_occurrence` takes its place.
 
 ### 2.7 Resolve back-references
 
@@ -296,6 +311,8 @@ Derived booleans in response: `has_splits` (any `shared_expense_splits` for this
 
 `totals` (2026-10-10): money over the **whole filtered set** — every page, the same filters and visibility as the rows (all of them optional; no `from`/`to` = all time). `income` / `expense` = sums of income / expense rows; transfers count in neither. `net` = income − expense. `count` = the income + expense rows (`pagination.total` also counts both transfer rows). System rows (opening balance, adjustments, debt settlements) count like any other row the list shows. Sent on every page. Unlike `GET /v1/transactions/summary`, there is no report-scope or reportable-category narrowing.
 
+Future-dated rows (0.4.0-2, updated 2026-10-20; §2.6): the list returns them like any row (with `date_desc` they come first) and `pagination.total` counts them, but `totals` leaves them out until their day.
+
 ### 3.3 `GET /v1/transactions/:id`
 
 Single transaction with full details — account, category, splits, project, scheduled_transaction reference, transfer pair (if transfer).
@@ -376,6 +393,8 @@ Hard delete. Caller must be `user_id`. Unconditional — no settlement guards.
 
 If the transaction had `source_split_id` set (it was a resolve action — `pay` or `receive`), deleting it removes the personal-side record of the resolution. The split itself stays (it lives on the parent transaction); per-caller settlement state recomputes accordingly.
 
+If the transaction records a recurring occurrence (0.4.0-2, updated 2026-10-20; §2.6), the delete releases it in the same DB transaction: the occurrence goes back to due / upcoming by its date (to paid if it had been marked paid first). With `?skip_occurrence=true` the occurrence is stored as skipped instead. The other leg of a transfer, or a shared-wallet member's delete, releases it the same way.
+
 If the transaction had `source_project_transaction_id` set (it was a claim), deleting it removes the personal mirror. The project_transaction stays as the project ledger record. **Splits that were migrated to the personal mirror at claim time stay on the personal mirror** — they don't auto-migrate back to the project_transaction. (If you want to fully unwind a claim, the actor would re-claim afterwards, which would re-create the personal mirror; the splits would still need to be re-pointed manually. Phase 2+ may add an auto-migrate-back on claim deletion.)
 
 **Errors:** `401`, `403`, `404`.
@@ -414,6 +433,8 @@ Aggregated totals across date range.
 ```
 
 Transfers are excluded from income/expense aggregates (they're just money movement, not spending or earning).
+
+Rows dated after today are left out until their day, even when `to` is later (0.4.0-2, updated 2026-10-20; §2.6).
 
 ---
 
@@ -545,7 +566,7 @@ Implementable but adds edge cases. Deferred to Phase 2 as "Move transaction to d
 ## 6. Status
 
 - **Phase** — spec; Phase 1a implementation pending
-- **Last updated** — 2026-04-26
+- **Last updated** — 2026-04-26; 0.4.0-2 notes 2026-10-20 (future-dated rows + recurring links §2.6, list §3.2, delete §3.5, summary §3.6, list numbers)
 - **Version** — 0.2 (unified shared-expenses model)
   - Renamed `settles_split_id` → `source_split_id` for naming consistency
   - Added `source_project_transaction_id` for the actor-claim mirror (links a personal entry back to the project_transaction it mirrors)
@@ -558,3 +579,5 @@ Implementable but adds edge cases. Deferred to Phase 2 as "Move transaction to d
 ## 0.4.0 list numbers
 
 `GET /transactions` also returns `avg_daily_spend` and `daily`: both follow the list's date range (`from` / `to`; with only `from`, that month; with neither, the CURRENT month in the user's timezone) and every other filter. `daily` = one `{date, income, expense}` per day of the range (my share, zero-filled, the whole range even past today; empty when the range is over 366 days). `avg_daily_spend` = the range's expense / the days of it that have happened (up to today, at least 1). `totals` is unchanged (it follows the filters as before).
+
+0.4.0-2 (updated 2026-10-20): `daily` and `totals` count rows up to today only, so the days after today stay 0 even when future-dated rows exist (§2.6).

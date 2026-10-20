@@ -14,6 +14,8 @@ Global conventions (base URL, error envelope, data types, HTTP verbs) are in [`o
 
 > **0.3.1-10 — wallet savings (goals v2).** `Account.savings` = the caller's saving buckets in the wallet: `saved` (goals + spare), `spare`, `available` (= balance − saved; null when the balance isn't tracked), `saved_exceeds_balance` + `over_by` (red warning only), `buckets[]`. See spec 09 §0.
 
+> **0.4.0-2 (updated 2026-10-20) — future-dated rows, card payments, wallet pages.** A transaction dated after today is a plain row (spec 04 §2.6), but it counts nowhere until its day: every wallet `balance` the API shows is the **effective balance** = `accounts.balance` − Σ the wallet's future-dated rows (§3.2a), and `month_in` / `month_out` and the account summary stop at today (§2.5b, §2.7). A credit-card / pay-later wallet's `month_in` counts the transfers IN to it (= card payments) (§2.5b). App: the wallets list hero and the wallet detail hero are redesigned (§2.9). Fields: [`api-document.md` §03](../api/api-document.md#03--accounts).
+
 ## Phase summary
 
 | Concern | Phase 0/1 | Phase 2 | Phase 3 |
@@ -262,7 +264,7 @@ Archive = hidden + ignored + read-only (owner only; 409 `ACCOUNT_HAS_MEMBERS` wh
 
 ### 2.5b Page numbers (0.4.0)
 
-`GET /v1/accounts` and every answer that returns a wallet carry, per wallet: `savings.{saved, available}` (already; available = balance − saved, null when untracked), `month_in` / `month_out` (this month's cash income / expense rows on the wallet, any author; transfers and opening / adjustment rows are not money in / out; month in the user's timezone), and for credit cards / pay-later with a `payment_due_date`: `due_date_next` (next due date on or after today, day 31 = last day of the month) and `days_until_due`. The card fields keep the names `credit_limit`, `statement_date`, `payment_due_date` (the 0.4.0 brief's due_day / statement_day are these two). List `totals` adds `total` (= net), `cash_total` (= assets: non-credit wallets), `cash_split` (`[{type, pct}]`, share of cash_total by bank / cash / e_wallet, only types with wallets), `card_debt` (= liabilities), `card_used_pct` (credit used / limits), `card_remaining` (limits − card_debt, ≥ 0), `saved_total` (money set aside in the tracked, non-archived wallets; unallocated goal money not included), `available_total` (= cash_total − saved_total); `by_type[].count` gives the group header counts.
+`GET /v1/accounts` and every answer that returns a wallet carry, per wallet: `savings.{saved, available}` (already; available = balance − saved, null when untracked), `month_in` / `month_out` (this month's cash income / expense rows on the wallet, any author, up to today: a row dated after today counts from its day (0.4.0-2); opening / adjustment rows are not money in / out; transfers are neither in nor out, except that on a `credit_card` / `pay_later` wallet the transfers IN (the card payments) count in `month_in` (0.4.0-2, so the card page's "เงินเข้า" is what was paid in); month in the user's timezone), and for credit cards / pay-later with a `payment_due_date`: `due_date_next` (next due date on or after today, day 31 = last day of the month) and `days_until_due`. The card fields keep the names `credit_limit`, `statement_date`, `payment_due_date` (the 0.4.0 brief's due_day / statement_day are these two). List `totals` adds `total` (= net), `cash_total` (= assets: non-credit wallets), `cash_split` (`[{type, pct}]`, share of cash_total by bank / cash / e_wallet, only types with wallets), `card_debt` (= liabilities), `card_used_pct` (credit used / limits), `card_remaining` (limits − card_debt, ≥ 0), `saved_total` (money set aside in the tracked, non-archived wallets; unallocated goal money not included), `available_total` (= cash_total − saved_total); `by_type[].count` gives the group header counts.
 
 ### 2.6 `DELETE /v1/accounts/:id` and `GET /v1/accounts/:id/delete-preview` (0.3.3)
 
@@ -316,6 +318,8 @@ Balance summary and income/expense totals for an account over a date range.
 
 The flag is the single rule the FE relies on; transfers no longer have special-case handling here. See [`05-categories-tags.md §4.14c`](05-categories-tags.md) for the seed defaults and rationale.
 
+**0.4.0-2 (updated 2026-10-20):** the app reads these numbers as `GET /v1/accounts/:id?include=summary` (the wallet page's flow row for a period other than this month). `balance` is the effective balance (§3.2a). The sums stop at today: a row dated after today is in no total until its day, even when `to` is later. One exception to the inclusion rule: on a `credit_card` / `pay_later` wallet the transfers IN (card payments) count in `total_income`, the same rule as `month_in` (§2.5b), so the page agrees with the wallet list.
+
 ### 2.8 `POST /v1/accounts/:id/identifiers` (0.3.1)
 
 Appends **one** identifier — the pending page's "จำเลขนี้ไว้กับกระเป๋านี้"
@@ -332,6 +336,32 @@ Appends **one** identifier — the pending page's "จำเลขนี้ไ�
 Every account response carries `identifiers` (always an array). Slip
 import matches a slip's masked numbers against them to pick the wallet
 and the draft's direction — see [spec 15 §5](15-slip-import.md).
+
+### 2.9 Wallet pages in the app (0.4.0-2, updated 2026-10-20)
+
+Layout only; every look comes from the kit (`AppHeroCard`, `HeroColors`). The numbers come from §2.5b / §2.7; nothing is computed on the device except the bar shares.
+
+**Wallets list hero** (owner 2026-10-19/20):
+- Head: the wallet module tile (40, card color) beside "ยอดสุทธิของฉัน | N กระเป๋า" (plus " | กระเป๋าร่วม N" when some are shared) over the big net; 🔍 on the right shows / hides the search + sort row.
+- A 3-color split bar: ใช้ได้จริง (available) | ออมไว้ (saved; a small amount still shows as a sliver) | หนี้บัตร (card debt). No bar when all three are 0.
+- Facts under it work as the bar's legend: each label has an icon in its segment's color instead of a dot: ใช้ได้จริง = coin (`available_total`), ออมไว้ › = piggy bank (`saved_total`, opens the saving goals list), หนี้บัตร = card (`card_debt`, plus " | ใช้วงเงิน N%" when there is debt and a limit).
+- Filter chips with icons and counts, only when the user has a card: ทั้งหมด | เงินสด/บัญชี | บัตรเครดิต. They filter the wallet grid.
+- No faint caption, and no fold / compact mode on this page.
+
+**Wallet detail hero** (view mode, top to bottom; replaces the 0.4.0-1 hero with the month tiles):
+1. Icon + name + description, ✏️ for the owner only. The type chip and the masked identifier chip are no longer in the hero.
+2. The balance on its own row: "ยอดในกระเป๋า" (credit / pay-later: "ยอดใช้ไป"). Only for wallets that track their balance.
+3. A split bar (parts only, no legend) and facts under it with icons in the segment colors:
+   - asset wallet with savings: ใช้ได้ (coin) | ออมไว้ › (piggy bank; › switches to the overview tab, whose "ออมไว้ใน" section lists each goal / ยังไม่จัดสรร with its amount and opens it). Saved more than the balance: the saved part and amount turn warning, plus the alert "ออมไว้เกินยอดในกระเป๋า ฿x". Nothing is blocked.
+   - credit / pay-later with a limit: the used share of the limit; facts "ใช้ไป N%" (card) | "เหลือใช้ จากวงเงิน ฿limit" (coin).
+   - neither (no savings, no limit): no bar.
+4. The card due alert "ครบกำหนดชำระ {date} | อีก N วัน" when the card has a due date.
+5. The flow row **[‹] [เงินเข้า ต.ค.] [เงินออก ต.ค.] [›]**: money in (+฿x) and out (−฿y) of the selected period. This month reads `month_in` / `month_out`; other periods read the account summary (§2.7), and show "—" while loading or after a failed call. ‹ › step the SAME period as the transactions tab (they stay in sync), and › may step into future periods like the list does (spec 04 §3.2). Tapping เงินเข้า / เงินออก filters the transactions tab to income / expense; a second tap clears it. The label follows the period kind (a month "ต.ค.", with the year added for another year; a year; a day). The row is always shown, also at ฿0 / ฿0. On a card, เงินเข้า = the payments into the card.
+6. A bottom chip row: the wallet type (its icon + color) | the report scope ("รวมในรายงาน" / "เฉพาะฉัน" / "ไม่รวมในรายงาน"; display only, it is changed in the settings section) | a members chip (an avatar stack + "+N"; tap → the members sheet), only when the wallet is shared.
+
+**No-balance wallets** (`track_balance` off): the hero is the name row, the flow row and the chips. No balance, no bar, no ปรับยอด, and no line saying the balance is not tracked (owner rule: rows show only what an item has).
+
+The overview tab, top to bottom: info → ออมไว้ใน (hidden with no buckets) → สมาชิก → การตั้งค่า → โน้ต → meta.
 
 ---
 
@@ -356,6 +386,18 @@ Alternatives considered:
 Chose: **cached column** maintained atomically by the transaction service. Read speed is fine; writes are the only place balance updates, so drift is contained to one layer.
 
 Phase 3 adds a scheduled reconciliation job that verifies `accounts.balance == SUM(transactions)` and alerts on mismatch, plus an admin `POST /v1/admin/accounts/:id/recalculate` for repair.
+
+### 3.2a Effective balance: future-dated rows wait for their day (0.4.0-2, updated 2026-10-20)
+
+A transaction may carry a date after today (spec 04 §2.6); it is a normal row from the moment it is saved. The cache above still applies every row's delta at write time, future ones included, so create / edit / delete keep one code path. What the API **shows** is the effective balance:
+
+- effective `balance` = `accounts.balance` − Σ the signed amounts of the wallet's rows dated after today ("today" in the caller's timezone);
+- one shared SQL helper builds it for every reader: `Account.balance` (list, detail), `account_balances` in write results, the form-options wallet balances and the saving `available` (spec 09);
+- on the row's day the number moves into place by itself: no job, no second write;
+- `POST /:id/adjust-balance` compares `new_balance` with the effective balance, so the target is the number the user sees;
+- in a write result the shown balance uses the wallet owner's timezone; on reads it uses the caller's. They differ only around midnight for a wallet shared across timezones.
+
+Month flow (`month_in` / `month_out`), the account summary, reports, the dashboard and budget `used` stop at today the same way.
 
 ### 3.3 Opening balance auto-creates a transaction
 
@@ -449,5 +491,5 @@ Cross-account totals (net worth, all-account spend) belong in the transactions m
 ## 5. Status
 
 - **Phase** — spec; Phase 1a implementation pending
-- **Last updated** — 2026-04-24
+- **Last updated** — 2026-04-24; 0.4.0-2 notes 2026-10-20 (effective balance §3.2a, month flow + card payments §2.5b / §2.7, wallet pages §2.9)
 - **Version** — 0.2 (balance-as-cache; opening-balance auto-transaction; adjust-balance endpoint; `status` enum; type/currency mutable; loans/savings via other modules; institution dropped)

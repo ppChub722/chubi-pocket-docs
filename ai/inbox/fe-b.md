@@ -228,3 +228,634 @@ State: `flutter analyze` = No issues; full `flutter test` = 579 passed. Nothing 
 3. Widget tests: Dio never completes under fake-async (use a fake repository, or SyncTransformer + real async); AppMessage/AppChip need the AppColors theme extension in the test theme; pages with AppTopBar need Pending/UnreadBadge/Auth cubits provided.
 4. Every new gate-exported class must be in a hub page `covers` (hub_coverage_test) and a piece lives on ONE page (hub_duplicates); new endpoints must be in a page flow or the api_flows baseline.
 5. Template contracts: lists clear the top bar themselves (never add paddingOf.top in pages); skeleton only on the first load (AsyncStateView `_settled`); EditModeMixin.editScope installs EditModeScope + its own ScaffoldMessenger (pageMessenger); SectionCard without heading is a BOX, DetailPageBody merges all headless ones.
+
+## 2026-10-20 12:38 — 0.4.0-2 (นายB-fe): pickers, budget period card, budget view scope, saving-goal plan + many auto-saves, wallet hero mock
+DONE · files: see each block · analyze/test: `flutter analyze lib test` = No issues; NO tests run (owner hasn't said); nothing committed since 470d30f
+
+**1. One picker core for every entity picker**
+- Kit: lib/ui/organisms/item_picker.dart (ItemPickerSheet + showItemPicker, PickerItem / Group / Filter / None / Create / FreeText / Action, layouts rows / cards / chips), picker_selection.dart (PickerChildren separate / toggle / always), picker_sheet.dart (+ subtitle, PickerConfirmBar.loading).
+- Entity pickers in features: CategoryPicker, AccountPicker, BankPicker, ContactPicker (+ walletInvite, wireNames), TagPicker, EventPicker (tabs เปิดอยู่ / ปิดแล้ว), RecurringPicker, SavingGoalPicker, DebtEntryPicker, EventMemberPicker.
+- Kit hooks so lib/ui can call feature pickers: TxFilterPick / TxFilterPicks (tx_filter_sheet.dart), PickBank (identifier_kind_sheet.dart).
+- Old sheets deleted: 9 in lib/ui/domain, 6 in lib/features, plus partial cuts. Hub: organisms_item_picker_page, domain_entity_pickers_page. Test: test/ui/item_picker_test.dart.
+
+**2. Hero / menu kit**
+- HeroAmountField = AppInput.card hero style (same API).
+- SettingMenuRow custom-value field = pill like the menu button.
+
+**3. Budget detail**
+- Period card (edit only), `_periodSection`: เริ่ม row, then the NEW kit DetailPairRow (lib/ui/molecules/detail_pair_row.dart, line between columns): ทำซ้ำ ☑ | นับรอบ chips [🔁 round] [📅 first period, budgetRangeShort] [end], or สิ้นสุด.
+- View mode: period + scope cards removed. Scope = the NEW kit IconChipStrip (lib/ui/molecules/icon_chip_strip.dart) under the hero, one strip each for categories / wallets / tags. TxTagStrip now uses it. The chips are selected (tinted border).
+- l10n: bgFieldRepeatToggle, bgEndOnDate, bgFieldRepeat th = นับรอบ.
+- Unused keys (นายA's cleanup): bgFieldRepeatHelp, bgFieldEndHelp, fpBudgetsRepeat*.
+
+**4. Saving goal create / edit: "แผนการออม" + many auto-saves** (BE by นายC, migration 000067)
+- Edit body: one SectionCard with:
+  - วันที่ครบกำหนด;
+  - เงินออมเริ่มต้น (create only: amount + wallet chip → an entry right after create);
+  - ออมอัตโนมัติ switch + split-bill-style rows (SplitRow: wallet pill, amount, ✕, then a round chip → showRecurrenceSheet and a next-date chip);
+  - + เพิ่มรายการออม.
+  No dashboard numbers on the edit page (owner).
+- View: the goal's auto-saves are read-only rows (`_autoView`). The spare pool keeps the old single sheet.
+- Domain: SavingAutoSave (+id, rule, listFromJson, which falls back to the legacy auto_save) and SavingAutoSaveWrite. SavingGoal.autoSaves; SavingGoalDetail.spareAutoSaves.
+- repo / cubit: setAutoSaves → PUT /saving-goals/{id}/auto-saves (setGoalAutoSaves).
+- Create = create → createSavingEntry → setGoalAutoSaves. A failure after the goal exists shows sgCreatedPartly and still leaves.
+- Files: saving_goal.dart, saving_goals_overview.dart, saving_goals_repository.dart, saving_goal_cubit.dart, saving_goal_detail_page.dart, hub/api/page_flows.dart, test saving_goal_parse_test.dart (2 lines), l10n sg* keys.
+- Owner action: run migration 000067 AND rebuild the BE together (the old BE breaks on saving_auto after the migration).
+
+**5. Wallet detail redesign**: mock + plan only; code by นายD (kit) / นายE (page)
+- Mock: https://claude.ai/artifact/9iiH4M6b4K4Mx5v5gtNnwW (hero 7 cases, overview tab, transactions tab).
+
+deviations/notes
+- Likely failing tests (not run): budgets_pages_test (period / scope text changed), saving goal page tests (edit body changed).
+- Open for the owner: credit-card month box ↑ = 0, because the BE month_in counts income only, not transfers (payments). Option (b): the BE counts transfers in for credit types.
+- Mockups: budget period (canvas in my scratchpad), saving goal edit https://claude.ai/artifact/96PdcTja6k6sD6WqseGmn6.
+
+## 2026-10-20 14:10 — PLAN 0.4.0-2 B1–B4 (scan only, no code)
+PLAN · files: read-only scan of recurring / pending / quick create (app) + recurring summary (BE) · analyze/test: n/a (nothing edited)
+
+### B1 — recurring LIST page rewrite (size L)
+**Files**
+- rewrite `lib/features/recurring/presentation/pages/recurring_home_page.dart`
+- `recurring_rows.dart` (row builders)
+- `recurring_repository.dart` (+ month list paging / summary)
+- `domain/recurring.dart` (+avgAmount)
+- `core/router/app_router.dart` (`?tab=` mapping)
+- l10n `fpRecurring*`
+
+**Exists, reusable**
+- RecurringDirectoryCubit (SyncBacked): rules + RecurringSummary (byKind count / monthly / yearly).
+- `RecurringRepository.calendar(month)` = `GET /recurring-items?month=YYYY-MM`.
+  - It returns every status, oldest first, and amount null = unknown.
+  - The client reads page 1 only (per_page 100).
+  - Paused / archived rules' items are excluded.
+  - Items carry no kind.
+- PendingCubit: `source.isRecurring` + `recurringRef.itemId`.
+- Sheets: `showQuickCreateSheet(draft:)` (confirm / enter amount for a pending draft); `showOccurrenceSheet(amountRequired:)` + `repo.editOccurrence` (amount for an upcoming item).
+- Kit: StepperPill.month, TabbedListPageBody / AppTabBar / AppTabPager, SectionCard(trailing:), DateGroupHeader, MonthCalendar (CalendarDot.warning exists but is unused), RecurringRow / RecurringItemRow / TxRow, OccurrenceStateChip, HeroNumber / HeroNote / HeroTiles + SummaryTile(tone amber, onTap), IconTile, ProgressRow.
+
+**Missing**
+- Real totals for any month: today's month_pay is an AVERAGE (BE summary.go: amount × monthlyCount).
+  - Plan: compute pay / receive / count / awaiting on the client from the month item list, fetching ALL pages (a few daily rules pass 100 / month).
+  - Then C3 only needs to cover what the client can't compute (below).
+- Kind per item: join on `recurring.id` with the directory rules (no BE needed).
+- Variable-amount "เฉลี่ย ฿x": no field anywhere → BE.
+- Installment chain per row: Recurring has only progressDone / progressTotal, with no per-occurrence state (wait / skip) → BE, or progress-only.
+- ต้องจัดการ:
+  - Pending recurring drafts. ยืนยัน = `submitOne` when canConfirm, else open the sheet.
+  - The mock also shows a FUTURE item with an unknown amount (ค่าไฟ 23 ต.ค.), which isn't in pending yet (see Q1 below).
+- Group header totals: subscription ฿/เดือน | ฿/ปี from byKind; installment "เหลือ ฿x" = amount × (total − done) on the client; variable "เฉลี่ย" needs avg.
+- Calendar dots: add warning dots for pending / unknown amount.
+
+**Kit API I'd like from A**
+- A2: `ModuleIconTile({required IconData icon, double size = 40})`, colours from HeroColors.
+- A4: `OccurrenceChain({required int? total /*null = open-ended*/, required int current, Map<int, ChainState> states = const {}, String Function(int)? label, Color? color})` plus `OccurrenceChain.progress({done, total})` for list rows. `ChainState { paid, waiting, skipped, next, future }`.
+- A5: `DateTile.small(DateTime date, {bool showYear})` and `DateTile.big(...)`.
+- A6: `OccurrenceRow({Widget? leading /*DateTile or icon*/, required String title /*2 lines*/, Widget? tag, String? sub, required Widget amount, String? amountCaption, Widget? action /*ใส่ยอด / ยืนยัน button*/, bool dimmed, VoidCallback? onTap})`. ต้องจัดการ needs the trailing action; the month list doesn't.
+- A11: `MonthCalendar(showStepper: false)`, `TodayLine({required String label})`, and big tabs as an AppTabBar variant (or SegmentedChoice).
+- The hero 2-cell strip: HeroTiles + SummaryTile should do. Say if you want a dedicated piece.
+
+**BE (C3)**
+1. `avg_amount` on Recurring (mean of the last N done amounts) for variable rows.
+2. Optional: `kind` in the item's parent ref (saves the join).
+3. Optional: compact per-rule occurrence states for installment chains in list rows (e.g. `chain: ["paid","waiting",...]`); otherwise rows draw progress-only.
+4. Q3 (open future): months past the generated horizon come back empty today.
+5. NOT needed if the client computes the month totals from `/recurring-items?month` (all pages).
+
+**Risks / open questions**
+- Q1: ต้องจัดการ = only the pending recurring drafts (exactly the pending page)? Or also this month's future items with an unknown amount (the mock's ค่าไฟ)? The second kind isn't on the pending page.
+- Q2: archived rules lose the current / archived / all filter. Proposal: a "เก็บถาวร N ›" row at the end of รายการประจำทั้งหมด.
+- Q3: the + button: there's no reminder tab any more (it used `?kind=reminder`). Proposal: + opens a small kind sheet (สมาชิก / ผ่อน / รายรับ / เตือนจ่าย), then `/recurring/new?kind=`.
+- Q4: past months: everything dimmed, no today line. Future months: no dimming.
+- Router: `?tab=calendar` → ปฏิทิน; `reminder` / `upcoming` → ภาพรวม. Coordinate with D3, which removes `/recurring?tab=upcoming`.
+- Parse crash: the BE allows `type:"saving"` rules / items; `TransactionType.fromJson` throws on unknown values, so one such rule breaks the whole page. Guard it.
+
+**Tests likely affected**
+- `test/features/recurring/recurring_pages_test.dart` (list-page group + calendar)
+- `test/app/shell/main_shell_test.dart`
+- `test/app/shell/cross_tab_links_test.dart`
+- `test/app/shell/more_page_test.dart`
+- `test/shared/fake_sync.dart`
+- `test/features/pending/pending_source_recurring_test.dart`
+
+### B2 — quick create: edit a COMMITTED tx (size M)
+**Files**
+- `features/transactions/presentation/widgets/quick_create_sheet.dart` (new mode)
+- `transaction_edit.dart` (reuse `saveTransactionEdit`)
+- `draft_form.dart` (hide splits / event in this mode)
+- the caller is A13's history tab
+
+**Exists**
+- `TransactionsRepository.get` (GET `/transactions/:id`)
+- `DraftFormController.prefillTransaction`
+- `saveTransactionEdit` (PUT `/transactions/:id` + splits PUT + linked prompt)
+- the skeleton (`quick_create_draft_skeleton`)
+- entry mode (`showEntrySheet`) as the pattern
+
+**Missing**
+- `showQuickCreateSheet(editTransactionId: …)`: fetch the full tx → prefill → typeLocked, no mode tabs → save through `saveTransactionEdit`, the same rules as tx detail (canEdit / canEditCategory / showLinkedPrompt).
+- Proposal (agree with A): only a SIMPLE tx opens in the sheet. Everything else opens tx detail. Complex =
+  - debt entry (`counterparty`)
+  - system / repayment row
+  - `isLocked`
+  - another member's row (`!canEditCategory`)
+  - `splitCount > 0`
+  - event bill (`projectId` / `eventBill`)
+  - transfer
+  A recurring-linked tx is fine: the linked prompt "this side / both sides" stays.
+
+**Kit:** none needed (title "แก้รายการ").
+**BE:** none.
+
+**Risks**
+- `saveTransactionEdit` returns movedToUpcoming when the date moves to the future; C1 / D3 remove upcoming, so this must follow D3.
+- The C2 period name = description: editing the description here renames that occurrence; fine.
+
+**Tests**
+- `test/features/transactions/entry_sheet_test.dart`
+- `test/features/transactions/quick_create_draft_skeleton_test.dart`
+- `test/features/transactions/tx_detail_linked_test.dart`
+- `test/features/transactions/draft_form_controller_test.dart`
+- `test/app/shell/quick_create_mode_test.dart`
+
+### B3 — quick create: edit ONE upcoming occurrence (size M)
+**Files**
+- `quick_create_sheet.dart` (extend entry mode)
+- `features/recurring/presentation/recurring_item_actions.dart` (a helper `editOccurrenceInSheet(context, item) → ItemWriteResult?`)
+- l10n
+
+**Exists**
+- Entry mode: `showEntrySheet` + EntrySheetConfig, used by `editRecurringItem`.
+- `RecurringItem.toDraft()`.
+- `repo.updateItem(id, draft, scope, alsoUpdateLink)` (PUT `/recurring-items/:id`).
+- `setItemArchived` (`/archive`, `/restore`) = ข้าม / ยกเลิกการข้าม (there is no separate "skipped" state; skipped = archived).
+
+**Missing**
+- Header "แก้เฉพาะงวดนี้" (A12).
+- Skip / un-skip inside the sheet. An archived (skipped) item opens read-only, with "ยกเลิกการข้าม" as the action.
+- Save with `scope: thisOne`, skipping `askItemScope`.
+
+**BUG to fix here:** `itemFieldsJson` sends no splits / project, but entry mode (DraftForm chipLayout) still shows an editable splits section and the event slot, so edits there are silently dropped. Hide both in B3, and in `editRecurringItem` too.
+
+**Kit A12:**
+- `QuickCreateSheetShell(subtitle: String?)`: muted, under the title.
+- `QuickCreateSheetShell(headerBar: Widget?)`: fixed, between the header and the scrolling body; holds `[ข้าม]` or "งวดนี้ถูกข้าม [ยกเลิกการข้าม]".
+- An alternative is `actions: List<Widget>` in the title row next to delete.
+
+**BE:** none for the edit (PUT scope 'this' exists). It depends on C3 / Q4: settings edits must keep user-edited occurrences, or B3's edits get wiped.
+
+**Risks**
+- `showOccurrenceSheet` (amount / date only) stays for now. Whether A13 replaces it with this sheet is A's call.
+- A linked occurrence: `alsoUpdateLink` is false (scope this).
+
+**Tests**
+- `test/features/transactions/entry_sheet_test.dart`
+- `test/features/recurring/recurring_pages_test.dart` (detail group)
+- hub `lib/hub/pages/sheet_demos/quick_create_demo.dart` (coverage)
+
+### B4 — remove RecurringItemPage (if Q6 = ก) (size S, after B2 + B3)
+**Callers (only two)**
+- `features/home/presentation/pages/home_page.dart:427-430` (`_UpcomingCard`, non-card items)
+- `recurring_home_page.dart:165` (`_openItem`, calendar), which goes away with B1
+
+**Replace with `openOccurrence(context, itemId)`:** `getItem` → by state:
+- pending → `showQuickCreateSheet(draft:)` (PendingCubit by `pendingId`)
+- upcoming / notCreated / archived → the B3 sheet
+- done → B2 (or tx detail when complex)
+
+**Delete**
+- `recurring_item_page.dart`
+- the route at `app_router.dart:472`
+- `/recurring/items/:id` in `hub/api/page_flows.dart` if present
+- l10n keys used only there
+
+**BE:** none.
+**Tests:** home page tests that tap "กำลังจะถึง" (test/features/home/*); `main_shell_test.dart` / `cross_tab_links_test.dart` if they hit the route. RecurringItemPage itself has no tests.
+
+### Order
+- B3 and B2 first (needs A12).
+- Then B4.
+- B1 last (needs A2, A4, A5, A6, A11 + C3 avg). B1's hero / month list / calendar can start on today's data with the client-side totals.
+
+## 2026-10-20 — KIT A5 / A6 / A11 / A16 (hub first)
+DONE · files: see below · analyze/test: `flutter analyze lib test` shows no issues in these files (the 33 it reports are in other sessions' work in progress: saving_goals_list_page / its tests / transaction_tile); no tests run
+
+**New kit**
+- `lib/ui/molecules/date_tile.dart`
+  - `CalendarTile({date, color?, width = 64})`: a tear-off sheet: a month strip in the card's accent (HeroColors), the day big, the weekday.
+  - `DateTile({date, caption?, weekday = false, color?, today?})`: the day over its month, plus "yy" when it's not this year ("ม.ค. 27"); the weekday when `weekday:`; any caption ("พรุ่งนี้"). `DateTile.minWidth = 38`.
+- `lib/ui/molecules/today_line.dart`: `TodayLine({label, color?})`, the accent label + line.
+- `lib/ui/domain/recurring/occurrence_row.dart`
+  - `OccurrenceRow({leading, title, tag?, sub?, amount?, amountCaption?, action?, titleMaxLines = 2, dimmed, onTap})`.
+  - `OccurrenceAction({label, onTap, warning = false, destructive = false})`.
+  - `OccurrenceActions({primary, more = [], moreTooltip})`: the primary is an AppButton (chip size; warning-coloured when `warning`), the rest sit behind ⋯ (an OptionMenuAnchor).
+- `lib/ui/domain/recurring/due_card.dart`
+  - `DueCard({title, trailing?, children})`: a card with a warning edge.
+  - `DueGroupHeader({label, caption?, actions?})`: an item with many due; the actions are an OccurrenceActions for ยืนยันทั้งหมด + จ่ายแล้ว / ข้ามทั้งหมด.
+  - `DueMoreRow({label, onTap})`.
+
+**Changed kit (additive, defaults keep the old look)**
+- `TxRow(titleMaxLines = 1)`
+- `SegmentedChoice(expand = false)`: full width, equal segments, titleSmall label
+- `MonthCalendar(showStepper = true)`
+
+**Hub**
+- `domain_recurring_page.dart`: MonthCalendar(showStepper:false) under a page stepper, CalendarTile + DateTile, TodayLine + OccurrenceRow (a month's list), DueCard.
+- `molecules_pickers_inputs_page.dart`: SegmentedChoice expand.
+- `hub_registry` covers: CalendarTile, DateTile, TodayLine, OccurrenceRow, OccurrenceAction, OccurrenceActions, DueCard, DueGroupHeader, DueMoreRow.
+- `ui.dart`: 4 exports.
+
+**Notes**
+- DueCard is data-agnostic: the page (B1 / A13) maps the C3 occurrences into rows and actions.
+- Tags are AppChip(mini, selected, color).
+- Unused after this: nothing yet.
+
+## 2026-10-20 — B2 / B3 / B4 + C3 data layer + A15 fixes (CODED, analyze clean, tests not run)
+`flutter analyze` on the whole app is clean, except นายA's in-progress recurring_detail_page.dart. Tests have not been run; that waits for the owner. Everything is written against นายC's C3 contract (v3.1–v3.3, not coded yet). With today's BE it falls back: a row without a slot behaves as before.
+
+**C3 data layer** (recurring/{domain,data}; the split with นายA was agreed)
+- RecurringItem gets ruleId / slot / stored / autoCreated / needsAmount and `bySlot`. A computed occurrence's id = `slot:{rule}:{slot}`. RecurringParent gets kind.
+- ItemWriteResult gets `leftOut` [(slot, reason)]. `applyTo` also matches on rule + slot, so a computed row that got stored replaces its old row.
+- OccurrenceState gets `paid`. 'due' parses as notCreated (ค้าง) and 'skipped' as archived (ข้าม).
+- RecurringRepository:
+  - reads: monthItems(month) / dueItems({ruleId}) (all pages, `status=`), occurrences(ruleId, {txDate, past, upcoming}) → (items, suggestedSlot), getOccurrence(ruleId, slot)
+  - writes: confirmOccurrence / skipOccurrence({deleteTx}) / restoreOccurrence / markOccurrencePaid / unmarkOccurrencePaid / updateOccurrence (presence-based PUT) / settleAll(OccurrenceBulk.confirm|markPaid|skip)
+- RecurringLinkRepository:
+  - linkOccurrence / unlinkOccurrence by slot
+  - `replace` on both link calls
+  - LinkResult.item
+  - LinkOccurrence gets ruleId / slot / linkedTxId plus `.ofItem`; LinkCandidate.replace
+- Tolerant parsing, so a computed occurrence (id null) doesn't crash:
+  - RecurringItemLink (transactions/domain/refs.dart) gets `slot`
+  - UpcomingItem (home/domain/dashboard.dart) gets ruleId / slot
+  - CurrentOccurrence.slot: นายA added it
+
+**B2: 2-step link** (owner link rules 1–4)
+- RecurringPicker:
+  - Step 1: rules sorted by nearest due.
+  - Step 2: that rule's occurrences.
+    - Groups: งวดใกล้เคียง (BE `suggested_slot`) / ค้าง / งวดถัดไป / งวดที่ผ่านมา. Skipped ones are hidden.
+    - A pinned "เลือกรายการประจำอื่น" goes back to step 1.
+    - Picking an occurrence another tx holds asks "สลับรายการที่ผูก?". No goes back to step 2; yes links with replace.
+  - An old BE (no slot) stays 1 step.
+- RecurringLinkHandle:
+  - links by slot
+  - a 409 ALREADY_LINKED asks swap / move, then retries with replace
+  - tx detail passes replace when the tx is moving off its own occurrence, and unlinks by slot
+  - quick create passes the tx date
+
+**B3: one occurrence in the quick create sheet**
+- New `features/recurring/presentation/occurrence_actions.dart`:
+  - `openOccurrenceSheet` / `openOccurrence` (by address)
+  - `occurrenceActionsFor` (ต้องจัดการ row buttons)
+  - `settleAllActions` (DueGroupHeader bulk)
+  - `confirmOccurrence` / `skipOccurrence` / `linkExistingTx` / `occurrenceFields`
+- Sheet:
+  - subtitle "แก้เฉพาะงวดนี้"
+  - chips ข้าม / จ่ายแล้ว / ผูกกับรายการที่มีอยู่ (once settled: ยกเลิกการข้าม, or ยกเลิกจ่ายแล้ว + ผูก)
+  - บันทึก = PUT of the changed fields only
+  - ยืนยัน = PUT the other edits, then confirm (the tx is dated on the slot unless the date was changed, R21)
+  - An occurrence with a tx opens the tx; pending → /pending; no slot → the old item sheet.
+- Skipping an occurrence that has a tx asks "ข้ามงวดนี้?" (เก็บรายการไว้ | ลบรายการ), owner rule 5.
+- New `TransactionPicker.one` (transactions/presentation/widgets): the tx side of "ผูกกับรายการที่มีอยู่". It shows that type's tx within ±45 days, nearest first, under น่าจะใช่ / ใกล้วันที่. A tx linked elsewhere asks before it moves.
+- quick_create_sheet.dart entry mode:
+  - new EntrySheetConfig `subtitle` / `chips` (EntrySheetChip)
+  - **bug fixed**: an entry no longer shows splits (they were silently dropped)
+- Hub (entity pickers → recurring):
+  - a fake 2-step RecurringPicker demo (a passed `loadOccurrences` forces step 2)
+  - a TransactionPicker demo
+
+**B4**
+- Deleted:
+  - `recurring_item_page.dart`
+  - route `/recurring/items/:id`
+  - page flow `recurring-item`, replaced by `recurring-occurrence`, which lists every new occurrence call as unspecified
+- Home "ใกล้ถึง" card: a recurring card now opens the occurrence sheet (`openOccurrence`) and reloads the dashboard after a write.
+- The ใกล้ถึง group shows a count of the overdue recurring cards, and "ดูทั้งหมด" → `/recurring?focus=due` (plain `/recurring` when nothing is due). **My reading of "badge counts due". Tell me if it's meant somewhere else.**
+- The calendar tab's `_openItem` on the old recurring_home_page uses the sheet. That page is replaced in B1.
+
+**A15 review fixes** (in my kit pieces)
+- ⋯ tooltip defaults to the new `UiStrings.more` (= l.commonMore).
+- A destructive primary → AppButtonVariant.destructive.
+- DateTile's muted line uses HeroColors.muted.
+- The › is gone from the DueMoreRow doc.
+- The hub has a 2-line TxRow.
+- New `OccurrenceRow.amountWaiting` ("รอใส่ยอด" in the warning colour).
+
+**Tests touched, not run:**
+- the recurring_link_test fake gets the new link methods, and unlinkNow takes a RecurringItemLink
+- the tx_detail_link_rows_test / tx_detail_linked_test fakes get `skipOccurrence`
+
+**Left unused, for A18:**
+- l10n `recurringItemStatusTitle`, `recurringItemStatusDescription`, `recurringItemStatusUpcoming`, `recurringItemStatusNotCreated`, `recurringItemStatusPending`, `recurringItemStatusDone`, `recurringItemStatusArchived`
+- `RecurringItemActions` / `askCreateTarget` / `addRecurringItem` / `createFromRecurringItem` / `askItemScope` (recurring_item_actions.dart): still used only by นายA's detail page (RecurringItemActions). Check after A13.
+
+**Open / for the owner:**
+- Bulk ข้ามทั้งหมด / จ่ายแล้วทั้งหมด have no confirm dialog (owner's words didn't ask for one).
+- The "อัปเดตยอดรายการประจำด้วยไหม" ask is not shown when linking from the occurrence side.
+
+Next: B1 (the recurring list page).
+
+## 2026-10-20 — B1 recurring list page (CODED, analyze clean, tests not run)
+`flutter analyze` on the whole app is clean, except นายA's in-progress recurring_detail_page.dart. Tests have not been run; that waits for the owner.
+
+**Page** `recurring_home_page.dart` is rewritten:
+- `RecurringHomeTab { overview, calendar }`, with SegmentedChoice(expand) ภาพรวม | ปฏิทิน at the top. It scrolls with the page; nothing folds.
+- Hero:
+  - HeroModuleTile + StepperPill.month + MoneyVisibilityToggle
+  - จ่ายรวมทั้งเดือน (big) and รายรับ (note), both computed on the client from `monthItems` (every page, skipped ones excluded)
+  - HeroTiles: รายการเดือนนี้ N | รอใส่ยอด N (amber; tapping scrolls to ต้องจัดการ)
+- ภาพรวม:
+  - The month's occurrences inside the hero (HeroInsetBox + OccurrenceRow + DateTile ("พรุ่งนี้") + TodayLine).
+    - This month: the past is dimmed unless still waiting.
+    - A past month: everything dimmed, no today line (R4).
+    - A coming month: nothing dimmed.
+  - Each row:
+    - tag: ค้าง / รอยืนยัน / จ่ายแล้ว / ข้าม / บันทึกอัตโนมัติ
+    - sub: wallet | n/total
+    - amount, or amountWaiting "รอใส่ยอด" + "เฉลี่ย ฿x" from the rule's avgAmount
+    - tap → openOccurrenceSheet
+  - ต้องจัดการ (DueCard, from `dueItems()` (status=due) + client filter): grouped per rule.
+    - A rule with ≥ 2: DueGroupHeader (name, "ค้างตั้งแต่ … | N งวด", settleAllActions).
+    - Up to 3 rows, each with occurrenceActionsFor; past 3, DueMoreRow → the rule's page.
+    - It reuses นายA's keys occurrenceDueTitle / occurrenceDueSince / occurrenceDueMore.
+  - รายการประจำทั้งหมด:
+    - SectionHeader with 🔍 (ToolbarToggleButton + ListToolbar search) and + (straight to /recurring/new, R3)
+    - groups สมาชิก (฿/เดือน | ฿/ปี) / ผ่อน (เหลือ ฿x) / เตือนจ่าย (เฉลี่ย ฿/เดือน) / รายรับ (฿/เดือน), then หยุดไว้
+    - no archived rules (R2)
+    - Installment rows get the OccurrenceChain (new `endChainDots(Recurring)` in recurring_rows.dart: the BE's `chain`, else from progress).
+- ปฏิทิน: MonthCalendar(showStepper: false) inside the hero (warning dots for waiting days), then the picked day's rows with their buttons. An empty day shows nothing (no absence label).
+- `?focus=due` scrolls to ต้องจัดการ once it loads. It steps down until the card is built, since the hero can be long.
+- Changing the month keeps the old rows until the new ones arrive; a failed new month shows the error view.
+- Writes patch with `applyTo`, then reload the month, the due list and the directory.
+
+**Router:** `?tab=calendar` → ปฏิทิน; anything else (old `recurring` / `reminder` / `upcoming`) → ภาพรวม. `?focus=due` → focusDue.
+
+**Data:** `RecurringItem.tryParse`: a row of a type the app doesn't know (the BE's `saving`) is skipped, not a crash. It's used in `occurrences()`.
+- **นายA:** please use it in ItemPage.fromJson. Recurring.fromJson has the same `TransactionType.fromJson` throw.
+
+**New l10n:** recurringHomeTabOverview / MonthPay / MonthIncome / MonthCount / ItemCount / Today / AllTitle / PerMonthYear / PerMonth / AvgPerMonth / Left.
+
+**Left unused, for A18:**
+- l10n:
+  - recurringTabRecurring, fpRecurringTabReminder, fpRecurringListCaption
+  - fpRecurringAwaitingAlert, fpRecurringMonthLine
+  - fpRecurringGroupDue, fpRecurringGroupComing, fpRecurringAddReminder
+  - recurringFilterCurrent / Archived / All, recurringStatusLabel
+  - recurringArchivedEmpty, fpRecurringCalendarNone
+- code:
+  - `RecurringFilter` (recurring.dart)
+  - `RecurringList` (recurring_repository.dart)
+  - `RecurringRepository.calendar`
+  - `RecurringItemRow`, `ItemDateGroup` / `groupItemsByDate` (recurring_rows.dart)
+  - `RecurringHomeTab.recurring / reminder` (gone)
+- Tests still use some of these.
+
+**Tests likely broken (not run):**
+- `test/features/recurring/recurring_pages_test.dart`, list-page group: AppTabBar<RecurringHomeTab>, the old tabs, `calendar()` in the fake repo.
+- Possibly `test/app/shell/main_shell_test.dart`, `cross_tab_links_test.dart`, `more_page_test.dart`.
+
+## 2026-10-20 — BE split items 2 (C2 occname) + 4 (notifications) (CODED, vet clean, tests NOT run, not deployed)
+This is from นายC's split, approved by the owner via นายA. No Go test runs, no commits, no BE / docker rebuild.
+
+**Checks**
+- `go vet ./internal/modules/notifications/` is clean.
+- `occname.go` + `occname_test.go` vet and build clean, checked as a standalone copy in my scratchpad.
+- `go build ./...` doesn't compile today, because of other sessions' in-progress files:
+  - `budgets/count.go`: ItemRecurring, s.expected (นายE's readers)
+  - `recurring/occurrence.go:79`: uuid vs *uuid (นายC's C3)
+- None of those lines are mine.
+
+**Item 2: `internal/modules/recurring/occname.go`** (new, pure, no DB) **+ `occname_test.go`** (table test, 27 cases, not run)
+- Signature: `OccurrenceName(OccNameInput{RuleName, Freq, Interval, Weekdays, Slot, Seq, Total, Lang}) string`.
+- Thai:
+  - daily: ประจำวันที่ 20 ต.ค. 2026
+  - every 3 days: ประจำ 20–22 ต.ค. 2026
+  - weekly: ประจำสัปดาห์ 20–26 ต.ค. 2026, which crosses months / years as 28 ต.ค. – 3 พ.ย. 2026 and 29 ธ.ค. 2026 – 4 ม.ค. 2027
+  - every 2 weeks: ประจำ 20 ต.ค. – 2 พ.ย. 2026
+  - monthly: ประจำเดือน ต.ค. 2026
+  - every 3 months: ประจำ ต.ค. – ธ.ค. 2026, or ประจำ พ.ย. 2026 – ม.ค. 2027 across years
+  - yearly: ประจำปี 2026; every 2 years: ประจำปี 2026–2027
+  - installment: "{name} งวด 5/12 ประจำเดือน ต.ค. 2026"
+- English:
+  - "Netflix – Oct 2026", "Lunch – 20 Oct 2026", "Swimming – week of 20–26 Oct 2026"
+  - "Cleaner – 20 Oct – 2 Nov 2026", "Insurance – Nov 2026 – Jan 2027", "Car tax – 2026"
+  - "iPhone 17 5/12 – Oct 2026"
+- Q7:
+  - `dates` and weekly with several weekdays are named by the day.
+  - The span is sized from the rule step (slot + step − 1), never from the next row, so the last occurrence reads like the others.
+- Other rules:
+  - Interval 0 counts as 1.
+  - An empty rule name gives the period only.
+  - Any Lang other than "en" is Thai.
+  - Years are Gregorian.
+- No other recurring/*.go file is touched; นายC integrates it.
+
+**Item 4: notifications** (`model.go`, `service.go`, `recurring.go`)
+- `RecurringDueTx`: the deep link is now `/recurring?focus=due`, both for a new notice and when the unread grouped notice is bumped (its `deep_link` is updated too).
+- New `TypeRecurringAutoCreated = "recurring_auto_created"`, which can be muted (`mutableTypes`).
+- New `RecurringAutoCreatedTx(ctx, tx, userID, count int, date string)`:
+  - ONE notice per user per date: an UPDATE adds to `payload.count` where `payload->>'date' = date`, else an INSERT
+  - payload `RecurringAutoCreatedPayload{count, date}`, deep link `/recurring`
+  - the row stays one row whether read or not, and is not bumped to the top (it's a quiet notice)
+  - it takes `pg_advisory_xact_lock(hashtext('recurring_auto_created:' || user || ':' || date))` first, so two due checks at once can't insert two rows for the day. This is the same pattern as saving_goals/store.go, and needs no new index.
+- Not added to the attention lists (dashboard `attentionTypes`, `shared/notification_view.go`), because it's quiet.
+
+**`notifications.type` has a CHECK** (`notifications_type_check`, last set in 000057; 068 doesn't touch it). An insert of the new type fails until 068 adds it. Lines for นายC's 068:
+- up:
+  ```sql
+  ALTER TABLE notifications DROP CONSTRAINT notifications_type_check;
+  ALTER TABLE notifications ADD CONSTRAINT notifications_type_check CHECK (type IN (
+      'split_created', 'split_paid', 'split_received', 'split_changed',
+      'project_tx_recorded_for_you', 'project_tx_changed', 'project_invite',
+      'contact_link_request', 'account_invite', 'project_added',
+      'recurring_due', 'recurring_ending', 'recurring_auto_created'));
+  -- optional: old unread due notices still point at /pending
+  UPDATE notifications SET deep_link = '/recurring?focus=due' WHERE type = 'recurring_due' AND deep_link = '/pending';
+  ```
+- down:
+  ```sql
+  DELETE FROM notifications WHERE type = 'recurring_auto_created';
+  ALTER TABLE notifications DROP CONSTRAINT notifications_type_check;
+  ALTER TABLE notifications ADD CONSTRAINT notifications_type_check CHECK (type IN (
+      'split_created', 'split_paid', 'split_received', 'split_changed',
+      'project_tx_recorded_for_you', 'project_tx_changed', 'project_invite',
+      'contact_link_request', 'account_invite', 'project_added',
+      'recurring_due', 'recurring_ending'));
+  ```
+- `notification_settings.muted_types` has no CHECK, so it needs nothing.
+
+**Left for others**
+- openapi.yaml (C6 / นายC): `NotificationType`
+  - add `recurring_auto_created` to the enum, with payload {count, date} and deep_link /recurring
+  - the recurring_due description still says deep_link /pending
+- App (via นายA):
+  - a notification tile for `recurring_auto_created` ("บันทึกอัตโนมัติ {count} รายการ" → /recurring)
+  - the type in the app's mute settings list if types are listed there
+- Tests (C6): a DB test for the per-day grouping (two calls → one row, count summed; a new date → a second row) and for the recurring_due deep link.
+
+## 2026-10-20 — app side of the C8 notices: recurring_auto_created + the due notice moved off pending (CODED, analyze clean, tests not run)
+นายA assigned this as part of the approved C8 plan. App only. The whole app analyzes clean. No tests, no commits.
+
+**New type `recurringAutoCreated('recurring_auto_created')`** (notification.dart)
+- Parsing was already unknown-safe: `fromWire` falls back to `unknown`.
+- Tile:
+  - a system notice from "รายการประจำ" with the recurring icon, like recurring_due
+  - title `notifRecurringAutoCreated(count)`: "บันทึกอัตโนมัติ {count} รายการ" / "Recorded {count} automatically"
+  - no button and not pending (quiet); tap = mark read + the deep link /recurring
+- Settings: a row under รายการประจำ with the same off / notify modes as recurring_due (no auto)
+  - label `notifTypeRecurringAutoCreated` "บันทึกอัตโนมัติ"
+  - hint `notifTypeRecurringAutoCreatedHint` "แจ้งวันละครั้ง ว่าบันทึกให้กี่รายการ | ปิด = ไม่แจ้ง"
+- Hub (domain_others_page): a new HubUse for the quiet notice.
+
+**recurring_due follows the new BE link** (recurring is out of pending)
+- The button opens the notice's deep link (BE: /recurring?focus=due), else falls back to /recurring?focus=due. It no longer goes to /pending.
+- New label `notifActionOpenDue` "ไปจัดการ ›" / "Open ›".
+- Texts changed:
+  - `notifRecurringDue`: "รายการประจำถึงกำหนด {count} งวด รอจัดการ" / "{count} recurring payments are due"
+  - `notifTypeRecurringDueHint`: "อยู่ใน ต้องจัดการ หน้ารายการประจำเสมอ | ปิด = ไม่แจ้ง"
+
+**Left unused, for A18:** l10n `notifActionOpenPending`.
+
+**Tests likely affected (not run):** `test/features/notifications/notifications_inbox_page_test.dart`:
+- :460 expects 'Open pending ›'
+- the fixture at :144 has deepLink '/pending'
+- the settings test may want a row for the new type
+
+## 2026-10-20 — app re-checked against นายC's final C3 contract ("C3 + C8 + C2 integration landed")
+The whole app analyzes clean. Tests not run.
+
+**Changed**
+- There is no `GET /recurring/{id}/occurrences/{slot}`. The picker endpoint windows around today, not tx_date, so it can't fetch an arbitrary slot either.
+- `getOccurrence` is replaced by `RecurringRepository.findOccurrence(ruleId, slot, {date})`. It reads `GET /recurring-items?month=&status=all&rule_id=`, the date's month first (a moved occurrence), then the slot's, and matches the slot.
+- `openOccurrence` gets `date`. The home card passes `dueDate`.
+- An occurrence that isn't found opens `/recurring/{rule}`.
+- Page flow `recurring-occurrence` open step: `listRecurringItems` (?month&status=all&rule_id) instead of the unspecified GET.
+
+**Checked, no change needed**
+- `status=all` is always sent with a month (monthItems, findOccurrence).
+- `status=due` (ต้องจัดการ) and the statuses due / skipped / paid parse.
+- The bulk `left_out` reason is needs_amount.
+- LinkResult `item`.
+- 409 `ITEM_ALREADY_LINKED` with `details.transaction` / `details.other` (swap vs move prompt).
+- `DELETE /transactions/{id}?skip_occurrence=true`.
+- Picker `{data, suggested_slot}`.
+- Dashboard upcoming rows carry `rule_id` / `slot` (id = the stored item, else the rule).
+- The removed `POST /recurring-items/batch` and `/recurring-items/{id}/create` are called only from the unused `RecurringItemActions` / `createFromRecurringItem` path (already on A18).
+- `auto_create_since` isn't in my code (นายA's recurring.dart).
+- Item `transaction {amount, date}`: the swap prompt names the other tx by description / wallet. The amount isn't shown (BoardSourceTx keeps id / description / account only).
+
+## 2026-10-20 — C6 (my part): openapi recurring + notifications tests (CODED, build + vet clean, tests NOT run)
+Assigned by นายA. Source of truth: be.md "C3 + C8 + C2 integration landed" + นายC's Go structs. No Go test runs, no commits, no rebuild.
+
+**Checks**
+- `go build ./...` is clean.
+- `go vet` is clean for notifications, recurring, apidoc/... and transactions.
+- The spec parses with goccy/go-yaml (the BE's lib, in a scratch module): 147 paths, every `$ref` resolves, no duplicate operationIds, every `required` key is in `properties`.
+- Every spec route is registered in main.go (the batch / create routes are gone from both).
+
+**openapi.yaml (recurring; นายE's BudgetItem / me edits untouched)**
+- New operations (operationIds):
+  - `listRecurringOccurrences` (GET /recurring/{id}/occurrences)
+  - `confirmRecurringOccurrencesReady`, `markRecurringOccurrencesPaidReady`, `skipRecurringOccurrencesReady`
+  - `updateRecurringOccurrence` (PUT …/{slot})
+  - `confirmRecurringOccurrence`, `skipRecurringOccurrence`, `restoreRecurringOccurrence`
+  - `markRecurringOccurrencePaid`, `unmarkRecurringOccurrencePaid`
+  - `linkRecurringOccurrence`, `unlinkRecurringOccurrence`
+  - new path parameter `SlotPath`
+- Removed:
+  - `batchRecurringItems` (POST /recurring-items/batch)
+  - `createFromRecurringItem` (POST /recurring-items/{id}/create)
+  - the schemas RecurringItemBatchRequest / RecurringItemBatchResult / RecurringItemCreateNowRequest
+- Schemas:
+  - `RecurringItem`:
+    - id nullable; new rule_id, slot, stored, auto_created, needs_amount
+    - status: upcoming | due | done | paid | skipped | pending
+    - `transaction` uses the new `RecurringItemTx` {id, description, account, amount, date}. LinkedTx stays as it is for event bills.
+    - created_at / updated_at are nullable
+  - `RecurringRef.kind`: optional, because only the recurring module sends it (omitempty)
+  - `Recurring`:
+    - counts {upcoming, due, pending, done, paid, skipped, not_created, archived}
+    - due_count, avg_amount, chain [{slot, status}], auto_create, recorded_tx_count
+    - `RecurringOccurrence`: item_id nullable, rule_id, slot, status upcoming | due
+  - `RecurringItemList.window` (required, null except tab=upcoming of a no-end setting)
+  - `RecurringDetail.stats` + `tx_update`
+  - summary due_count / due_total
+  - requests:
+    - create / update `auto_create`; update `also_update_tx`
+    - `RecurringLinkRequest.replace`
+    - new: RecurringOccurrenceEditRequest, RecurringConfirmRequest, RecurringSkipRequest
+  - results: RecurringOccurrencesResult, RecurringBulkResult (left_out reason needs_amount), RecurringUnlinkResult (also used by the by-id unlink)
+- Params:
+  - listRecurringItems: status due / paid / skipped / pending / all (+ the old names), `state` alias, `rule_id`
+  - listRecurringRuleItems: `from` / `months`
+  - deleteTransaction: `skip_occurrence`
+  - extendRecurring: now declares 409
+- Errors documented: AUTO_CREATE_NEEDS_AMOUNT / AUTO_CREATE_NEEDS_WALLET / AMOUNT_REQUIRED / ALREADY_RECORDED / ITEM_ALREADY_LINKED (details.transaction / details.other).
+- `NotificationType`: + recurring_auto_created; recurring_due's deep link is /recurring?focus=due.
+- Descriptions are rewritten for the computed model: create / update / pause / resume / extend / delete, the by-id calls as the stored-row forms, and the tx delete.
+
+**recurring_test.go (นายC's):** only the empty `op` strings were filled in, 78 calls:
+- every recurring call and the deleteTransaction calls get their operationId, with error statuses only where the spec declares them
+- the 3 GET / PUT /transactions calls stay ""
+
+**notifications/handler_test.go** (new, DB-backed, not run):
+- `TestRecurringAutoCreatedGroupsPerDay`:
+  - 2 + 3 on the same day → 1 row of 5, link /recurring; 0 → no change
+  - read, then +1 the same day → still one row (6), still read
+  - a new day → its own row
+  - listed by listNotifications (conform)
+  - muted → nothing written
+- `TestRecurringDueDeepLink`:
+  - a new notice → /recurring?focus=due
+  - an old unread one on /pending, bumped → 1 row, count 3, the new link
+  - due(0) → no change
+
+**For the first test run (นายC / C6)**
+- the conformance of every recurring call now runs against the new schemas
+- where Go and spec could differ:
+  - `current_occurrence.status` is assumed upcoming | due only
+  - RecurringRef.kind is optional
+  - chain statuses include pending
+
+## 2026-10-20 — after นายC's "C3 / C8 review fixes": openapi + the settle-all snack (CODED, analyze / build / vet clean, tests not run)
+**openapi.yaml**
+- `RecurringBulkResult.left_out.reason`: needs_amount | refused; confirm-ready description says each occurrence runs on its own savepoint.
+- `resumeRecurring`:
+  - what was due before the pause stays due
+  - the occurrences in the pause (from the pause day to yesterday) are stored as SKIPPED
+  - tracked_from is untouched
+  - the due notice and auto-create start from today
+- `listRecurringOccurrences.suggested_slot`: the oldest overdue occurrence of ALL, even past the 24 listed.
+- `linkRecurringItem` acts on the stored row itself, a manual one included.
+- me/counts: the stale "0 until the occurrences are computed (recurring v3)" clause is gone.
+- The spec parses (147 paths, refs OK). `go build ./...` and vet (apidoc, recurring) are clean.
+
+**App**
+- The `settleAllActions` snack is split by reason, joined with " | ": "เหลือ N งวดที่ยังไม่มียอด" (needs_amount) and the new `occurrenceLeftOutRefused` "บันทึกไม่ได้ N งวด" / "N couldn't be recorded" (refused). With nothing left out it shows the plain saved snack.
+- Picker (review item 11): step 2 groups by state and `suggested_slot`, not by list order, so oldest-first changes nothing. Clearing an occurrence's amount already sends `amount: null`.
+- flutter analyze is clean.
+
+## 2026-10-20 — test run + fixes, my folders (owner: "สั่งให้แก้เทสได้เลย แบ่งๆ กัน", via นายA) — ALL PASS after 2 fix loops
+Folders: test/features/transactions, recurring, pending, notifications, home, pickers_test.dart. First run: 275 passed, 18 failed. After 2 loops: 0 failed (the last re-run of the failing files: 40 / 40).
+
+**Per folder (first run → now)**
+- transactions: 7 failed → 0.
+  - `tx_detail_linked_test`: 3 stale. A recurring-linked tx now asks owner rule 5 ("Delete only (the occurrence is due again)" / "Delete and skip the occurrence" / Cancel → `skip_occurrence`), not the old "Delete the linked item too?". The fake records skip_occurrence; Cancel taps the dialog's one.
+  - `recurring_link_test`: 4 failed. 1 stale: a 409 now asks "สลับรายการที่ผูก?" (owner rule 1, swap asks). The unanswered dialog hung the file, so the 3 after it timed out.
+    - The test is split into ยกเลิก (its message, one try) and สลับ (a second link with replace).
+    - The fake throws only without replace and logs " (replace)".
+- recurring: 9 failed → 0. `recurring_pages_test` list-page group: stale, the old 3-tab page. Rewritten for B1:
+  - the opening reads (month + due)
+  - big tabs above the hero above the rules; every rule by kind
+  - month totals / tiles / list / today line
+  - ต้องจัดการ: rows + buttons + the per-rule header
+  - ปฏิทิน: grid + day, no new read
+  - search, failed sync, ?tab=calendar, paused group, network down + retry
+  - The fake gets monthItems / dueItems in place of calendar(); `_occ` builds C3-shaped occurrences.
+- pending: 1 failed → 0. `pending_saving_test`: stale. นายD removed PendingSource.recurring (D3; the owner: old drafts "ปล่อยไป", confirmed by นายA), so the test now expects no recurring chip.
+- notifications: 1 failed → 0. `notifications_inbox_page_test`: stale wording. The due notice says "3 recurring payments are due" / "Open ›", fixture link /recurring?focus=due.
+- home, pickers_test.dart: all passed.
+
+**A real bug found and fixed (my B1 page):** `recurring_home_page.dart` passed `isEmpty: false` to ListPageBody, so it never showed the skeleton or the error view: a failed month load showed an empty month. Now `isEmpty: _items == null`.
+
+**Note for the others:** test/app (main_shell / cross_tab_links, นายE's folders) may open /recurring. The page now shows a skeleton until the month loads, and its fake repo needs `monthItems` / `dueItems`.
