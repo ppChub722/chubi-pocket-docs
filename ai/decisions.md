@@ -22,6 +22,7 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - Data is disposable (DB wipe OK); migration squash is planned.
 - **Shared AI notes (owner 2026-10-20):** several AI sessions work at once, so notes, decisions, status and reports go into `chubi-pocket-docs/ai` (STATUS / decisions / backlog / inbox). A session's private memory is not enough.
 - **Edits (owner 2026-10-19):** change code with the Read + Edit tools, not python / sed scripts. A script is OK only for a 100+-site mechanical sweep, and it must be announced first.
+- **Page-by-page rounds (owner 2026-10-21, from 0.4.0-3):** the owner talks through ONE page at a time with Lead until it is settled; Lead briefs fe-A (or others) per page right away and keeps going. No more one big batch at the end. 0.4.0-3 scope = UI + logic polish of the debts and events pages, plus bugs the owner reports from 0.4.0-2.
 - **Hub first (owner 2026-10-19, repeated):** use what is in the hub; a new piece goes into `lib/ui` + a hub demo + `hub_registry` covers before any page uses it.
 
 ## Product

@@ -905,3 +905,26 @@ A read-only agent built and verified the list (every candidate was grepped for u
   - นายE: green.
   - นายD: 233 pass / 13 fail, waiting for the owner's fix go in his session.
   - นายB: not reported yet.
+
+## 0.4.0-2 close (2026-10-21, FE session on Lead's brief) — reds fixed, gate green; bump / tag / push BLOCKED
+**Gate (fvm 3.47.3, whole app, run on the final tree):** `flutter analyze`: no issues (148 s); the 3 changed files were re-analyzed after the last edit, no issues. `flutter test`: **1,137 pass / 0 fail**.
+
+**Fixed:**
+1. `test/features/saving_goals/saving_goals_pages_test.dart`: 12 stale cases rewritten to the D1–D3 + many-auto-saves UI. A temporary probe test (deleted) captured what each screen shows now. The file is 44/44 with the parse test.
+   - List: HeroSummaryHead "Total saved", ring (month saved of plan) + facts (still short / not allocated / goals); no group sections, one SectionCard; "needs saving first" order checked by row y; row texts (Short ฿x, month line, saved / target | %, ETA caption).
+   - New list cases: the HeroFilterChips count and filter on the device (no call); the month stepper is one call with `month=` and the head switches to "Saving plan".
+   - Ongoing row: caption "Ongoing", saved on the right, "This month +฿x".
+   - Search toggle: ToolbarToggleButton inside the AppHeroCard (was AppCard + 🔍).
+   - Sort: the default is needFirst (the BE gets `created`); pick "Nearest deadline" → `deadline`.
+   - Detail: HeroInfoBox due + days left, HeroRing saved of target | %, facts (saved this month x / plan, short this month, left to go), chips "Short ฿x this month" + "2 months behind schedule", 2 tabs (no Settings tab).
+   - The goal auto-save toggle no longer exists on the view (auto-saves are edited in the edit form, several per goal). The case was replaced by: a goal lists its auto-saves read-only (no switch), and the spare page turns auto-save off with ONE DELETE and no re-read. The fake gained `spareJson` and `months`.
+   - Edit / create: the "Saving plan" section (deadline, auto-save, plus starting amount on create) replaces the old InfoBox / "Save ฿x/month" line. Create now has the auto-save switch (off). The ongoing hero has no "Ongoing" status chip any more (active goals have no header). These are the redesign, not bugs.
+2. **lib change (real bug exposed by the tests):** `saving_goals_cubit.dart` `load()` now returns when the cubit is closed after the await. Leaving the list page after stepping the month calls `resetMonth()` → `load()`. If the cubit closed before the answer came back, it emitted after close and threw "Cannot emit new states after calling close". In the app the cubit is app-wide, so this only bites when its provider closes (logout / re-scope); the tests hit it.
+3. `test/core/data/sync_coordinator_test.dart`: **flaky, not a code bug.** It passes 11/11 alone. It used fixed 60 ms sleeps against a real 10 ms debounce timer and fire-and-forget device writes (real file I/O), so a busy machine (full suite) can miss the window, and a write still in flight can block the temp-dir delete on Windows. Fix: `until(condition)` waits (10 s cap) for the call / second round / device write; `settle()` is kept only for "did NOT happen" checks; tearDown retries the delete. The sync code is unchanged.
+
+**Commits (app main, local, NOT pushed):**
+- `fix(saving-goals): drop a list answer that lands after the cubit closed`
+- `test: saving goals pages to the D1-D3 redesign; de-flake sync coordinator`
+- Both are on top of `c25af30` (count 132). I couldn't read the hashes back: git reads were blocked right after (see below). Get them with `git log --oneline -3`.
+
+**BLOCKED (permission, not a code problem):** the next step (bump pubspec to `0.4.0-2+133`, commit "chore: version 0.4.0-2+133", annotated tag `v0.4.0-2`, push main + tag) was denied by this session's permission check ("unrequested commit"). The owner's go reached me only as a relay, which this session doesn't accept for push / tag. Nothing from that step ran: pubspec is still `0.4.0-1+126`, there is no tag, and nothing is pushed. N stays **133** as long as no other app commit lands first (count + 1). Remaining: bump + commit + tag + push, by the owner or in a session where the owner approves it.
