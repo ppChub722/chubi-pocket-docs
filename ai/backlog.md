@@ -4,6 +4,12 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
 
 Release scope comes from `product/roadmap-1.0.md` (owner 2026-10-15). Items here that the roadmap puts out of scope (Play Store, monetization, web / admin, receipt photos, multi-currency) are dropped.
 
+## 0.4.0-3 not yet discussed (2026-10-22)
+- **Event pages**: in the 0.4.0-3 scope; not surveyed or discussed yet. Start page by page (list → event detail + tabs → bill sheet). The quick create event card + the linked-pair rules are done; reuse them.
+- **Income + ผูกกับ tabs**: today income keeps the old section (จ่ายแทน is expense-only). Option A: income gets [ส่วนตัว | แบ่ง | อีเวนต์]; option B: keep as is. Lead recommends A.
+- **Debt open bits**: the earlier-cycle "open count" (a debt in a cleared cycle without the paid label still counts as open; proposal: count only the current cycle); the person tx filter (counterparty_key) doesn't list split-source bills. Both proposals were asked; the owner didn't answer.
+- **B3 leftovers**: the preview shows person + wallet deltas, not event-board positions; editing a bill's payer / members from tx detail goes through the bill edit.
+
 ## 0.4.0-2 leftovers (2026-10-20, waiting on the owner's go)
 - **Tests (run 2026-10-20, see STATUS "Where it stands"):** all green except นายD's folders: 13 failures waiting for the owner's "fix" in his session (12 stale `saving_goals_pages_test` cases + `core/data/sync_coordinator_test`, likely pre-existing / flaky, since the sync code is unchanged this round).
 - **Cleanup pass: DONE 2026-10-20** (นายA, A18; details in `inbox/fe-a.md` "A18 cleanup pass DONE"). Left for later:

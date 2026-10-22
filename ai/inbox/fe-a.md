@@ -1425,3 +1425,152 @@ A read-only agent built and verified the list (every candidate was grepped for u
   3. For be-A: switching INTO อีเวนต์ with someone else paying, I still send `amount` = the bill (the form's number) next to `event`. I assume the BE sets my tx to my share; please confirm.
   4. My copy of someone else's bill has no tabs (it follows the board; "อัปเดตตามอีเวนต์" covers it).
 - Open point 3 closed (be-A): when switching into อีเวนต์ with someone else as payer, the BE reads `amount` as the BILL total (the field edits apply first, then the board bill, then my tx becomes my share with no wallet). The FE already sends it, in the preview too. No change.
+
+## 0.4.0-3 round 2 (branch wip/0.4.0-3, uncommitted) — Lead's order "ต่อเลย ให้จบทุกงาน"
+### Block 0: DONE
+- **1. Sheet edit = the SAME form:**
+  - The edit logic moved into a shared `LinkEditSession` (transaction_edit.dart): start / changed / prepare = checks → event id → preview → ONE confirm. Both tx detail and the quick create sheet's edit mode use it.
+  - The sheet edit shows the tabs, opens on the saved tab, and a switch previews + confirms before the PUT.
+  - `txEditsInSheet` lets จ่ายแทน rows edit in the sheet again.
+  - The sheet's form keeps a picked event on itself (`projectId`); prepare reads it.
+- **2a. Linked pair asks, the owner's words:**
+  - My tx tied to an event bill (origin or my copy): "แก้ในอีเวนต์ด้วยไหม?" [แก้แค่ของฉัน] [แก้ทั้งคู่]. A shared `askLinkedTxSave` serves detail + sheet; a recurring link keeps the generic ask.
+  - The bill edit on the board: a bill made from my tx asks "แก้ในสมุดของฉันด้วยไหม?" [แก้แค่ในอีเวนต์] [แก้ทั้งคู่] up front.
+  - My copy is asked after the save, from `EventPatch.myTransaction` (new) when in_sync is false; yes → apply-event. My tx row is patched from the answer.
+  - Both send also_update_link (= apply_to_event / apply_to_my_tx on the BE).
+- **2b. Resolve "as debt":** `createEntry(billId:)` → `bill_id` = the bill (the parent of a split row).
+- **2c. Drafts carry the tab:**
+  - `PendingDraft.paidBy / payer / members`
+  - `DraftResolved.linkMode / paidBy / billPayer / billMembers` (+ `ResolvedBillPerson`)
+  - `toDraft` follows the active tab: แบ่ง = splits, จ่ายแทน = paid_by, อีเวนต์ = project_id + payer + members. With no tab picked, it's as before.
+  - A draft reopens on its tab (`prefillLinkFromDraft`, members by member_id). The draft form shows the tabs; its event chip is the draft's own.
+  - "เก็บเป็นร่าง" now works from every tab. A NEW event is refused with "ร่างผูกได้กับอีเวนต์ที่มีอยู่แล้วเท่านั้น".
+- **arb:** +6 (`linkedEventAskTitle`, `linkedBookAskTitle`, `linkedMineOnly`, `linkedEventOnly`, `linkedBoth`, `txLinkDraftNeedsExistingEvent`).
+- **Tests:**
+  - quick_create_link_save +5 (sheet edit: saved tab / preview + confirm + PUT, cancel, text edit; draft from จ่ายแทน / ส่วนตัว)
+  - new linked_ask_test (3)
+  - event_model +1 (my_transaction)
+  - debt_repository +1 (bill_id)
+  - link_draft +4 (toDraft per tab, legacy draft, event + จ่ายแทน drafts reopen)
+- **Runs:**
+  - every test in test/features/{transactions, pending, projects, personal_debts} + test/hub + hub ratchets + quick create / offline / share card / debt pieces: 503 pass, 0 fail
+  - analyze lib + test/features: clean
+
+### Block A — debt quick create = "หนี้: 2 chip + ลูกศรสลับทิศ": DONE
+- **No sub-tabs.** `DebtModeChips` (new kit, ui/domain/money) sits in the hero's chip slot (`EntryCard.typeBadge`): record | settle, worded + coloured by the direction:
+  - them → me = [รอรับ | รับคืน], green
+  - me → them = [รอจ่าย | จ่ายคืน], red
+  - a small caption: "เขาต้องคืนฉัน" / "ฉันต้องคืนเขา"
+- **The arrow:** กับใคร and กระเป๋า always show as FlowCards; the arrow swaps the direction (`DebtEntryController.towardMe` / `swapDirection`; record and settle keep the same direction).
+- **Record:** the switch is now "ทำรายการเงิน (tx) ด้วย" (off = ledger only). While off, the wallet card dims with "ไม่ผ่านกระเป๋า"; picking a wallet turns the switch on. → POST …/entries.
+- **Settle:** always a tx (a wallet is required) → POST …/repayments. "ติดป้ายจ่ายแล้ว" stays on this side.
+- **Result box** (`DebtResultBox`, new kit) under the hero:
+  - "ตอนนี้" → "หลังบันทึก" (รอรับ ฿x / รอจ่าย ฿x / ✓ เคลียร์ครบ, coloured), plus the wallet ("Cash −฿200" / "ไม่ผ่านกระเป๋า")
+  - Fed by BE-39's `?preview=true` (repo `preview()`, debounced 350 ms, stale answers dropped); until it answers or if it fails, the app's own sum shows (dimmed while loading).
+  - A settle that flips the side shows a warning line.
+- **Overpay:** the save warns ONCE ("จ่ายเกินยอดค้าง" [บันทึกเลย] [แก้ยอด]); the next save goes through.
+- **Model:** `DebtPreview` (before / after / flipped / walletDelta).
+- **Hub:** debts page demo (swap, both chips, two boxes); registry covers both. page_flows adds the preview step.
+- **arb:** +9 (`debtQuickCreateTxLabel`, `debtResult*`, `debtWalletNotUsed`, `debtOverpay*`).
+  - **My slip, fixed:** I first appended `debtCreateTxLabel`, which already existed: the duplicate silently changed the debt detail page's switch. It's renamed now; a scan of both arbs shows no duplicate keys.
+- **Tests:**
+  - quick_create_debt_mode rewritten for the new layout (13): chips + caption + no sub-tabs; swap renames / recolours; the box from the app's sum; the BE preview wins; record save ledger-only; switch on; settle preset; settle save; the settle chip then the arrow; overpay warns once; no person; tx ⇄ debt
+  - new test/ui/debt_mode_pieces_test (3): 320 / 390 geometry, arrow between the sides, colours
+  - debt_repository +1 (the preview request + parse)
+- **Runs:**
+  - test/features/{transactions, personal_debts, pending} + test/hub + hub ratchets + quick create mode + debt pieces + offline: 472 pass, 0 fail
+  - analyze lib + test/features: clean
+- **Decisions taken** (mock file `project/QuickCreateDebt.dc.html` isn't in any checkout I can read, so I built from ai/decisions.md + the brief):
+  - The chips reuse the hero's chip slot (kit `typeBadge`), not a new hero.
+  - The caption sits under the chips (Lead's earlier subtitle rule).
+  - The wallet card stays visible while ledger-only, dimmed (kit `muted`), so the arrow always has two ends.
+  - Picking a wallet while recording turns the switch on.
+- **Now unused arb keys** (for the cleanup list): `debtSubRecord`, `debtSubRepay`, `debtMoneyMovedLabel`, `debtRepayLeft`.
+- **Block A re-checked against QuickCreateDebt.dc.html — fixes:**
+  1. The cards follow the MONEY: record รอรับ / settle จ่ายคืน = wallet → person; record รอจ่าย / settle รับคืน = person → wallet. I had person → wallet for every "them → me".
+  2. A sentence under the cards (new kit `FlowCards.caption`), with the person's name:
+     - "จดว่าลีต้องคืนฉัน" (+ " (ฉันให้ลียืมเงินออกจากกระเป๋า)" when the switch is on)
+     - "จดว่าฉันต้องคืนลี" (+ " (ฉันยืมเงินลีเข้ากระเป๋า)")
+     - "ลีคืนเงินฉัน เข้ากระเป๋า" / "ฉันคืนเงินลี ออกจากกระเป๋า"
+     - The chips' own caption is gone.
+  3. An unused wallet reads "กระเป๋า (ไม่ใช้)" (dimmed).
+  4. The switch sits right under the hero, before the result box. Its hint changes: off "ปิด = จดในสมุดหนี้อย่างเดียว ไม่มีเงินเคลื่อน" / on "เงินออกจากกระเป๋า (ให้ยืม)" or "เงินเข้ากระเป๋า (ยืมมา)".
+  5. `DebtResultBox` = three rows, the words left and the value right: "ลี ตอนนี้", "หลังบันทึก" (bold), "กระเป๋า test2" → "−฿230" or "ไม่เปลี่ยน". ✓ เคลียร์ครบ shows in the brand colour.
+  - Kept (kit-consistent): the kit FlowCards arrow button (the mock draws its own "→ สลับ" circle); the richer existing description hints. Debt mode tests + kit tests: 15 pass.
+
+### Block B — debt pages per mocks DebtsList / DebtPerson / DebtEntry / DebtEntryEdit (DONE)
+- **List (`personal_debts_page.dart`):**
+  - The hero: tile + "หนี้สุทธิ | N คน" + the big signed net; facts รอรับ / รอจ่าย / ค้างเกิน 30 วัน (with icons); HeroFilterChips ทั้งหมด / รอรับ / รอจ่าย / ค้างเกิน 30 วัน with counts.
+  - ONE card of open people, oldest first. Each row: name + last activity ("ค่าตั๋ว | 1 ก.ย." / "คุณจ่ายคืน ฿400 | …") + the side word + amount + age ("ค้าง 45 วัน", amber past 30).
+  - It all comes from the synced directory: open = no request. The counts and filters run on the device (`countPeople`, `filterPeople(overdue30:)`, `DebtListFilter`).
+- **Person (`debt_person_page.dart`):**
+  - The hero: avatar / name / age / 🪪 / 🔍; "รอจ่ายให้ลี" + the big amount (`DebtSentenceAmount`).
+  - The buttons (`DebtPersonActions`, tinted to the side's colour):
+    - [จ่ายคืน ฿x / ได้คืน ฿x] opens quick create preset to settle the full amount
+    - [สรุปยอด / ทวง] opens `DebtShareSheet`: chips รอบนี้ / ยอดคงเหลืออย่างเดียว (BE `text` / `text_balance_only`), editable text, คัดลอก + share (share_plus)
+  - Statement:
+    - Day groups use `DateGroupHeader` with a note: "เพิ่ม ฿x" in the side colour, or "ลดลง ฿x" in the brand colour. The BE's `days[]` is used when present (merged across pages); otherwise the lines' own sum.
+    - Rows are `DebtStatementRow`. Repayments get a cash icon on a soft background. Sub-lines come from the origin: "ลีจ่ายแทน" / "หารบิล ฿x" / "งาน X" / "จาก/เข้ากระเป๋า X". A paid debt gets the "✓ จ่ายแล้ว" pill.
+    - Earlier cycles sit behind `CycleDivider` "เคลียร์ครบ <date> | ดูรอบก่อน ▾". They load once, toggle hide / show, and are dimmed.
+- **Entry (`debt_entry_detail_page.dart`):**
+  - The tx-detail hero, with the line `DebtEntryNote` "รอรับจาก chalee ฿82" + ✓จ่ายแล้ว under the amount.
+  - Cards: กับใคร › and มาจาก › (from `entry.origin`; opens the tx or the event / bill; dimmed and locked in edit).
+  - View box = only the จ่ายแล้ว LiveSetting (saves at once, ONE PUT).
+  - Then note, meta. Delete is in edit mode only.
+  - **Edit:** box = "เงินเข้า/ออกกระเป๋า" switch + wallet chip (hint by direction) + จ่ายแล้ว. Every row is tappable.
+- **Kit (new, exported, on hub page domain/debts):**
+  - In `ui/domain/money/debt_person_pieces.dart`: DebtSentenceAmount, DebtEntryNote, DebtPersonActions, DebtStatementRow, CycleDivider, DebtShareSheet.
+  - PersonBalanceRow gains `age` / `ageWarn`; DateGroupHeader gains `note` / `noteColor`.
+- **Root fixes found by the 320 / 390 tests + hub smoke:**
+  - CycleDivider overflowed with a long label → the words wrap between two short lines.
+  - DebtStatementRow: a big amount pushed the row → the amount is capped at 32% width and scales down; the ✓ pill drops under the sub-line when there's no room.
+- **Tests:**
+  - debt_pages_test rewritten: 18, + 2 for block C
+  - debt_entry_detail_page_test updated: 10 (view note / no wallet card; origin card + locked in edit; paid saves at once; edit money switch; switch off PUT; amount PUT; delete; tx row → debt mode; event row)
+  - new test/ui/debt_person_pieces_test: 5 (320 / 390 geometry + share sheet + lone summary button)
+  - Plus: personal_debts folder, budgets pages, debt pieces / mode pieces, list clearance, hub coverage / duplicates / layering / page_flows / api_spec, hub smoke domain/debts. All pass; analyze lib clean.
+- **Decisions taken:**
+  - Delete stays edit-only (the kit edit pattern).
+  - The search toolbar is kept (behind 🔍).
+  - The person buttons are AppButtons tinted through Theme.
+  - The edit page has no category row: `DebtEntryUpdate` has no category.
+  - The hero debt subtitles were removed (the mock shows none).
+  - The edit top bar keeps the kit edit bar.
+  - The old source row shows only when the BE sends no `origin`.
+- **Pre-existing kit limit (not mine; follow-up):** `PersonBalanceRow` / `NetBalance` overflows ~7 px at 320 with a 7-digit amount (with or without the new age). Only with the square test font; noted for the kit owner.
+- **Unused arb keys** (cleanup list): `debtSubRecord`, `debtSubRepay`, `debtRepayLeft`, `debtDirection*Sub`, `debtsEmptyTitle`, `debtsEmptyMessage` (replaced by `debtsEmptyOpen*`).
+
+### Block C — create button colour + word + in-page buttons (DONE)
+- **Colours:**
+  - `ModuleColors` gains `debt` (#7A5AE0) and `saving` (#3B7DD8) tokens, defaults in every theme.
+  - `QuickCreateModeColors` uses them. `people` / `planning` are unchanged, so the module tints elsewhere don't move.
+  - The saving form's accent follows the new colours (blue).
+- **Centre button:**
+  - `QuickCreateButton(label:)` is a 48-high capsule: the mode icon (`quickCreateModeIcon`: + / handshake / savings) + บันทึก / จดหนี้ / ออมเงิน, in the mode colour, cross-fading as before.
+  - The bar's centre slot is now `MainBottomNav.addSlotFor(row)` = 32% of the tab row, clamped 96–120 px. The four tabs share the rest, and the drag highlight uses the same slot.
+  - A long word scales down inside the slot.
+- **In-page:**
+  - kit `QuickCreateHeadButton` (round, level with 🔍, + and ring in the mode colour) is on the debts list hero head.
+  - kit `QuickCreateCtaButton` (filled AppButton in the mode colour) is on the debts empty state, with the mock words "ยังไม่มีหนี้ค้าง / จดไว้ว่าใครยืม ใครจ่ายแทน จะได้ไม่ลืมทวง".
+  - Both open quick create in debt mode.
+- **Hub:** bottom-bar page: capsule + round per mode; head + per mode; EmptyView with the CTA. Registry covers the 3 new names.
+- **arb +5:** `quickCreateBtnTx` / `Debt` / `Saving`, `debtsEmptyOpenTitle` / `Message`.
+- **Tests:**
+  - new test/app/shell/main_bottom_nav_capsule_test (7): 320 / 390 × 3 modes. Checks: capsule 48 high, centred, clear of รายการ and กระเป๋า, the mode colour, tap; plus the head + / CTA colours.
+  - quick_create_mode_test: the colour test is updated (debt purple, saving blue) + a capsule test.
+  - debt_pages_test: + 2 (the hero +, the empty CTA).
+  - Shell tests (main_shell, shell_chrome, page_presets, more_page) 38 pass.
+  - hub smoke bottom-bar / debts, hub coverage / duplicates / layering / page_flows / cross_tab_links pass. Analyze clean.
+- **Decisions taken:**
+  - The capsule sits centred IN the floating bar (no −14 px lift as in the mock's flat bar); the outer bar height is unchanged, so no page insets move.
+  - The icons are the module icons (the mock's icon + small-plus glyphs aren't in the kit).
+  - The "+ in list heads" is live on the debts list only. The piece is ready for the tx / saving lists when ordered.
+- **For QA:** debts.mjs labels change: the empty title is now "ยังไม่มีหนี้ค้าง" and the CTA is "จดหนี้" (was "ยังไม่มีหนี้" / "บันทึกหนี้").
+
+### feature_visuals ratchet fix (Lead's full run: 1 FAIL) — DONE, no baseline / exception change
+- 3 feature classes laid out widgets; the layout moved into the kit:
+  - `debt_person_page` hero trailing `Row` → new `HeroIdentity.actions` (kit spaces the round buttons like HeroSummaryHead, control chip size).
+  - `LinkSection` `Column` (recurring / bar / card) → new kit `LinkSectionFrame` (ui/domain/transactions/link_mode_bar.dart); `_pickChip` `Align` → new kit `SplitPickChip` (ui/molecules/split_row.dart).
+  - `LinkViewRows` `Padding`s → `InfoBox(first: false)` (the kit section gap; 16 px instead of 12) and new `showAppSheet(padded: true)` / `AppSheetScaffold.padded` for the card-in-a-sheet gutter.
+- Hub: LinkSectionFrame + SplitPickChip demo on domain/transactions; registry covers both.
+- Runs: feature_visuals + hub coverage / duplicates / layering 5 pass; link / split / hero / sheet / toolbar / debt pages / link save / linked ask 78 pass; tx_detail_* + full hub smoke 64 pass; analyze of touched files clean.

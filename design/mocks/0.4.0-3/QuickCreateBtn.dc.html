@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>ปุ่มสร้าง</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0E7C6B}a:hover{color:#0A5E51}
+</style>
+</helmet>
+<div style="width: 390px; height: 640px; box-sizing: border-box; padding: 16px 0; background: #F3F5F7; font-family: 'Noto Sans Thai', system-ui, sans-serif; color: #1D2327; display: flex; flex-direction: column; gap: 14px">
+
+<div style="padding: 0 12px; display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 12px; color: #5B6770; padding: 0 4px">ปุ่ม + ในหน้า (หัว list)</span>
+<div style="display: flex; align-items: center; gap: 6px; padding: 0 4px">
+<span style="font-size: 15px; font-weight: 600">รอรับ</span>
+<span style="font-size: 14px; color: #8A949B">| 4 คน</span>
+<span style="flex: 1 1 auto"></span>
+<button aria-label="ค้นหา" style="width: 36px; height: 36px; border-radius: 18px; border: 1px solid #E3E8EB; background: #FFFFFF; display: flex; align-items: center; justify-content: center; color: #3C474F; padding: 0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><path d="M20 20l-4.5-4.5"></path></svg></button>
+<button aria-label="จดหนี้" style="width: 36px; height: 36px; border-radius: 18px; border: 1px solid {{debtLine}}; background: #FFFFFF; display: flex; align-items: center; justify-content: center; color: {{debt}}; padding: 0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+</div>
+
+<span style="font-size: 12px; color: #5B6770; padding: 4px 4px 0">ตอนยังไม่มีข้อมูล</span>
+<div style="border-radius: 16px; background: #FFFFFF; padding: 20px 16px; display: flex; flex-direction: column; align-items: center; gap: 10px">
+<span style="width: 48px; height: 48px; border-radius: 24px; background: {{debtSoft}}; color: {{debt}}; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12l4-4h4l3 3-2 2-2-2"></path><path d="M21 12l-4 4h-5l-4-4"></path></svg></span>
+<span style="font-size: 15px; font-weight: 600">ยังไม่มีหนี้ค้าง</span>
+<span style="font-size: 13px; color: #5B6770; text-align: center">จดไว้ว่าใครยืม ใครจ่ายแทน จะได้ไม่ลืมทวง</span>
+<button style="height: 40px; border: 0; border-radius: 20px; background: {{debt}}; color: #FFFFFF; padding: 0 18px; font-family: inherit; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>จดหนี้</button>
+</div>
+</div>
+
+<span style="font-size: 12px; color: #5B6770; padding: 4px 16px 0">ปุ่มกลาง bottom bar · สี + label ตามหน้า</span>
+<sc-for list="{{bars}}" as="b" hint-placeholder-count="3">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 11px; color: #8A949B; padding: 0 16px">{{b.page}}</span>
+<div style="height: 64px; background: #FFFFFF; border-top: 1px solid #E6EAED; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; padding-bottom: 6px">
+<span style="display: flex; flex-direction: column; align-items: center; gap: 2px; color: #8A949B; font-size: 11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v9H4z"></path></svg>หน้าหลัก</span>
+<span style="display: flex; flex-direction: column; align-items: center; gap: 2px; color: {{b.listFg}}; font-size: 11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8 8h8M8 12h8M8 16h5"></path></svg>รายการ</span>
+<button style="justify-self: center; align-self: center; white-space: nowrap; height: 48px; border: 0; border-radius: 24px; background: {{b.color}}; color: #FFFFFF; padding: 0 16px 0 12px; display: flex; align-items: center; gap: 6px; font-family: inherit; font-size: 14px; font-weight: 700; box-shadow: 0 4px 10px {{b.shadow}}; transform: translateY(-14px)">
+<span style="display: flex; align-items: center; justify-content: center">
+<sc-if value="{{b.isTx}}" hint-placeholder-val="{{ true }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></sc-if>
+<sc-if value="{{b.isDebt}}" hint-placeholder-val="{{ false }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12l4-4h4l3 3-2 2-2-2"></path><path d="M16 14l-3 3H9l-4-4"></path><path d="M19 3v6M16 6h6"></path></svg></sc-if>
+<sc-if value="{{b.isSave}}" hint-placeholder-val="{{ false }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a6 5 0 0 1 11-3h1.5v3H15a6 5 0 0 1-2 2.5V17h-2.5v-1.5H8V17H5.5v-3A5 5 0 0 1 4 12z"></path><path d="M19 3v6M16 6h6"></path></svg></sc-if>
+</span>{{b.label}}</button>
+<span style="display: flex; flex-direction: column; align-items: center; gap: 2px; color: {{b.debtFg}}; font-size: 11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12l4-4h4l3 3-2 2-2-2"></path><path d="M21 12l-4 4h-5l-4-4"></path></svg>หนี้</span>
+<span style="display: flex; flex-direction: column; align-items: center; gap: 2px; color: {{b.saveFg}}; font-size: 11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v5H4zM5 9v10h14V9M10 13h4"></path></svg>ออม</span>
+</div>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"debtColor":{"editor":"color","default":"#7A5AE0","options":["#7A5AE0","#E0703A","#3B7DD8","#D9468F"],"section":"สีโหมด"},"saveColor":{"editor":"color","default":"#3B7DD8","options":["#3B7DD8","#E8A20C","#7A5AE0","#D9468F"],"section":"สีโหมด"},"$preview":{"width":390,"height":640}}'>
+function soft(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+}
+class Component extends DCLogic {
+  renderVals() {
+    const tx = '#12A08A';
+    const debt = this.props.debtColor ?? '#7A5AE0';
+    const save = this.props.saveColor ?? '#3B7DD8';
+    const off = '#8A949B';
+    const mk = (page, color, label, kind) => ({
+      page, color, label,
+      shadow: soft(color, 0.35),
+      isTx: kind === 'tx', isDebt: kind === 'debt', isSave: kind === 'save',
+      listFg: kind === 'tx' ? tx : off,
+      debtFg: kind === 'debt' ? debt : off,
+      saveFg: kind === 'save' ? save : off,
+    });
+    return {
+      debt,
+      debtLine: soft(debt, 0.45),
+      debtSoft: soft(debt, 0.14),
+      bars: [
+        mk('อยู่หน้ารายการ / หน้าหลัก', tx, 'บันทึก', 'tx'),
+        mk('อยู่หน้าหนี้', debt, 'จดหนี้', 'debt'),
+        mk('อยู่หน้าออม', save, 'ออมเงิน', 'save'),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

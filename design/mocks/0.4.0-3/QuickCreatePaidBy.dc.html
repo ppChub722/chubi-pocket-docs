@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>Quick create ผูกกับ</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0E7C6B}a:hover{color:#0A5E51}
+input:focus{outline:none}
+</style>
+</helmet>
+<div style="position: relative; overflow: hidden; width: 390px; height: 940px; box-sizing: border-box; background: #FFFFFF; font-family: 'Noto Sans Thai', system-ui, sans-serif; color: #1D2327; display: flex; flex-direction: column">
+<div style="padding: 10px 14px 0; display: flex; flex-direction: column; gap: 10px; flex: 1 1 auto; overflow: hidden">
+<div style="display: flex; align-items: center"><span style="flex: 1 1 auto; font-size: 16px; font-weight: 600">รายการใหม่</span><span style="font-size: 20px; color: #3C474F">×</span></div>
+
+<div style="border-radius: 14px; border: 1px solid #F09A9C; background: linear-gradient(180deg, #FDE7E7 0%, #FFF4F4 100%); padding: 10px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; gap: 6px">
+<span style="height: 28px; box-sizing: border-box; border-radius: 14px; border: 1px solid #E26A6E; background: #FFFFFF; padding: 0 10px; display: flex; align-items: center; font-size: 12px; font-weight: 600; color: #D93A3F">− รายจ่าย</span>
+<span style="padding: 0 6px; font-size: 12px; color: #3C474F">รายรับ</span><span style="padding: 0 6px; font-size: 12px; color: #3C474F">โอนเงิน</span>
+<span style="flex: 1 1 auto"></span>
+<span style="height: 28px; box-sizing: border-box; border-radius: 14px; border: 1px dashed #E7B3B4; padding: 0 10px; display: flex; align-items: center; font-size: 12px">วันนี้</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: end">
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 13px; font-weight: 600">คำอธิบาย</span><span style="height: 36px; border-bottom: 1px solid #E7B3B4; font-size: 14px; display: flex; align-items: center">ข้าวเย็น</span></div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<label for="amt" style="font-size: 13px; font-weight: 600">{{amountLabel}}</label>
+<div style="display: flex; align-items: center; border-bottom: 2px solid #D93A3F; height: 36px">
+<span style="font-size: 22px; font-weight: 700; color: #D93A3F">฿</span>
+<input id="amt" type="number" inputmode="decimal" value="{{amountStr}}" onInput="{{setAmount}}" style="width: 100%; min-width: 0; border: 0; background: transparent; text-align: right; font-family: inherit; font-size: 26px; font-weight: 700; color: #D93A3F">
+</div>
+</div>
+</div>
+<sc-if value="{{hasLine}}" hint-placeholder-val="{{ false }}">
+<span style="align-self: flex-end; font-size: 12px; color: #3C474F; text-align: right">{{line}}</span>
+</sc-if>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<div style="height: 64px; box-sizing: border-box; border-radius: 12px; border: 2px dashed #E7C2C3; background: #FFFFFF; padding: 10px; display: flex; align-items: center; gap: 8px"><span style="font-size: 16px">🍜</span><span style="display: flex; flex-direction: column"><span style="font-size: 11px; color: #5B6770">หมวดหมู่</span><span style="font-size: 14px">อาหาร</span></span></div>
+<div style="height: 64px; box-sizing: border-box; border-radius: 12px; border: 2px dashed #6CCDBA; background: #F2FBF9; padding: 10px; display: flex; align-items: center; gap: 8px; opacity: {{walletOpacity}}"><span style="width: 28px; height: 28px; border-radius: 14px; background: #DDF2EE; color: #12A08A; display: flex; align-items: center; justify-content: center">▣</span><span style="display: flex; flex-direction: column"><span style="font-size: 11px; color: #5B6770">กระเป๋า</span><span style="font-size: 14px; font-weight: 600">test2</span><span style="font-size: 12px; font-weight: 700; color: #12A08A">{{walletSub}}</span></span></div>
+</div>
+</div>
+
+<span style="font-size: 13px; font-weight: 600; color: #0E7C6B">ผูกกับ</span>
+
+<!-- แบ่งกับคน -->
+<div style="display: flex; flex-direction: column; gap: 6px; opacity: {{splitOpacity}}">
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="font-size: 13px; width: 78px; flex: none; font-weight: {{splitFw}}">แบ่งกับคน</span>
+<sc-if value="{{splitActive}}" hint-placeholder-val="{{ false }}">
+<span style="height: 32px; box-sizing: border-box; border-radius: 16px; border: 1px solid #6CCDBA; background: #EAF8F5; padding: 0 6px 0 12px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #0E7C6B">ฉันจ่าย แบ่งให้คนอื่น<button onClick="{{clearSplit}}" aria-label="เอาออก" style="border: 0; background: transparent; font-size: 15px; color: #0E7C6B">×</button></span>
+</sc-if>
+<sc-if value="{{splitIdle}}" hint-placeholder-val="{{ true }}">
+<button onClick="{{useSplit}}" style="height: 32px; box-sizing: border-box; border-radius: 16px; border: 1px solid #D5DCE1; background: #FFFFFF; padding: 0 12px; font-family: inherit; font-size: 13px; font-weight: 600; color: #0E7C6B">{{splitIdleLabel}}</button>
+</sc-if>
+</div>
+<sc-if value="{{splitActive}}" hint-placeholder-val="{{ false }}">
+<div style="border-radius: 12px; border: 1px solid #CFE2F6; background: #F6FAFE; padding: 10px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="flex: 1 1 auto; font-size: 12px; font-weight: 600; color: #3C474F">แบ่งให้ใคร</span>
+<button onClick="{{equalSplit}}" style="height: 28px; box-sizing: border-box; border-radius: 14px; border: 1px solid #D5DCE1; background: #FFFFFF; padding: 0 10px; font-family: inherit; font-size: 12px; font-weight: 600; color: #2F6FB8">⑂ หารเท่ากัน</button>
+<button onClick="{{addPerson}}" style="height: 28px; box-sizing: border-box; border-radius: 14px; border: 1px solid #D5DCE1; background: #FFFFFF; padding: 0 10px; font-family: inherit; font-size: 12px; font-weight: 600; color: #2F6FB8">+ เพิ่มคน</button>
+</div>
+<div style="display: flex; align-items: center; gap: 10px"><span style="width: 32px; height: 32px; border-radius: 10px; background: #12A08A; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 13px">ฉ</span><span style="flex: 1 1 auto; font-size: 14px; font-style: italic; color: #3C474F">ส่วนของฉัน</span><span style="width: 90px; text-align: right; border-bottom: 1px solid #D5DCE1; font-size: 14px; padding: 4px 0">฿{{myShareStr}}</span><span style="width: 22px"></span></div>
+<sc-for list="{{splitRows}}" as="r" hint-placeholder-count="2">
+<div style="display: flex; align-items: center; gap: 10px"><span style="width: 32px; height: 32px; border-radius: 16px; background: {{r.avBg}}; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700">{{r.initial}}</span><span style="flex: 1 1 auto; height: 32px; box-sizing: border-box; border-radius: 10px; background: #FDECF1; padding: 0 10px; display: flex; align-items: center; font-size: 14px">{{r.name}}</span><input type="number" value="{{r.amt}}" onInput="{{r.set}}" aria-label="ยอดของ {{r.name}}" style="width: 90px; border: 0; border-bottom: 1px solid #D5DCE1; text-align: right; font-family: inherit; font-size: 14px; padding: 4px 0"><button onClick="{{r.remove}}" aria-label="เอาออก" style="width: 22px; border: 0; background: transparent; font-size: 16px; color: #3C474F">×</button></div>
+</sc-for>
+<span style="align-self: flex-end; font-size: 12px; font-weight: 600; color: {{splitStatusColor}}">{{splitStatus}}</span>
+</div>
+</sc-if>
+</div>
+
+<!-- คนจ่ายแทน -->
+<div style="display: flex; flex-direction: column; gap: 6px; opacity: {{paidOpacity}}">
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="font-size: 13px; width: 78px; flex: none; font-weight: {{paidFw}}">คนจ่ายแทน</span>
+<sc-if value="{{paidIdle}}" hint-placeholder-val="{{ true }}">
+<button onClick="{{usePaid}}" style="height: 32px; box-sizing: border-box; border-radius: 16px; border: 1px solid #D5DCE1; background: #FFFFFF; padding: 0 12px; font-family: inherit; font-size: 13px; font-weight: 600; color: #0E7C6B">{{paidIdleLabel}}</button>
+</sc-if>
+</div>
+<sc-if value="{{paidActive}}" hint-placeholder-val="{{ false }}">
+<div style="border-radius: 12px; border: 1px solid #CFE2F6; background: #F6FAFE; padding: 10px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; gap: 8px"><span style="flex: 1 1 auto; font-size: 12px; font-weight: 600; color: #3C474F">ใครจ่ายแทน และจ่ายเท่าไหร่</span></div>
+<div style="display: flex; align-items: center; gap: 10px"><button onClick="{{openPaidPicker}}" aria-label="เลือกคนจ่ายแทน" style="width: 32px; height: 32px; flex: none; border: 0; border-radius: 16px; background: {{paidAvBg}}; color: #FFFFFF; font-family: inherit; font-size: 12px; font-weight: 700; padding: 0">{{paidInitial}}</button><input value="{{paidByStr}}" onInput="{{typePaidBy}}" onFocus="{{openPaidPicker}}" aria-label="คนจ่ายแทน" placeholder="พิมพ์ชื่อ หรือเลือก" style="flex: 1 1 auto; min-width: 0; height: 32px; box-sizing: border-box; border: 1px solid #C9D6E3; border-radius: 10px; background: #FFFFFF; padding: 0 10px; font-family: inherit; font-size: 14px"><input type="number" value="{{paidAmtStr}}" onInput="{{setPaidAmt}}" aria-label="ยอดที่จ่ายแทน" style="width: 90px; border: 0; border-bottom: 1px solid #D5DCE1; text-align: right; font-family: inherit; font-size: 14px; padding: 4px 0"><button onClick="{{clearAll}}" aria-label="เอาออก" style="width: 22px; border: 0; background: transparent; font-size: 16px; color: #3C474F">×</button></div>
+<span style="font-size: 11px; color: #5B6770">{{paidHint}}</span>
+</div>
+</sc-if>
+</div>
+
+<!-- อีเวนต์ -->
+<div style="display: flex; flex-direction: column; gap: 6px; opacity: {{eventOpacity}}">
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="font-size: 13px; width: 78px; flex: none; font-weight: {{eventFw}}">อีเวนต์</span>
+<sc-if value="{{eventIdle}}" hint-placeholder-val="{{ true }}">
+<button onClick="{{useEvent}}" style="height: 32px; box-sizing: border-box; border-radius: 16px; border: 1px dashed #6CCDBA; background: #EAF8F5; padding: 0 12px; font-family: inherit; font-size: 13px; font-weight: 600; color: #0E7C6B">{{eventIdleLabel}}</button>
+</sc-if>
+<sc-if value="{{eventActive}}" hint-placeholder-val="{{ false }}">
+<span style="height: 32px; box-sizing: border-box; border-radius: 16px; border: 1px dashed #5FA8E8; background: #EAF4FD; padding: 0 6px 0 12px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #2F6FB8">🏕 ทริปเขาใหญ่ · 10 ต.ค.<button onClick="{{dropEvent}}" aria-label="เอาอีเวนต์ออก" style="border: 0; background: transparent; font-size: 15px; color: #2F6FB8">×</button></span>
+</sc-if>
+</div>
+<sc-if value="{{eventActive}}" hint-placeholder-val="{{ false }}">
+<div style="border-radius: 12px; border: 1px solid #CFE2F6; background: #F6FAFE; padding: 10px; display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 12px; font-weight: 600; color: #3C474F">ใครจ่าย</span>
+<div style="display: flex; align-items: center; gap: 10px">
+<button onClick="{{openPayerPicker}}" aria-label="เลือกคนจ่าย" style="width: 32px; height: 32px; flex: none; border: 0; border-radius: 16px; background: {{evAvBg}}; color: #FFFFFF; font-family: inherit; font-size: 12px; font-weight: 700; padding: 0">{{evInitial}}</button>
+<input value="{{evPayerStr}}" onInput="{{typePayer}}" onFocus="{{openPayerPicker}}" aria-label="ใครจ่าย" placeholder="พิมพ์ชื่อ หรือเลือก" style="flex: 1 1 auto; min-width: 0; height: 34px; box-sizing: border-box; border: 1px solid #C9D6E3; border-radius: 10px; background: #FFFFFF; padding: 0 10px; font-family: inherit; font-size: 14px">
+<sc-if value="{{evPayerNew}}" hint-placeholder-val="{{ false }}"><span style="font-size: 10px; font-weight: 700; color: #2F6FB8; background: #DCEBFB; border-radius: 8px; padding: 1px 6px">ใหม่</span></sc-if>
+</div>
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="flex: 1 1 auto; font-size: 12px; font-weight: 600; color: #3C474F">ใครอยู่ในบิล</span>
+<button onClick="{{addPerson}}" style="height: 28px; box-sizing: border-box; border-radius: 14px; border: 1px solid #D5DCE1; background: #FFFFFF; padding: 0 10px; font-family: inherit; font-size: 12px; font-weight: 600; color: #2F6FB8">+ เพิ่มคน</button>
+</div>
+<sc-for list="{{memberRows}}" as="m" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 8px"><span style="width: 28px; height: 28px; border-radius: 14px; background: {{m.avBg}}; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700">{{m.initial}}</span><span style="flex: 1 1 auto; font-size: 13px">{{m.name}}</span><sc-if value="{{m.isNew}}" hint-placeholder-val="{{ false }}"><span style="font-size: 10px; font-weight: 700; color: #2F6FB8; background: #DCEBFB; border-radius: 8px; padding: 1px 6px">ใหม่ · เพิ่มเข้าอีเวนต์</span></sc-if><span style="width: 64px; text-align: right; font-size: 13px">฿{{m.share}}</span><button onClick="{{m.remove}}" aria-label="เอาออก" style="width: 20px; border: 0; background: transparent; font-size: 15px; color: #3C474F">×</button></div>
+</sc-for>
+<span style="font-size: 11px; color: #5B6770">หารเท่ากัน | แก้ละเอียดได้ที่หน้าอีเวนต์</span>
+</div>
+</sc-if>
+</div>
+
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="font-size: 13px; width: 78px; flex: none">รายการประจำ</span>
+<span style="height: 32px; box-sizing: border-box; border-radius: 16px; border: 1px dashed #6CCDBA; background: #EAF8F5; padding: 0 12px; display: flex; align-items: center; font-size: 13px; font-weight: 600; color: #0E7C6B">+ เลือกรายการประจำ</span>
+</div>
+</div>
+<div style="border-top: 1px solid #EEF1F3; padding: 10px 14px; display: flex; gap: 8px">
+<span style="height: 36px; box-sizing: border-box; border-radius: 18px; border: 1px solid #D5DCE1; padding: 0 14px; display: flex; align-items: center; font-size: 13px; color: #8A949B">บันทึกร่าง</span>
+<span style="flex: 1 1 auto; height: 36px; border-radius: 18px; background: #12A08A; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600">บันทึก</span>
+</div>
+
+<sc-if value="{{pickerOpen}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; background: rgba(20,28,32,0.42); display: flex; flex-direction: column; justify-content: flex-end">
+<div style="height: 620px; border-radius: 22px 22px 0 0; background: #FFFFFF; padding: 10px 0 14px; display: flex; flex-direction: column; gap: 8px">
+<span style="align-self: center; width: 36px; height: 4px; border-radius: 2px; background: #3C474F"></span>
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 16px"><span style="flex: 1 1 auto; font-size: 16px; font-weight: 600">{{pickerTitle}}</span><span style="width: 32px; height: 32px; border-radius: 16px; border: 1px solid #E3E8EB; display: flex; align-items: center; justify-content: center; font-size: 14px">🔍</span><button onClick="{{closePicker}}" aria-label="ปิด" style="border: 0; background: transparent; font-size: 20px; color: #3C474F">×</button></div>
+<div style="display: flex; gap: 6px; padding: 0 16px"><span style="height: 24px; box-sizing: border-box; border-radius: 12px; border: 1px solid #12A08A; background: #EAF8F5; padding: 0 8px; display: flex; align-items: center; font-size: 11px; font-weight: 600; color: #0E7C6B">ทั้งหมด</span><span style="height: 24px; box-sizing: border-box; border-radius: 12px; border: 1px dashed #D5DCE1; padding: 0 8px; display: flex; align-items: center; font-size: 11px">ผู้ติดต่อ</span><span style="height: 24px; box-sizing: border-box; border-radius: 12px; border: 1px dashed #D5DCE1; padding: 0 8px; display: flex; align-items: center; font-size: 11px">ไม่อยู่ในผู้ติดต่อ</span></div>
+<div style="flex: 1 1 auto; overflow: auto; display: flex; flex-direction: column">
+<sc-for list="{{pickerRows}}" as="p" hint-placeholder-count="6">
+<button onClick="{{p.pick}}" style="min-height: 52px; border: 0; background: {{p.bg}}; padding: 6px 16px; display: flex; align-items: center; gap: 16px; font-family: inherit; text-align: left; color: inherit">
+<span style="width: 34px; height: 34px; flex: none; border-radius: 17px; background: {{p.avBg}}; color: {{p.avFg}}; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700">{{p.initial}}</span>
+<span style="display: flex; flex-direction: column"><span style="font-size: 15px; font-weight: {{p.fw}}; color: {{p.fg}}">{{p.name}}</span><sc-if value="{{p.hasSub}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: #5B6770">{{p.sub}}</span></sc-if></span>
+</button>
+</sc-for>
+</div>
+<div style="padding: 0 16px"><span style="height: 44px; box-sizing: border-box; border-radius: 12px; border: 2px dashed #6CCDBA; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #0E7C6B">+ สร้างผู้ติดต่อใหม่</span></div>
+</div>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":940}}'>
+const PEOPLE = [
+  { name: 'บอส ทดสอบ', initial: 'บอ', avBg: '#E2547C' },
+  { name: 'มาตาก', initial: 'มา', avBg: '#8A949B' },
+  { name: 'มิ้นท์ ทดสอบ', initial: 'มิ', avBg: '#E07A2E' },
+  { name: 'ลี ทดสอบ', initial: 'ลี', avBg: '#4F8BD6' },
+];
+const EVENT_MEMBERS = ['ลี ทดสอบ', 'บอส ทดสอบ'];
+const ME = { name: 'ฉัน', initial: 'ฉ', avBg: '#12A08A' };
+const PICK = [
+  { name: 'test', initial: 'T', avBg: '#FFB547', sub: 'เกสๆ' },
+  { name: 'บอส ทดสอบ', initial: 'บท', avBg: '#E2547C' },
+  { name: 'มิ้นท์ ทดสอบ', initial: 'มิ', avBg: '#4FB6E8' },
+  { name: 'ลี ทดสอบ', initial: 'ลี', avBg: '#4F8BD6' },
+  { name: 'แบงค์ ทดสอบ', initial: '👤', avBg: '#FFFFFF', plain: true },
+  { name: 'chalee', initial: '👤', avBg: '#FFFFFF', plain: true },
+  { name: 'มาตาก', initial: '👤', avBg: '#FFFFFF', plain: true },
+];
+function r2(n) { return Math.round(n * 100) / 100; }
+function fmt(n) { return r2(n).toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+function person(name) {
+  if (!name || name === 'ฉัน') return ME;
+  return PEOPLE.find((p) => p.name === name) || PICK.find((p) => p.name === name && !p.plain) || { name, initial: name.slice(0, 2), avBg: '#8A949B' };
+}
+const KNOWN = PICK.map((p) => p.name);
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    // ONE shared data set: people in the bill (+ their shares), who paid, how much they paid.
+    this.state = { amount: 123, mode: 'none', people: [], paidBy: null, paidAmt: null, evPayer: 'ฉัน', picker: null };
+  }
+  eq(list, amount, withMe) {
+    const each = r2(amount / (list.length + (withMe ? 1 : 0) || 1));
+    return list.map((x) => ({ name: x.name, amt: each }));
+  }
+  renderVals() {
+    const s = this.state;
+    const m = s.mode;
+    const amt = Number(s.amount) || 0;
+    const others = s.people.reduce((t, x) => t + (Number(x.amt) || 0), 0);
+    const myShare = r2(amt - others);
+    const paidAmt = s.paidAmt == null ? amt : Math.min(Number(s.paidAmt) || 0, amt);
+    const members = ['ฉัน'].concat(s.people.map((x) => x.name));
+    if (s.paidBy && !members.includes(s.paidBy)) members.push(s.paidBy);
+    const each = r2(amt / members.length);
+    const evPayer = s.evPayer;
+    let line = '';
+    if (m === 'split') line = 'ส่วนของคุณ ฿' + fmt(myShare) + ' | รอรับจากคนอื่น ฿' + fmt(others);
+    if (m === 'paid') line = 'ส่วนของคุณ ฿' + fmt(amt) + ' | ฉันติด' + s.paidBy + ' ฿' + fmt(paidAmt) + (amt - paidAmt > 0 ? ' | ออกจากกระเป๋า ฿' + fmt(amt - paidAmt) : '');
+    if (m === 'event') line = evPayer === 'ฉัน'
+      ? 'ส่วนของคุณ ฿' + fmt(each) + ' | รอรับในอีเวนต์ ฿' + fmt(amt - each)
+      : 'ส่วนของคุณ ฿' + fmt(each) + ' | ฉันติด' + evPayer + ' ฿' + fmt(each) + ' (ในอีเวนต์)';
+    const noWallet = (m === 'paid' && paidAmt >= amt) || (m === 'event' && evPayer !== 'ฉัน');
+    const walletOut = m === 'paid' ? amt - paidAmt : amt;
+    const nextPerson = (taken) => PEOPLE.find((p) => !taken.includes(p.name));
+    const names = s.people.map((x) => x.name);
+    const dim = (k) => (m === 'none' || m === k ? '1' : '0.45');
+    const on = { border: '1px solid #2F6FB8', bg: '#DCEBFB', fw: '700' };
+    const off = { border: '1px solid #DCE2E6', bg: '#FFFFFF', fw: '500' };
+    const payerNames = members;
+    const pk = s.picker;
+    const current = pk === 'payer' ? evPayer : s.paidBy;
+    const pickList = (pk === 'payer' ? [{ name: 'ฉัน', initial: 'ฉ', avBg: '#12A08A' }] : []).concat(PICK);
+    const choose = (name) => {
+      if (pk === 'payer') this.setState({ evPayer: name, paidBy: name === 'ฉัน' ? s.paidBy : name, picker: null });
+      else this.setState({ paidBy: name, picker: null });
+    };
+    return {
+      pickerOpen: !!pk,
+      pickerTitle: pk === 'payer' ? 'ใครจ่าย' : 'ใครจ่ายแทน',
+      closePicker: () => this.setState({ picker: null }),
+      pickerRows: pickList.map((p) => {
+        const sel = p.name === current;
+        return {
+          name: p.name, initial: p.initial, sub: p.sub || '', hasSub: !!p.sub,
+          avBg: p.avBg, avFg: p.plain ? '#3C474F' : '#FFFFFF',
+          bg: sel ? '#E3F5F1' : '#FFFFFF', fg: sel ? '#0E7C6B' : '#1D2327', fw: sel ? '700' : '400',
+          pick: () => choose(p.name),
+        };
+      }),
+      openPayerPicker: () => this.setState({ picker: 'payer' }),
+      openPaidPicker: () => this.setState({ picker: 'paidBy' }),
+      evPayerStr: evPayer,
+      evInitial: person(evPayer).initial,
+      evAvBg: person(evPayer).avBg,
+      evPayerNew: evPayer !== 'ฉัน' && !!evPayer && !EVENT_MEMBERS.includes(evPayer),
+      typePayer: (e) => { const v = e.target.value; this.setState({ evPayer: v, paidBy: v && v !== 'ฉัน' ? v : s.paidBy, picker: null }); },
+      paidByStr: s.paidBy || '',
+      typePaidBy: (e) => this.setState({ paidBy: e.target.value, picker: null }),
+      amountLabel: m === 'paid' ? 'ส่วนของฉัน' : m === 'event' ? 'ยอดบิล' : 'จำนวนเงิน',
+      amountStr: String(s.amount),
+      setAmount: (e) => {
+        const v = e.target.value;
+        this.setState({ amount: v, people: this.eq(s.people, Number(v) || 0, true) });
+      },
+      hasLine: m !== 'none',
+      line,
+      walletOpacity: noWallet ? '0.4' : '1',
+      walletSub: noWallet ? 'ไม่ออกจากกระเป๋า' : (walletOut < amt ? '−฿' + fmt(walletOut) + ' จาก ฿172' : '฿172'),
+
+      // แบ่งกับคน
+      splitActive: m === 'split',
+      splitIdle: m !== 'split',
+      splitOpacity: dim('split'),
+      splitFw: m === 'split' ? '700' : '400',
+      splitIdleLabel: names.length ? names.join(', ') + ' · ใช้อันนี้' : '+ เพิ่มคน',
+      useSplit: () => {
+        if (names.length) { this.setState({ mode: 'split' }); return; }
+        const p = nextPerson(names.concat(['ลี ทดสอบ']));
+        this.setState({ mode: 'split', people: this.eq([{ name: p.name }], amt, true) });
+      },
+      addPerson: () => {
+        const p = nextPerson(names.concat(s.paidBy ? [s.paidBy] : []));
+        if (p) this.setState({ people: this.eq(s.people.concat([{ name: p.name }]), amt, true) });
+      },
+      equalSplit: () => this.setState({ people: this.eq(s.people, amt, true) }),
+      myShareStr: fmt(myShare),
+      splitRows: s.people.map((x, i) => {
+        const p = person(x.name);
+        return {
+          name: x.name, initial: p.initial, avBg: p.avBg, amt: String(x.amt),
+          set: (e) => { const list = s.people.slice(); list[i] = { name: x.name, amt: e.target.value }; this.setState({ people: list }); },
+          remove: () => { const list = s.people.filter((_, j) => j !== i); this.setState({ people: this.eq(list, amt, true), mode: list.length ? 'split' : 'none' }); },
+        };
+      }),
+      splitStatus: myShare < 0 ? 'เกินยอด ฿' + fmt(-myShare) : '✓ แบ่งครบแล้ว',
+      splitStatusColor: myShare < 0 ? '#D93A3F' : '#12A08A',
+
+      // คนจ่ายแทน
+      paidActive: m === 'paid',
+      paidIdle: m !== 'paid',
+      paidOpacity: dim('paid'),
+      paidFw: m === 'paid' ? '700' : '400',
+      paidIdleLabel: s.paidBy ? s.paidBy + ' จ่ายแทน · ใช้อันนี้' : '+ เลือกคน',
+      usePaid: () => this.setState({ mode: 'paid', paidBy: s.paidBy || 'ลี ทดสอบ' }),
+      paidBy: s.paidBy,
+      paidInitial: s.paidBy ? person(s.paidBy).initial : '',
+      paidAvBg: s.paidBy ? person(s.paidBy).avBg : '#8A949B',
+      cyclePaidBy: () => {
+        const i = PEOPLE.findIndex((p) => p.name === s.paidBy);
+        this.setState({ paidBy: PEOPLE[(i + 1) % PEOPLE.length].name });
+      },
+      paidAmtStr: String(s.paidAmt == null ? amt : s.paidAmt),
+      setPaidAmt: (e) => this.setState({ paidAmt: e.target.value }),
+      clearAll: () => this.setState({ mode: 'none', paidBy: null, paidAmt: null }),
+      clearSplit: () => this.setState({ mode: 'none', people: [] }),
+      paidHint: paidAmt >= amt ? 'จ่ายแทนทั้งหมด | ไม่ออกจากกระเป๋า' : 'ที่เหลือ ฿' + fmt(amt - paidAmt) + ' ออกจากกระเป๋า test2',
+
+      // อีเวนต์
+      eventActive: m === 'event',
+      eventIdle: m !== 'event',
+      eventOpacity: dim('event'),
+      eventFw: m === 'event' ? '700' : '400',
+      eventIdleLabel: '+ เพิ่มอีเวนต์',
+      useEvent: () => this.setState({ mode: 'event', evPayer: m === 'paid' && s.paidBy ? s.paidBy : (m === 'split' ? 'ฉัน' : s.evPayer) }),
+      dropEvent: () => this.setState({ mode: s.paidBy && s.evPayer !== 'ฉัน' ? 'paid' : (s.people.length ? 'split' : 'none') }),
+      payers: payerNames.map((name) => {
+        const c = evPayer === name ? on : off;
+        return { name, border: c.border, bg: c.bg, fw: c.fw, pick: () => this.setState({ evPayer: name, paidBy: name === 'ฉัน' ? s.paidBy : name }) };
+      }),
+      memberRows: members.map((name) => {
+        const p = person(name);
+        return {
+          name, initial: p.initial, avBg: p.avBg, share: fmt(each),
+          isNew: name !== 'ฉัน' && !EVENT_MEMBERS.includes(name),
+          remove: () => {
+            if (name === 'ฉัน') return;
+            if (name === s.paidBy) this.setState({ paidBy: null, evPayer: 'ฉัน' });
+            else this.setState({ people: this.eq(s.people.filter((x) => x.name !== name), amt, true) });
+          },
+        };
+      }),
+    };
+  }
+}
+</script>
+</body>
+</html>

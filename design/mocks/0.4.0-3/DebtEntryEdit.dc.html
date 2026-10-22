@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>แก้ไขรายการหนี้</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0E7C6B}a:hover{color:#0A5E51}
+input:focus,textarea:focus{outline:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 860px; box-sizing: border-box; background: #F3F5F7; font-family: 'Noto Sans Thai', system-ui, sans-serif; color: #1D2327; display: flex; flex-direction: column">
+
+<div style="display: flex; align-items: center; gap: 8px; padding: 10px 12px">
+<a href="DebtEntry.dc.html" style="height: 36px; box-sizing: border-box; border: 1px solid #E3E8EB; border-radius: 18px; background: #FFFFFF; padding: 0 14px; display: flex; align-items: center; gap: 6px; font-size: 14px; color: #3C474F; text-decoration: none">✕ ยกเลิก</a>
+<span style="flex: 1 1 auto; text-align: center; font-size: 15px; font-weight: 600">แก้ไขรายการหนี้</span>
+<a href="DebtEntry.dc.html" style="height: 36px; border-radius: 18px; background: #12A08A; padding: 0 16px; display: flex; align-items: center; font-size: 14px; font-weight: 700; color: #FFFFFF; text-decoration: none">บันทึก</a>
+</div>
+
+<div style="padding: 0 12px; display: flex; flex-direction: column; gap: 12px">
+<div style="box-sizing: border-box; padding: 14px; border-radius: 18px; border: 1px solid {{line}}; background: linear-gradient(180deg, {{soft}} 0%, #FFFFFF 75%); display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 8px">
+<div style="flex: 1 1 auto; height: 36px; box-sizing: border-box; padding: 3px; border-radius: 18px; border: 1px solid #D5DCE1; background: #EEF1F3; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px">
+<button onClick="{{pickIn}}" style="border: {{inBorder}}; border-radius: 15px; background: {{inBg}}; font-family: inherit; font-size: 13px; font-weight: {{inFw}}; color: {{inFg}}">รอรับ</button>
+<button onClick="{{pickOut}}" style="border: {{outBorder}}; border-radius: 15px; background: {{outBg}}; font-family: inherit; font-size: 13px; font-weight: {{outFw}}; color: {{outFg}}">รอจ่าย</button>
+</div>
+<span style="height: 36px; box-sizing: border-box; border-radius: 18px; border: 1px dashed #C9D1D6; background: #FFFFFF; padding: 0 12px; display: flex; align-items: center; font-size: 13px">17 ก.ย. 2026 ▾</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: end">
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="desc" style="font-size: 12px; font-weight: 600; color: #3C474F">ค่าอะไร</label><input id="desc" value="Food Delivery" style="height: 36px; border: 0; border-bottom: 1px solid #C9D1D6; background: transparent; font-family: inherit; font-size: 15px"></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="amt" style="font-size: 12px; font-weight: 600; color: #3C474F">จำนวนเงิน</label><div style="display: flex; align-items: center; border-bottom: 2px solid {{accent}}; height: 36px"><span style="font-size: 20px; font-weight: 700; color: {{accent}}">฿</span><input id="amt" type="number" value="82" style="width: 100%; min-width: 0; border: 0; background: transparent; text-align: right; font-family: inherit; font-size: 26px; font-weight: 700; color: {{accent}}"></div></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 12px; font-weight: 600; color: #3C474F">กับใคร</span>
+<div style="display: flex; align-items: center; gap: 10px"><span style="width: 32px; height: 32px; flex: none; border-radius: 16px; background: #E9EDF0; color: #5B6770; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700">C</span><input value="chalee" aria-label="กับใคร" style="flex: 1 1 auto; min-width: 0; height: 34px; box-sizing: border-box; border: 1px solid #C9D6E3; border-radius: 10px; background: #FFFFFF; padding: 0 10px; font-family: inherit; font-size: 14px"></div>
+</div>
+</div>
+
+<div style="border-radius: 16px; background: #FFFFFF; overflow: hidden">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid #F0F2F4">
+<span style="flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 500">มีเงินเข้า/ออกกระเป๋า</span><span style="font-size: 12px; color: #5B6770">{{walletHint}}</span></span>
+<button role="switch" aria-checked="{{walletAria}}" aria-label="มีเงินเข้า/ออกกระเป๋า" onClick="{{toggleWallet}}" style="width: 48px; height: 28px; flex: none; border: 0; border-radius: 14px; padding: 3px; background: {{walletBg}}; display: flex; justify-content: {{walletSide}}"><span style="width: 22px; height: 22px; border-radius: 11px; background: #FFFFFF; display: block"></span></button>
+</div>
+<sc-if value="{{walletOn}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid #F0F2F4">
+<span style="flex: 1 1 auto; font-size: 14px; color: #5B6770">กระเป๋า</span>
+<span style="height: 32px; box-sizing: border-box; border-radius: 16px; border: 1px solid #DCE2E6; padding: 0 12px; display: flex; align-items: center; gap: 6px; font-size: 14px">▣ KBank ▾</span>
+</div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid #F0F2F4">
+<span style="flex: 1 1 auto; font-size: 14px; color: #5B6770">หมวด</span>
+<span style="height: 32px; box-sizing: border-box; border-radius: 16px; border: 1px solid #DCE2E6; padding: 0 12px; display: flex; align-items: center; gap: 6px; font-size: 14px">🍜 Food Delivery ▾</span>
+</div>
+</sc-if>
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px">
+<span style="flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 500">จ่ายแล้ว</span><span style="font-size: 12px; color: #5B6770">ป้ายบอกเท่านั้น ไม่มีผลกับยอด</span></span>
+<button role="switch" aria-checked="{{paidAria}}" aria-label="จ่ายแล้ว" onClick="{{togglePaid}}" style="width: 48px; height: 28px; flex: none; border: 0; border-radius: 14px; padding: 3px; background: {{paidBg}}; display: flex; justify-content: {{paidSide}}"><span style="width: 22px; height: 22px; border-radius: 11px; background: #FFFFFF; display: block"></span></button>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 15px; font-weight: 600; color: #0E7C6B; padding: 0 4px">มาจาก</span>
+<div style="border-radius: 16px; background: #FFFFFF; display: flex; align-items: center; gap: 12px; padding: 12px 14px; opacity: 0.75">
+<span style="width: 32px; height: 32px; flex: none; border-radius: 10px; background: #E3EEFB; color: #3B7DD8; display: flex; align-items: center; justify-content: center">▤</span>
+<span style="flex: 1 1 auto; display: flex; flex-direction: column"><span style="font-size: 15px">รายการ Food Delivery</span><span style="font-size: 12px; color: #5B6770">17/9/2026 | KBank | −฿164 | แก้ไม่ได้ที่นี่</span></span>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="note" style="font-size: 15px; font-weight: 600; color: #0E7C6B; padding: 0 4px">โน้ต</label>
+<textarea id="note" rows="3" style="border-radius: 16px; border: 1px solid #DCE2E6; background: #FFFFFF; padding: 12px 14px; font-family: inherit; font-size: 14px; line-height: 1.6; resize: none">แบ่งค่าข้าวเที่ยงคนละครึ่ง</textarea>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 15px; font-weight: 600; color: #B42328; padding: 0 4px">การจัดการ</span>
+<button style="height: 44px; border: 1px solid #F2C2C3; border-radius: 14px; background: #FFFFFF; font-family: inherit; font-size: 15px; font-weight: 600; color: #D93A3F">ลบรายการหนี้</button>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":860}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { dir: 'in', wallet: true, paid: false };
+  }
+  renderVals() {
+    const s = this.state;
+    const inSel = s.dir === 'in';
+    const on = { border: '1px solid #6CCDBA', bg: '#FFFFFF', fw: '700' };
+    const off = { border: '1px solid transparent', bg: 'transparent', fw: '500' };
+    const a = inSel ? on : off, b = inSel ? off : on;
+    return {
+      accent: inSel ? '#1E9E4F' : '#D93A3F',
+      line: inSel ? '#A9DDBA' : '#F2C2C3',
+      soft: inSel ? '#DDF3E4' : '#FCE6E6',
+      inBorder: a.border, inBg: a.bg, inFw: a.fw, inFg: inSel ? '#1E9E4F' : '#5B6770',
+      outBorder: b.border, outBg: b.bg, outFw: b.fw, outFg: inSel ? '#5B6770' : '#D93A3F',
+      pickIn: () => this.setState({ dir: 'in' }),
+      pickOut: () => this.setState({ dir: 'out' }),
+      walletOn: s.wallet,
+      walletAria: s.wallet ? 'true' : 'false',
+      walletBg: s.wallet ? '#12A08A' : '#C9D1D6',
+      walletSide: s.wallet ? 'flex-end' : 'flex-start',
+      walletHint: s.wallet ? (inSel ? 'เงินออกจากกระเป๋า (ให้ยืม / จ่ายแทน)' : 'เงินเข้ากระเป๋า (ยืมมา)') : 'จดหนี้อย่างเดียว ไม่มีเงินเคลื่อน',
+      toggleWallet: () => this.setState({ wallet: !s.wallet }),
+      paidAria: s.paid ? 'true' : 'false',
+      paidBg: s.paid ? '#12A08A' : '#C9D1D6',
+      paidSide: s.paid ? 'flex-end' : 'flex-start',
+      togglePaid: () => this.setState({ paid: !s.paid }),
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -68,6 +68,27 @@ Every number comes from ONE line set (`shared.DebtLedgerSQL`): the debts + the r
 `{kind debt | repayment, id (debt id | transaction id), key, direction paid | received (= the sign), amount, signed_amount, date, description, note, paid (debts; null on a repayment), source (debts; null on a repayment), transaction {id, account} (a debt's linked tx | the repayment tx itself), in_current_cycle, created_at, updated_at}`.
 `counts {entries, money, current, earlier}` are over the lines (`money` = debts with a linked tx + every repayment).
 
+### 2.4 Debt pages, page-ready (0.4.0-3, mocks "หนี้ · …" + "Quick create · หนี้: 2 chip + ลูกศรสลับทิศ")
+- **People list** (`GET /people`). Each row adds:
+  - `side` (receivable | payable | clear)
+  - `first_activity_at` (the first line ever)
+  - `last_activity {kind debt | repayment, id, title (its description), direction, amount, signed_amount, date}`: the row's second line ("ค่าตั๋ว | 1 ก.ย." / "คุณจ่ายคืน ฿400 | 10 ต.ค.")
+  - `days_outstanding` (existing)
+- **List totals** add `receivable_total`, `payable_total` and `counts {all, receivable, payable, overdue_30}` for the hero and the chips. `side=receivable | payable | overdue_30` filters the list (owed_to_me / i_owe still work).
+- **Person page**:
+  - Every statement item has `running_balance`: the balance right after it, in book order over all lines.
+  - `days [{date, change, balance_after, count}]` groups the page's items by day for the day headers ("เพิ่ม ฿70" / "ลดลง ฿400").
+  - The "ดูรอบก่อน" divider shows when `counts.earlier > 0`; its label comes from `cleared_at`; `?cycle=earlier` pages the earlier cycles.
+- **Share sheet** (`summary_message`) has two variants:
+  - `text` = "รอบนี้": "สรุปยอดกับ X (ตั้งแต่ d)", the cycle's lines, then "รวม ฉันรอรับจาก X …" / "รวม ฉันรอจ่ายให้ X …".
+  - `text_balance_only` = "ยอดคงเหลืออย่างเดียว".
+  - Both follow the wording rule: รอรับ / รอจ่าย, never "ติด". `since` = the cycle's first date.
+- **Debt detail "มาจาก"**: every debt (entry views and statement debt items) carries `origin {kind split | paid_by | partner | event | cash, transaction_id, bill_id, event_id, title, amount, date, account}`:
+  - split = my bill; paid_by = my expense someone paid part of; partner = my expense of their split; event = the bill (no wallet); cash = a loan / borrow's own wallet transaction.
+  - Null for a ledger-only debt. The debt itself has no wallet.
+- **Quick create preview**: `POST …/entries?preview=true` (record, with or without a transaction) and `POST …/repayments?preview=true` (settle) run the write and roll it back. They answer `DebtPreview {preview, people: [PersonDelta {key, person, before, after, delta, side_before, side_after, flipped}], wallets: [WalletDelta]}`, the same shape as a transaction preview: the result box "ลี ตอนนี้ → หลังบันทึก" plus the wallet effect.
+- **Overpaid settle** is allowed: the balance crosses 0. Every create (entries and repayments) returns `balance_change` (a PersonDelta); `flipped: true` when the side changed (รอจ่าย 230, pay 300 → รอรับ 70).
+
 The pending `settle_debt` draft (target = a debt) submits as a **repayment transaction** to that debt's person in the opposite direction (a paid debt → receive; a received debt → pay), on the draft's wallet; the debt is not touched.
 
 ## 3. Endpoints

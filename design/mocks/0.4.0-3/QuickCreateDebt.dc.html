@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>Quick create หนี้ 2 chip + ลูกศร</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0E7C6B}a:hover{color:#0A5E51}
+input:focus{outline:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 760px; box-sizing: border-box; background: #FFFFFF; font-family: 'Noto Sans Thai', system-ui, sans-serif; color: #1D2327; display: flex; flex-direction: column">
+<div style="padding: 10px 14px 0; display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto">
+<div style="display: flex; align-items: center"><span style="flex: 1 1 auto; font-size: 16px; font-weight: 600">รายการใหม่</span><span style="font-size: 20px; color: #3C474F">×</span></div>
+
+<div role="tablist" style="position: relative; height: 40px; box-sizing: border-box; padding: 3px; border-radius: 20px; border: 1px solid #D5DCE1; background: #EEF1F3; display: flex">
+<div aria-hidden="true" style="position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 3); transform: translateX(100%); box-sizing: border-box; border-radius: 17px; border: 1px solid #6CCDBA; background: #C4F1E8"></div>
+<span style="position: relative; flex: 1 1 0; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #5B6770">▤ รายการ</span>
+<span style="position: relative; flex: 1 1 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #0A4F44">🤝 หนี้</span>
+<span style="position: relative; flex: 1 1 0; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #5B6770">▣ ออม</span>
+</div>
+
+<div style="border-radius: 16px; border: 1px solid {{line}}; background: linear-gradient(180deg, {{soft}} 0%, #FFFFFF 85%); padding: 12px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 6px">
+<button onClick="{{pickRecord}}" style="height: 32px; box-sizing: border-box; border-radius: 16px; border: {{recBorder}}; background: {{recBg}}; padding: 0 12px; font-family: inherit; font-size: 13px; font-weight: {{recFw}}; color: {{recFg}}">{{recLabel}}</button>
+<button onClick="{{pickSettle}}" style="height: 32px; box-sizing: border-box; border-radius: 16px; border: {{setBorder}}; background: {{setBg}}; padding: 0 12px; font-family: inherit; font-size: 13px; font-weight: {{setFw}}; color: {{setFg}}">{{setLabel}}</button>
+<span style="flex: 1 1 auto"></span>
+<span style="height: 30px; box-sizing: border-box; border-radius: 15px; border: 1px dashed #C9D1D6; background: #FFFFFF; padding: 0 10px; display: flex; align-items: center; font-size: 12px">📅 วันนี้</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: end">
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 13px; font-weight: 600">คำอธิบาย</span><span style="height: 34px; border-bottom: 1px solid #C9D1D6; display: flex; align-items: center; font-size: 13px; color: #8A949B">{{descHint}}</span></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 13px; font-weight: 600">จำนวนเงิน</span><div style="display: flex; align-items: center; border-bottom: 2px solid {{accent}}; height: 34px"><span style="font-size: 20px; font-weight: 700; color: {{accent}}">฿</span><input type="number" value="{{amtStr}}" onInput="{{setAmt}}" aria-label="จำนวนเงิน" style="width: 100%; min-width: 0; border: 0; background: transparent; text-align: right; font-family: inherit; font-size: 24px; font-weight: 700; color: {{accent}}"></div></div>
+</div>
+<div style="display: flex; align-items: center; gap: 6px">
+<div style="flex: 1 1 0; min-width: 0; height: 66px; box-sizing: border-box; border-radius: 12px; border: {{leftBorder}}; background: #FFFFFF; padding: 8px 10px; display: flex; align-items: center; gap: 8px; opacity: {{leftOpacity}}"><span style="width: 30px; height: 30px; flex: none; border-radius: 15px; background: {{leftIconBg}}; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700">{{leftIcon}}</span><span style="display: flex; flex-direction: column; min-width: 0"><span style="font-size: 11px; color: #5B6770">{{leftCap}}</span><span style="font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{leftName}}</span></span></div>
+<button onClick="{{swap}}" aria-label="สลับทิศ" style="width: 38px; height: 38px; flex: none; border-radius: 19px; border: 1px solid #C9D1D6; background: #FFFFFF; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0; color: {{accent}}"><span style="font-size: 16px; line-height: 1">→</span><span style="font-size: 8px; color: #8A949B">สลับ</span></button>
+<div style="flex: 1 1 0; min-width: 0; height: 66px; box-sizing: border-box; border-radius: 12px; border: {{rightBorder}}; background: #FFFFFF; padding: 8px 10px; display: flex; align-items: center; gap: 8px; opacity: {{rightOpacity}}"><span style="width: 30px; height: 30px; flex: none; border-radius: 15px; background: {{rightIconBg}}; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700">{{rightIcon}}</span><span style="display: flex; flex-direction: column; min-width: 0"><span style="font-size: 11px; color: #5B6770">{{rightCap}}</span><span style="font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{rightName}}</span></span></div>
+</div>
+<span style="text-align: center; font-size: 13px; color: #3C474F">{{sentence}}</span>
+</div>
+
+<sc-if value="{{isRecord}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; align-items: center; gap: 12px; padding: 0 2px">
+<span style="flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 500">ทำรายการเงิน (tx) ด้วย</span><span style="font-size: 12px; color: #5B6770">{{txHint}}</span></span>
+<button role="switch" aria-checked="{{txAria}}" aria-label="ทำรายการเงินด้วย" onClick="{{toggleTx}}" style="width: 48px; height: 28px; flex: none; border: 0; border-radius: 14px; padding: 3px; background: {{txBg}}; display: flex; justify-content: {{txSide}}"><span style="width: 22px; height: 22px; border-radius: 11px; background: #FFFFFF; display: block"></span></button>
+</div>
+</sc-if>
+
+<div style="border-radius: 14px; background: #F4F7F8; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 13px">
+<div style="display: flex; gap: 8px"><span style="flex: 1 1 auto; color: #3C474F">ลี ตอนนี้</span><span style="font-weight: 600; color: {{beforeC}}">{{before}}</span></div>
+<div style="display: flex; gap: 8px"><span style="flex: 1 1 auto; color: #3C474F">หลังบันทึก</span><span style="font-weight: 700; color: {{afterC}}">{{after}}</span></div>
+<div style="display: flex; gap: 8px"><span style="flex: 1 1 auto; color: #3C474F">กระเป๋า test2</span><span style="font-weight: 600">{{walletEffect}}</span></div>
+</div>
+</div>
+<div style="border-top: 1px solid #EEF1F3; padding: 10px 14px"><span style="height: 40px; border-radius: 20px; background: #12A08A; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600">บันทึก</span></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":760}}'>
+const RED = '#D93A3F', GREEN = '#1E9E4F';
+const BAL = -230; // ฉันรอจ่ายให้ลี 230
+function fmt(n) { return Math.abs(Math.round(n * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+function st(b) {
+  if (Math.abs(b) < 0.005) return { t: '✓ เคลียร์ครบ', c: '#12A08A' };
+  return b > 0 ? { t: 'รอรับ ฿' + fmt(b), c: GREEN } : { t: 'รอจ่าย ฿' + fmt(b), c: RED };
+}
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    // dir 'in' = เงิน/หนี้ไหลเข้าหาฉัน (ฝั่งรับ), 'out' = ไหลออกจากฉัน (ฝั่งจ่าย)
+    this.state = { act: 'settle', dir: 'out', amt: '230', tx: false };
+  }
+  renderVals() {
+    const s = this.state;
+    const inDir = s.dir === 'in';
+    const rec = s.act === 'record';
+    const amt = Number(s.amt) || 0;
+    const recLabel = inDir ? 'รอรับ' : 'รอจ่าย';
+    const setLabel = inDir ? 'รับคืน' : 'จ่ายคืน';
+    // balance effect: + = รอรับมากขึ้น
+    let delta;
+    if (rec) delta = inDir ? amt : -amt;      // จดหนี้: รอรับ +, รอจ่าย −
+    else delta = inDir ? -amt : amt;          // คืน: รับคืน ลดรอรับ, จ่ายคืน ลดรอจ่าย
+    const after = BAL + delta;
+    const usesWallet = !rec || s.tx;
+    // wallet money direction: รอรับ+tx = ให้ยืม (ออก), รอจ่าย+tx = ยืม (เข้า), รับคืน = เข้า, จ่ายคืน = ออก
+    const moneyIn = rec ? !inDir : inDir;
+    const on = (c) => ({ border: '1px solid ' + c, bg: '#FFFFFF', fw: '700', fg: c });
+    const off = { border: '1px solid transparent', bg: 'transparent', fw: '500', fg: '#3C474F' };
+    const accent = (rec ? inDir : !inDir) ? (rec ? GREEN : RED) : (rec ? RED : GREEN);
+    const a = rec ? on(accent) : off, b = rec ? off : on(accent);
+    const person = { icon: 'ลี', bg: '#4F8BD6', cap: 'กับใคร', name: 'ลี ทดสอบ' };
+    const wallet = { icon: '▣', bg: '#12A08A', cap: usesWallet ? 'กระเป๋า' : 'กระเป๋า (ไม่ใช้)', name: 'test2' };
+    // flow: money goes left → right
+    const left = moneyIn ? person : wallet;
+    const right = moneyIn ? wallet : person;
+    const b0 = st(BAL), b1 = st(after);
+    const sentences = {
+      'record-in': 'จดว่าลีต้องคืนฉัน' + (s.tx ? ' (ฉันให้ลียืมเงินออกจากกระเป๋า)' : ''),
+      'record-out': 'จดว่าฉันต้องคืนลี' + (s.tx ? ' (ฉันยืมเงินลีเข้ากระเป๋า)' : ''),
+      'settle-in': 'ลีคืนเงินฉัน เข้ากระเป๋า',
+      'settle-out': 'ฉันคืนเงินลี ออกจากกระเป๋า',
+    };
+    return {
+      line: accent === GREEN ? '#A9DDBA' : '#F2C2C3',
+      soft: accent === GREEN ? '#DDF3E4' : '#FCE6E6',
+      accent,
+      recLabel, setLabel,
+      recBorder: a.border, recBg: a.bg, recFw: a.fw, recFg: a.fg,
+      setBorder: b.border, setBg: b.bg, setFw: b.fw, setFg: b.fg,
+      pickRecord: () => this.setState({ act: 'record' }),
+      pickSettle: () => this.setState({ act: 'settle' }),
+      swap: () => this.setState({ dir: inDir ? 'out' : 'in' }),
+      descHint: rec ? (inDir ? 'ค่าอะไร? เช่น ให้ยืม' : 'ค่าอะไร? เช่น ยืมเงิน') : 'คืนเงิน',
+      amtStr: s.amt,
+      setAmt: (e) => this.setState({ amt: e.target.value }),
+      leftIcon: left.icon, leftIconBg: left.bg, leftCap: left.cap, leftName: left.name,
+      rightIcon: right.icon, rightIconBg: right.bg, rightCap: right.cap, rightName: right.name,
+      leftBorder: '1px dashed #C9D1D6', rightBorder: '1px dashed #C9D1D6',
+      leftOpacity: (!usesWallet && left === wallet) ? '0.4' : '1',
+      rightOpacity: (!usesWallet && right === wallet) ? '0.4' : '1',
+      sentence: sentences[s.act + '-' + s.dir],
+      isRecord: rec,
+      txHint: s.tx ? (inDir ? 'เงินออกจากกระเป๋า (ให้ยืม)' : 'เงินเข้ากระเป๋า (ยืมมา)') : 'ปิด = จดในสมุดหนี้อย่างเดียว ไม่มีเงินเคลื่อน',
+      txAria: s.tx ? 'true' : 'false', txBg: s.tx ? '#12A08A' : '#C9D1D6', txSide: s.tx ? 'flex-end' : 'flex-start',
+      toggleTx: () => this.setState({ tx: !s.tx }),
+      before: b0.t, beforeC: b0.c,
+      after: b1.t, afterC: b1.c,
+      walletEffect: usesWallet ? (moneyIn ? '+฿' : '−฿') + fmt(amt) : 'ไม่เปลี่ยน',
+    };
+  }
+}
+</script>
+</body>
+</html>

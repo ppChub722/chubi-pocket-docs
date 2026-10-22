@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>หนี้สิน รายการ</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0E7C6B}a:hover{color:#0A5E51}
+</style>
+</helmet>
+<div style="width: 390px; height: 760px; box-sizing: border-box; background: #F3F5F7; font-family: 'Noto Sans Thai', system-ui, sans-serif; color: #1D2327; display: flex; flex-direction: column">
+
+<div style="display: flex; align-items: center; gap: 8px; padding: 10px 12px">
+<span style="height: 36px; box-sizing: border-box; border: 1px solid #E3E8EB; border-radius: 18px; background: #FFFFFF; padding: 0 14px 0 10px; display: flex; align-items: center; gap: 10px; font-size: 15px">← หนี้สิน</span>
+<span style="flex: 1 1 auto"></span>
+<span style="width: 34px; height: 34px; border-radius: 17px; background: #FFFFFF; border: 1px solid #E3E8EB"></span>
+<span style="width: 34px; height: 34px; border-radius: 10px; background: #12A08A"></span>
+</div>
+
+<div style="padding: 0 12px; display: flex; flex-direction: column; gap: 12px">
+<div style="box-sizing: border-box; padding: 14px; border-radius: 18px; border: 1px solid #BFE3DB; background: linear-gradient(180deg, #DDF2EE 0%, #FFFFFF 75%); display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 10px">
+<div style="width: 40px; height: 40px; flex: none; border-radius: 12px; background: #12A08A; display: flex; align-items: center; justify-content: center; color: #FFFFFF">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12l4-4h4l3 3-2 2-2-2"></path><path d="M21 12l-4 4h-5l-4-4"></path></svg>
+</div>
+<span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column">
+<span style="font-size: 13px; color: #3C474F">หนี้สุทธิ | 8 คน</span>
+<span style="font-size: 26px; font-weight: 700; color: #12A08A; line-height: 1.2">+฿2,138.34</span>
+</span>
+<button aria-label="ค้นหา" style="width: 40px; height: 40px; flex: none; border-radius: 20px; border: 1px solid #BFE3DB; background: #FFFFFF; padding: 0; display: flex; align-items: center; justify-content: center; color: #12A08A">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><path d="M20 20l-4.5-4.5"></path></svg>
+</button>
+</div>
+<div style="display: flex; flex-direction: column">
+<div style="display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px dashed #CFE3DE"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1E9E4F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 7L7 17M15 17H7V9"></path></svg><span style="flex: 1 1 auto; font-size: 14px; color: #3C474F">รอรับ | 7 คน</span><span style="font-size: 14px; font-weight: 600; color: #1E9E4F">฿2,368.34</span></div>
+<div style="display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px dashed #CFE3DE"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D93A3F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"></path></svg><span style="flex: 1 1 auto; font-size: 14px; color: #3C474F">รอจ่าย | 1 คน</span><span style="font-size: 14px; font-weight: 600; color: #D93A3F">฿230</span></div>
+<div style="display: flex; align-items: center; gap: 8px; padding: 7px 0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8890C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg><span style="flex: 1 1 auto; font-size: 14px; color: #3C474F">ค้างเกิน 30 วัน</span><span style="font-size: 14px; font-weight: 600; color: #C2610C">2 คน</span></div>
+</div>
+<div style="display: flex; gap: 6px; flex-wrap: wrap">
+<sc-for list="{{chips}}" as="c" hint-placeholder-count="4">
+<button onClick="{{c.pick}}" style="height: 28px; box-sizing: border-box; border-radius: 14px; border: {{c.border}}; background: {{c.bg}}; padding: 0 10px; display: flex; align-items: center; gap: 6px; font-family: inherit; font-size: 13px; font-weight: {{c.fw}}; color: #1D2327"><sc-if value="{{c.hasDot}}" hint-placeholder-val="{{ false }}"><span style="width: 7px; height: 7px; border-radius: 4px; background: {{c.dot}}"></span></sc-if>{{c.label}}<span style="min-width: 18px; height: 18px; border-radius: 9px; background: #EEF1F3; font-size: 11px; display: flex; align-items: center; justify-content: center">{{c.n}}</span></button>
+</sc-for>
+</div>
+</div>
+
+<div style="border-radius: 16px; background: #FFFFFF; display: flex; flex-direction: column; overflow: hidden">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+<a href="DebtPerson.dc.html" style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; text-decoration: none; color: inherit; border-bottom: 1px solid #F0F2F4">
+<span style="width: 40px; height: 40px; flex: none; border-radius: 20px; background: {{r.avBg}}; color: {{r.avFg}}; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600">{{r.initial}}</span>
+<span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column">
+<span style="font-size: 15px; font-weight: 500">{{r.name}}</span>
+<span style="font-size: 12px; color: #5B6770; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.last}}</span>
+</span>
+<span style="display: flex; flex-direction: column; align-items: flex-end">
+<span style="font-size: 11px; color: {{r.sideColor}}">{{r.side}}</span>
+<span style="font-size: 15px; font-weight: 700; color: {{r.sideColor}}">{{r.amount}}</span>
+<span style="font-size: 11px; color: {{r.ageColor}}; font-weight: {{r.ageFw}}">{{r.age}}</span>
+</span>
+</a>
+</sc-for>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":760}}'>
+const PEOPLE = [
+  { name: 'แบงค์ ทดสอบ', initial: 'แ', avBg: '#E9EDF0', avFg: '#5B6770', side: 'in', amount: '฿300', days: 50, last: 'ค่าตั๋วคอนเสิร์ต | 1 ก.ย.' },
+  { name: 'chalee', initial: 'C', avBg: '#E9EDF0', avFg: '#5B6770', side: 'in', amount: '฿82', days: 34, last: 'Food Delivery | 17 ก.ย.' },
+  { name: 'ลี ทดสอบ', initial: 'ลี', avBg: '#4F8BD6', avFg: '#FFFFFF', side: 'out', amount: '฿230', days: 23, last: 'คุณจ่ายคืน ฿400 | 10 ต.ค.' },
+  { name: 'test', initial: 'T', avBg: '#FFB547', avFg: '#FFFFFF', side: 'in', amount: '฿1,189.67', days: 11, last: 'ค่าข้าว | 10 ต.ค.' },
+  { name: 'ลี', initial: 'ล', avBg: '#E9EDF0', avFg: '#5B6770', side: 'in', amount: '฿667.67', days: 11, last: 'ค่าแท็กซี่ | 10 ต.ค.' },
+  { name: 'มิ้นท์ ทดสอบ', initial: 'มิ', avBg: '#4FB6E8', avFg: '#FFFFFF', side: 'in', amount: '฿64', days: 9, last: 'มิ้นท์คืน ฿100 | 15 ต.ค.' },
+  { name: 'บอส ทดสอบ', initial: 'บอ', avBg: '#E2547C', avFg: '#FFFFFF', side: 'in', amount: '฿45', days: 3, last: 'ค่ากาแฟ | 18 ต.ค.' },
+  { name: 'มาตาก', initial: 'ม', avBg: '#E9EDF0', avFg: '#5B6770', side: 'in', amount: '฿20', days: 11, last: 'ค่าน้ำ | 10 ต.ค.' },
+];
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { f: 'all' };
+  }
+  renderVals() {
+    const f = this.state.f;
+    const match = (p) => f === 'all' || (f === 'in' && p.side === 'in') || (f === 'out' && p.side === 'out') || (f === 'old' && p.days > 30);
+    const defs = [
+      { k: 'all', label: 'ทั้งหมด', dot: null },
+      { k: 'in', label: 'รอรับ', dot: '#1E9E4F' },
+      { k: 'out', label: 'รอจ่าย', dot: '#D93A3F' },
+      { k: 'old', label: 'ค้างเกิน 30 วัน', dot: '#E8890C' },
+    ];
+    return {
+      chips: defs.map((d) => {
+        const on = d.k === f;
+        const n = PEOPLE.filter((p) => d.k === 'all' || (d.k === 'in' && p.side === 'in') || (d.k === 'out' && p.side === 'out') || (d.k === 'old' && p.days > 30)).length;
+        return {
+          label: d.label, n, hasDot: !!d.dot, dot: d.dot,
+          border: on ? '1px solid #12A08A' : '1px solid #DCE2E6',
+          bg: on ? '#DDF2EE' : '#FFFFFF', fw: on ? '700' : '500',
+          pick: () => this.setState({ f: d.k }),
+        };
+      }),
+      rows: PEOPLE.filter(match).map((p) => ({
+        name: p.name, initial: p.initial, avBg: p.avBg, avFg: p.avFg, last: p.last, amount: p.amount,
+        side: p.side === 'in' ? 'รอรับ' : 'รอจ่าย',
+        sideColor: p.side === 'in' ? '#1E9E4F' : '#D93A3F',
+        age: 'ค้าง ' + p.days + ' วัน',
+        ageColor: p.days > 30 ? '#C2610C' : '#8A949B',
+        ageFw: p.days > 30 ? '700' : '400',
+      })),
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1386,3 +1386,59 @@ DONE. No migration, additive (except one behaviour note below). Not committed, n
 - (a) Preview shows person and wallet moves only, not event-board positions.
 - (b) Editing a bill's payer / members from tx detail when the row is already in the same event is not part of PUT. Use the bill edit (project-transactions PUT with splits).
 
+## 0.4.0-3 debt pages API (BE session, 2026-10-22)
+DONE (Lead brief, owner "ต่อเลย ให้จบทุกงาน"). Branch wip/0.4.0-3, uncommitted, no docker rebuild, no migration. Mocks read: DebtsList, DebtPerson, DebtEntry / Edit, QuickCreateDebt.
+
+**1. People list (`GET /personal-debts/people`):**
+- Rows gain `side` (receivable | payable | clear), `first_activity_at`, and `last_activity {kind debt|repayment, id, title, direction, amount, signed_amount, date}` (from peopleSQL: the line with the highest book rank).
+  - title = the line's description. FE words a null title, e.g. "คุณจ่ายคืน ฿400".
+- `days_outstanding` already existed.
+- `totals` gain `receivable_total`, `payable_total` (same values as owed_to_me / i_owe, kept for Home / More / dashboard) and `counts {all, receivable, payable, overdue_30}`.
+- `side=receivable | payable | overdue_30` filters the list (owed_to_me / i_owe still accepted).
+- `shared.DebtLedgerSQL` gains a `descr` column; `shared.DebtSide`.
+
+**2. Person page:**
+- Every statement item gets `running_balance`. It is a window over ALL the person's lines in book order, applied before the cycle filter, so the earlier pages are right too.
+- The page gets `days [{date, change, balance_after, count}]` built from the page's items. A day split across pages shows its part on each page.
+- Cycles: `cleared_at` + `counts.earlier` + `?cycle=earlier` already exist (confirmed) and drive the "ดูรอบก่อน" divider.
+- `summary_message` gains `text_balance_only` ("ยอดกับ X ตอนนี้: ฉันรอรับจาก / รอจ่ายให้ X N บาท") and `since`.
+  - `text`'s header gains "(ตั้งแต่ d)".
+  - Its total line now reads "รวม ฉันรอรับจาก X …" / "รวม ฉันรอจ่ายให้ X …" (was "… ค้างจ่ายฉัน …", wording rule). handler_test is updated for it.
+
+**3. Debt detail "มาจาก":**
+- `origin {kind split|paid_by|partner|event|cash, transaction_id, bill_id, event_id, title, amount, date, account}` on every DebtEntry and on statement debt items.
+- One SQL in entryViewSQL. Event origins come from the bill (`source_project_transaction_id`): amount / date / description, no wallet.
+- Cash = a manual debt with its own wallet tx.
+- Null = ledger-only.
+- `source` is unchanged (it still means "managed by a split").
+
+**4. Quick create preview:**
+- `POST …/entries?preview=true` and `POST …/repayments?preview=true` → 200 `DebtPreview {preview, people: [PersonDelta], wallets: [WalletDelta]}`, B3's shape minus rows.
+- The write runs in a DB tx that is always rolled back. Before = after − the line's signed amount; wallet before / after are read in the tx.
+- `CreateEntry` / `CreateRepayment` were split into `createEntryTx` / `createRepaymentTx` so the preview and the write share them (same validation, same errors).
+- `PersonDelta` (transactions) gains `side_before`, `side_after`, `flipped` via `transactions.NewPersonDelta`. B3's tx preview uses it too.
+
+**5. Overpay:**
+- An overpaid settle was always allowed; nothing caps it.
+- Both creates now return `balance_change` (PersonDelta), and `flipped` = true when the side changes (test: รอจ่าย 160, pay 200 → รอรับ 40).
+- Entry writes other than create keep `balance_change: null`.
+
+**Files (be):**
+- personal_debts: model.go, store.go (peopleSQL, peopleCols, scanPerson, statement running balance, statementDays, entryViewSQL origin), service.go (create/preview split, Person days), message.go, handler.go (side values, preview), NEW pages_test.go, handler_test.go + paid_by_test.go (asserts).
+- shared/debts.go.
+- transactions: model.go (PersonDelta sides, NewPersonDelta), link_mode.go.
+- apidoc: openapi.yaml (DebtPerson, DebtTotals, DebtSummaryMessage, DebtOrigin NEW, DebtEntry, DebtPersonPage.days, DebtStatementItem, write results, PersonDelta / WalletDelta / DebtPreview NEW, TransactionPreview refs, operations), conform_test.go (getMyCounts fixture).
+
+**Docs:** spec 12 §2.4 (new), api-document §12 note.
+
+**Tests** (`chubi_test_043`, 0 SKIP): `go vet ./internal/...` clean.
+- personal_debts, transactions, me, dashboard, sync, projects, pending, contacts, shared/..., apidoc/... → all ok.
+- NEW TestDebtPagesAPI:
+  - Lee 60 (40 days ago) + 500 cash + pay 400: last_activity, side, first date, totals and counts, overdue_30 filter.
+  - running_balance −160 / −560 / −60; days.
+  - text_balance_only; split origin; cash origin.
+  - Preview record (wallet −50, nothing saved); preview overpay (flipped); real overpay balance_change.
+- TestPaidByLeeScenario also checks the paid_by origin.
+
+**Breaking for the current app:** the `summary_message.text` wording only. Everything else is additive.
+
