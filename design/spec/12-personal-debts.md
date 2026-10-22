@@ -1,394 +1,102 @@
-# 12 — Personal Debts (bidirectional)
+# 12 — Personal Debts (the person ledger)
 
-The unified obligations ledger. Tracks "I owe X" and "Y owes me" in one
-table — every commitment between the user and another party, regardless
-of how it originated. Replaces the old two-table design (`shared_expense_splits`
-+ debtor-only `personal_debts`) that shipped in 1b.1; merged in migration 24.
+What the user and each other person owe each other: debts ("Lee paid for my food, I owe 60", "borrowed 500 from Lee") and repayments ("จ่ายคืนลี 400"). One balance per person.
 
-References: `transactions` (origin + settlement), `contacts`, `projects`
-(1b.2), `project_transactions` (1b.2).
+Shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`, tag **Debts**. Global conventions in [`overview.md`](overview.md). Owner decision: `ai/decisions.md` "Debt model" (2026-10-21).
 
-Global conventions in [`overview.md`](overview.md).
+## 1. Model (0.4.0-3, migration 069)
 
-## 0. 0.4.0 — cycles, ages and the summary message
+### 1.1 Debts and repayments
+- A **DEBT** is a ledger record in `personal_debts`: `{person, direction paid | received, amount > 0, date, description, note, paid label, optional linked transaction, optional split source}`.
+  - **paid** = I paid them / for them (they owe me, signed +amount); **received** = they paid me / for me (I owe them, signed −amount).
+  - A debt MAY carry its own **linked transaction** (`transactions.source_personal_debt_id`, see §1.3), e.g. the 500 I borrowed landing in my wallet. That transaction moves the wallet but **never changes the person's balance**.
+- A **REPAYMENT** is a **transaction** tied to the **person** (not to a debt): `transactions.repay_contact_id` + `repay_person_name` (§1.4).
+  - **pay** = I pay them back: an expense in the system category Debt Paid, signed **+amount**.
+  - **receive** = they pay me back: an income in Debt Received, signed **−amount**.
+  - Both categories are out of reports (`include_in_report = false`); the wallet moves like any transaction.
+- **Balance per person** (`net`) = Σ signed debts + Σ signed repayments. > 0 = they owe me (รอรับ), < 0 = I owe them (รอจ่าย), 0 = cleared (หายกัน). It can flip sign freely.
+  - Example (Lee): debts −60, −500 (with a linked income tx), −70; repayment pay 400 (+400) → net −230. A final pay 230 → 0, cleared.
+- **"จ่ายแล้ว"** (`personal_debts.paid`) is an optional manual label per debt: never set automatically, never changes a number. The balance alone decides when it's done.
+- No cancel, no `settled_amount`, no `outstanding`, no `status`: stop counting = delete (hard). Repayments are deleted as transactions.
 
-- **Cycle.** A person's entries in book order (date, created) carry a running balance; a cycle ends where it hits 0. `cleared_at` = the date of the last such entry (null if it never did); entries after it are the **current cycle**, the rest are earlier cycles. `GET /people/:key` and `/entries` take `cycle=current|earlier` (omitted = all); every entry in those lists has `in_current_cycle`; `counts` has `current` / `earlier`.
-- **Age.** `days_outstanding` = days (user timezone) since the oldest entry of the CURRENT cycle that is not labelled paid; null when none. Computed from the user's stored timezone (not the request header).
-- **Order:** `GET /personal-debts/people?sort=oldest|amount|recent` (default oldest: days_outstanding desc, none last, then |net|). `totals` and the `*_people` counts always cover ALL people (they ignore `q` / `side` / `all` / paging) so the tiles stay put while a filter is on.
-- **List summary.** `totals` adds `owed_to_me_people`, `i_owe_people`, `over_30_days_people` (people with days_outstanding > 30) next to `owed_to_me`, `i_owe`, `net`, `open_count`.
-- **Summary message.** `GET /people/:key` carries `summary_message` `{text, entries, net}` (the page is ONE call; its `items` default to the current cycle, `cycle=earlier|all` pages the rest): Thai text, the current-cycle entries oldest first (`+` I paid for them, `−` they paid me, with description) and the total (they owe me / I owe them / cleared). The FE only shares it.
+### 1.2 Person key
+`c:<contact_id>` (one of my contacts) or `n:<name>` (a typed name, matched case-insensitively; the BE returns it lower-cased and trimmed). `shared.DebtKey` / `shared.DebtKeySQL` (debts) / `shared.RepayKeySQL` (repayments). A typed name and a contact are separate people (merge them by linking: §1.6). Writing to an `n:` key without `person_name` keeps the person's current spelling (the latest line's snapshot); `person_name` sets it.
 
----
+### 1.3 A debt's linked transaction (one record)
+A debt with a wallet transaction owns exactly ONE (`source_personal_debt_id`, unique): paid = expense, received = income, in Debt Paid / Debt Received, same date / amount / description / note.
+- Edits on either side write both (`PUT /personal-debts/:id` → the tx; `PUT /transactions/:id` → the debt, via `transactions.DebtLinks`); deleting either deletes both (the wallet balance comes back).
+- From the tx side the category stays (400 `SYSTEM_TRANSACTION_IMMUTABLE`), the wallet can't be dropped (400 `DEBT_TX_NEEDS_WALLET`: ledger-only is `PUT /personal-debts/:id {account_id: null}`), and a co-member who isn't the author can't edit / delete it (403 `DEBT_TX_AUTHOR_ONLY`).
+- The tx shows `counterparty: {entry_id, key, person, direction, paid}` to its author; it can't carry splits or join an event.
+- Tags live only on that transaction (a debt without one takes no tags: 400 `TAGS_NEED_WALLET`).
 
-> **0.3.1-10 — the person ledger (migration 054) supersedes §1–§4 where they disagree.** Shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`, tag **Debts**.
+### 1.4 A repayment transaction
+- Made by `POST /personal-debts/people/:key/repayments` (or a pending `settle_debt` draft, §2.3). DB rule (CHECK): the person columns are set only on an expense / income that is not a debt's linked tx and not a transfer; `repay_person_name` is always set on a repayment, `repay_contact_id` only for a contact (`ON DELETE SET NULL`).
+- The row shows `repayment_person: {key, name, contact_id, person}` to its author (tx detail "จ่ายคืนให้ ลี ›" / "รับคืนจาก ลี ›" → the person page).
+- Edit it like any transaction (`PUT /transactions/:id`: amount, date, wallet (may be dropped), description, note, tags; never the category: 400 `SYSTEM_TRANSACTION_IMMUTABLE`; author only: 403 `DEBT_TX_AUTHOR_ONLY`). The link stays; the balance is computed, so amount / date edits flow in. The write answer's `person_balance` is the person's new balance.
+- `DELETE /transactions/:id` deletes the repayment (its answer carries the person's new `person_balance`).
+- It can't carry splits or join an event (system category).
 
-## 0. The person ledger (0.3.1-10)
+### 1.5 Split-sourced debts
+`source_kind`: `transaction` = a split on my bill (the bill owns amount / person / date); `partner` = another user's split on me (the mirror); `event` = the event resolve sheet's "as debt" (0.4.0-3 B3: `POST …/entries {bill_id}`, the entry keeps the bill (`source_project_transaction_id`) and its event; 400 `BILL_NOT_FOUND` unless I am an active member; its money STAYS editable, it is my own record). On `transaction` / `partner` / `paid_by` only description / note / paid change (409 `ENTRY_MANAGED_BY_SOURCE`). Deleting a `transaction` split takes it off the bill (my_share grows; a linked partner gets `split_changed` "removed"). An expense split = a `paid` debt (they owe me); an income split = `received`. The mirror on a linked partner's side has the opposite direction; each user owns their own rows (ledger, not sync).
 
-### 0.1 Model
-- One record type, an **entry**: `{person, direction paid | received, amount > 0, date, description, note, paid label, optional wallet transaction, optional split source}`.
-  - **paid** = I paid them / for them (net +amount); **received** = they paid me / for me (net −amount).
-  - **net per person** = Σ paid − Σ received. > 0 = they owe me (ติดคุณ), < 0 = I owe them (คุณติด), 0 = หายกัน. It can flip sign freely.
-  - The **paid label** (`paid`) never changes a number. There is no cancel, no `settled_amount`, no `outstanding`, no `status`: stop counting = delete.
-- **Person key**: `c:<contact_id>` (one of my contacts) or `n:<name>` (a typed name, matched case-insensitively; the BE returns it lower-cased and trimmed). `shared.DebtKey` / `shared.DebtKeySQL`.
-- **Wallet side**: an entry with a wallet owns exactly ONE transaction (`transactions.source_personal_debt_id`, unique): paid = expense, received = income, in the reserved Debt Paid / Debt Received category, same date / amount / description / note. Entry and transaction are one record:
-  - edits on either side write both (`PUT /personal-debts/:id` → the tx; `PUT /transactions/:id` → the entry, via `transactions.DebtLinks`);
-  - deleting either deletes both (the wallet balance comes back);
-  - from the tx side the category stays the reserved one (400 `SYSTEM_TRANSACTION_IMMUTABLE`), the wallet can't be dropped (400 `DEBT_TX_NEEDS_WALLET`: making the entry ledger-only is `PUT /personal-debts/:id {account_id: null}`), and a wallet co-member who isn't the author can't edit / delete it (403 `DEBT_TX_AUTHOR_ONLY`);
-  - the tx shows `counterparty: {entry_id, key, person, direction, paid}` to its author; it can't carry splits or join an event.
-- **Tags** live only on the wallet transaction (an entry without a wallet takes no tags: 400 `TAGS_NEED_WALLET`).
-- **Split-sourced entries** (`source_kind`): `transaction` = a split on my bill (the bill owns amount / person / date); `partner` = another user's split on me (the mirror); `event` reserved for the event resolve flow (on hold). Only description / note / paid change on them (409 `ENTRY_MANAGED_BY_SOURCE`). Deleting a `transaction` split takes it off the bill (my_share grows; a linked partner gets `split_changed` "removed").
-- An expense split = a `paid` entry (they owe me); an income split = `received`. The mirror on a linked partner's side has the opposite direction.
+### 1.5a Paid by someone else (0.4.0-3, migration 070)
+Owner 2026-10-21 ("Paid by someone else", quick create tab จ่ายแทน). Someone paid (part of) MY expense: I record a real expense of the whole bill, and the same save makes the debt I owe.
+- **Shape.** Bill 123, Lee paid 13, I paid 110 = ONE expense `amount 123` with `transactions.paid_by_amount 13`. Reports, budgets and `my_share` count 123 (my consumption). The wallet moves only the cash part, `amount − paid_by_amount` = 110 (`wallet_amount` on the row); they paid it all → no wallet. The debt "I owe Lee 13" is a `received` entry, `source_kind paid_by`, linked back by `personal_debts.paid_for_transaction_id` (unique, `ON DELETE CASCADE`). It is NOT a `source_transaction_id` split, so it never lowers my_share.
+- **One record with the expense.** `POST /transactions` / `PUT /transactions/:id` / pending submit take `paid_by {contact_id | person_name, amount}` (spec 04 §2.8). The debt follows the row: amount = paid_by.amount, date and description = the row's. Another person = the old debt goes and a new one comes. `paid_by: null` = the debt goes. Deleting the expense deletes the debt. From the debts page only description / note / paid change (409 `ENTRY_MANAGED_BY_SOURCE`), and `DELETE /personal-debts/:id` → 409 `DEBT_MANAGED_BY_TX`.
+- **Linked payer.** When the payer is a contact linked to a user, they get the usual `split_created` notice with `recipient_direction: paid` (they are owed). Their mirror is a plain `paid` debt with no expense. A paid_by change / removal sends `split_changed`, like a split edit.
+- **A partner's split on me** (`source_kind partner`, the mirror of a split on THEIR expense) now also makes my expense of my share: `amount` = my share, `paid_by_amount` = the same (paid in full by them), no wallet. The category is my category with the same name as theirs (case-insensitive, top level first), else none. Description = theirs. It is created when the mirror is (auto-accept or the accept tap) and linked by `paid_for_transaction_id`. Its money (amount / date / wallet / paid_by) follows their bill: `PUT` → 409 `PAID_BY_LOCKED`; "อัปเดตตาม" (`split-changes/:nid/apply`, or auto-apply) moves the debt AND the expense, and a removed split deletes both. Category / description / note / tags are mine. Deleting the expense keeps their debt on me (unlinked). Deleting the mirror debt from the debts page deletes the expense too (it has no wallet). Mirrors from before 0.4.0-3 have no expense.
+- **DebtSource** on such debts: `paid_by` → `{id: the expense, title: its description or category}`; `partner` → `{id: my expense of it (or null), title: their name}`.
 
-### 0.2 Endpoints
+### 1.6 Contacts
+Debts and repayments are independent of contacts (spec 07): archiving a contact changes nothing; deleting one drops its debts AND repayments back to the typed name (`RestoreOnContactDeleteTx` writes the live name into the snapshot first); `unlinked-names` and absorb cover both tables.
+
+## 2. Balance, cycles, statement
+
+### 2.1 The ledger
+Every number comes from ONE line set (`shared.DebtLedgerSQL`): the debts + the repayment transactions, each signed (§1.1), in book order (date, created_at, id). A debt's linked transaction is not a line.
+- `net` = Σ signed; `entry_count` = lines (debts + repayments); `open_count` = debts not labelled paid (a repayment is never open); `last_activity_at` = the latest line date.
+- **Listing rule** (`GET /people`, `/me/counts.open_debts`, totals' `open_count`): a person shows when |net| > 0.005 OR a debt isn't labelled paid; `all=true` shows everyone.
+
+### 2.2 Cycles, age, summary message (0.4.0)
+- **Cycle.** The running balance over the lines; a cycle ends where it hits 0. `cleared_at` = the date of the last such line (null if never); lines after it = the **current cycle**. `GET /people/:key` takes `cycle=current (default) | earlier | all`; `/entries` takes `cycle` too (debts only); every listed line has `in_current_cycle`.
+- **Age.** `days_outstanding` = days (user timezone) since the oldest debt of the current cycle not labelled paid; null when none.
+- **Order:** `GET /personal-debts/people?sort=oldest|amount|recent` (default oldest: days_outstanding desc, none last, then |net|). `totals` (`owed_to_me, i_owe, net, open_count, owed_to_me_people, i_owe_people, over_30_days_people`) cover ALL people and ignore `q` / `side` / `all` / paging.
+- **Summary message.** `GET /people/:key` carries `summary_message {text, entries, net}`: Thai text, the current-cycle lines oldest first (`+` ฉันจ่ายให้ / ฉันจ่ายคืน, `−` ได้รับจาก / ได้รับคืนจาก, with description) and the total. The FE only shares it.
+
+### 2.3 Statement ("ที่มาของยอด")
+`GET /personal-debts/people/:key` `items` = `DebtStatementItem[]`: debts AND repayments interleaved, newest first, page-ready:
+`{kind debt | repayment, id (debt id | transaction id), key, direction paid | received (= the sign), amount, signed_amount, date, description, note, paid (debts; null on a repayment), source (debts; null on a repayment), transaction {id, account} (a debt's linked tx | the repayment tx itself), in_current_cycle, created_at, updated_at}`.
+`counts {entries, money, current, earlier}` are over the lines (`money` = debts with a linked tx + every repayment).
+
+The pending `settle_debt` draft (target = a debt) submits as a **repayment transaction** to that debt's person in the opposite direction (a paid debt → receive; a received debt → pay), on the draft's wallet; the debt is not touched.
+
+## 3. Endpoints
 | Route | What |
 |---|---|
-| `GET /personal-debts/people?page&per_page&q&all&side` | One list, \|net\| desc then latest entry. Default: people with something open (net ≠ 0 OR an entry not labelled paid); `all=true` = everyone; `side=owed_to_me` (net > 0) / `i_owe` (net < 0). `totals` (`DebtTotals {owed_to_me, i_owe, net, open_count}`) cover every person and ignore the filters. |
-| `GET /personal-debts/people/:key` | The person page: `DebtPerson` + `counts {entries, money}` + first page of entries. A contact key with no entries answers zeros; a typed key with none → 404. |
-| `GET /personal-debts/people/:key/entries` | `q` (description / note), `sort` date_desc \| date_asc \| amount_desc \| amount_asc, `direction`, `paid`, `money=true` (has a wallet tx), `account_id`, `from` / `to`. |
-| `POST /personal-debts/people/:key/entries` | The ONE write: `{direction, amount, date?, account_id?, description?, note?, tag_ids?, mark_paid_ids?, person_name?}` → 201 `DebtEntryWriteResult {entry, person_balance, previous_person_balance, transaction, account_balances}`. `mark_paid_ids` labels entries of the same person paid (400 `ENTRY_NOT_FOUND` otherwise). |
-| `GET /personal-debts/:id` | The tx-detail page in debt mode: `{entry, person_balance, transaction (full row \| null)}`. |
-| `PUT /personal-debts/:id` | Partial; `account_id: null` = ledger-only (tx deleted), a value creates / moves the tx; `key` moves a manual entry to another person (`previous_person_balance` set). |
-| `DELETE /personal-debts/:id` | `{id, transaction_id, person_balance, account_balances}`. |
-| `POST /personal-debts/split-requests/:nid/accept` | Mirror entry (`partner`) → `DebtEntryWriteResult`. |
-| `POST /personal-debts/split-changes/:nid/apply` | `{result updated \| deleted, entry, person_balance}` (no more `zeroed`). |
-
-Retired: `GET / POST /personal-debts`, `/cancel`, `/settle`, the `split_paid` notification (nothing is sent on pay / receive). `GET /transactions?counterparty_key=` lists a person's wallet transactions. The pending `settle_debt` draft submits as a new entry with the target's person in the opposite direction.
-
-### 0.3 Totals everywhere
-`Dashboard.debts` and `/me/counts.debts_summary` are `DebtTotals` (the same query as the people header); `/me/counts.open_debts` = people with something open.
-
-### 0.4 Migration 054 (data)
-`owed_to_me` → paid, `i_owe` → received; `settled` → paid label; each repayment transaction becomes its own entry (same person, its type → direction) and stays its wallet side; cancelled debts and splits kept at amount 0 are deleted; `split_paid` notifications removed. Down migration is best effort (data is disposable).
-
----
-
-
-## 1. The model
-
-### 1.1 Three layers
-
-The app keeps **three separate truths**:
-
-| Layer | What it tracks | Mutability |
-|---|---|---|
-| **Account** (`accounts.balance`) | Real cash. ฿4000 went out, balance dropped ฿4000. Never adjusted to reflect "my share". | Recomputed atomically on every transaction |
-| **Transactions** (`transactions`) | The cash event itself. Full amount, account, category, date. | Mutable per spec §04 |
-| **Personal debts** (`personal_debts`) | Relationship state — "X owes Y". Bidirectional, person-grouped. Net positions. | Mutable: cancel, settle, direct-edit |
-
-The `personal_debts` row never moves money — it's metadata on top of
-transactions, capturing the obligation that a transaction created.
-Settlement of a debt creates *another* transaction that moves money,
-with `source_personal_debt_id` pointing back at the debt.
-
-### 1.2 Schema overview
-
-Full column definitions in [`../database/schema.md#12--personal-debts-bidirectional`](../database/schema.md).
-
-Key columns:
-
-- `direction` — `'i_owe'` (counterparty is creditor) | `'owed_to_me'` (counterparty is debtor)
-- `counterparty_contact_id` (nullable) + `counterparty_person_name` (always set) — direction-agnostic identification
-- `source_transaction_id` (nullable) — origin transaction in this row's owner's book; NULL for manual debts and partner-side mirror rows
-- `amount`, `settled_amount`, `status` (`open`/`settled`/`cancelled`)
-
-### 1.3 Per-user ownership
-
-Every row is owned by one user (`user_id`). When a split is created with
-a linked contact, **two rows are created**, one in each user's book —
-each user can edit theirs independently. If Alice creates expense + split
-with linked Bob, the rows are:
-
-| `user_id` | `direction` | `counterparty_*` | `source_transaction_id` |
-|---|---|---|---|
-| Alice | `owed_to_me` | Bob | Alice's transaction |
-| Bob | `i_owe` | Alice | NULL (Bob has no transaction in his book) |
-
-Bob can delete his row without affecting Alice's. Alice can edit her row
-without affecting Bob's. This respects each user's sovereignty over their
-own book.
-
-### 1.4 Origin paths
-
-A `personal_debts` row can be created via:
-
-| Trigger | `source_transaction_id` | Direction |
-|---|---|---|
-| `POST /v1/transactions` with `splits[]` (splitter side) | parent transaction | **by parent type** _(2026-09-16)_: `expense` → `owed_to_me` (splitter fronted money), `income` → `i_owe` (splitter received money that partly belongs to others) |
-| Same call's mirror on linked partner's side | NULL (no tx in partner's book) | inverse of the splitter's (`i_owe` on expense, `owed_to_me` on income) |
-| Manual `POST /v1/personal-debts` (cash loan, IOU, broken item) | NULL | caller picks |
-| 1b.2: `POST /v1/projects/:id/project-transactions` with `splits[]` | NULL (project context uses `source_project_transaction_id`) | actor side / member side |
-
-Settlement already keys off the debt's own direction (§2), so income-split
-debts settle naturally: the splitter pays their share out as an expense,
-the partner receives it as income. UI wording follows the direction:
-expense splits = "หารกับ…", income splits = "แบ่งให้…".
-
----
-
-## 2. Settlement
-
-Two ways `settled_amount` advances:
-
-### 2.1 Through a transaction (default — money actually moves)
-
-User creates a real income/expense via the settle endpoint:
-
-```
-POST /v1/personal-debts/:id/settle
-{
-  "account_id": "...",
-  "amount": 2000,
-  "date": "2026-05-04"
-}
-```
-
-BE creates:
-- One `transactions` row in the caller's book
-  - `type=expense` for `i_owe` debts (paying back)
-  - `type=income` for `owed_to_me` debts (receiving back)
-  - `source_personal_debt_id = debtId`
-  - Account balance updates accordingly
-- Auto-bump: `personal_debts.settled_amount += amount`, status flips to `settled` if covered
-
-### 2.2 Direct edit (no money — adjustments)
-
-User edits the row directly via `PUT /v1/personal-debts/:id`:
-
-```
-{ "settled_amount": 2000 }     // marked partially/fully settled
-{ "amount": 1500 }              // changed total (e.g., agreed lower)
-{ "status": "cancelled" }       // forgiven / written off
-```
-
-Use cases:
-- Forgiveness in exchange for a favor ("I'll do the dishes for a week instead of paying you back")
-- Math correction (entered ฿2000, actual ฿1800)
-- Negotiated amount ("just give me ฿1500, we're square")
-- User doesn't track a cash account and partner paid cash
-
-### 2.3 Settle endpoint flag
-
-`POST /v1/personal-debts/:id/settle?direct=true` — explicit direct-edit mode.
-Skips the transaction entirely and bumps `settled_amount` only. Useful when
-the FE wants a single endpoint with toggle.
-
----
-
-## 3. API
-
-All endpoints require auth. Paths under `/api/v1`.
-
-### 3.1 `GET /v1/personal-debts/people`
-
-People view — aggregated by counterparty with net position.
-
-**Response:**
-
-```json
-{
-  "currency": "THB",
-  "total_owed_to_me": 2000,
-  "total_i_owe": 1000,
-  "net_position": 1000,
-  "data": [
-    {
-      "contact_id": "0190e5-bob",
-      "display_name": "Bob",
-      "owed_to_me_open": 500,
-      "i_owe_open": 0,
-      "net_position": 500,
-      "open_count": 2
-    },
-    {
-      "contact_id": null,
-      "display_name": "Mom",
-      "owed_to_me_open": 0,
-      "i_owe_open": 1000,
-      "net_position": -1000,
-      "open_count": 1
-    }
-  ]
-}
-```
-
-Grouping key: `contact_id` when set, else case-insensitive `counterparty_person_name`.
-Settled and cancelled rows excluded.
-
-### 3.2 `GET /v1/personal-debts`
-
-Flat list. Filters:
-
-| Name | Description |
-|---|---|
-| `direction` | `i_owe` / `owed_to_me` |
-| `status` | `open` (default) / `settled` / `cancelled` / `all` |
-| `counterparty_contact_id` | filter to a specific contact |
-| `from`, `to` | date range (`created_at`) |
-| `page`, `per_page` | pagination |
-
-### 3.3 `POST /v1/personal-debts`
-
-Manual debt entry. Both directions supported.
-
-**Request:**
-
-```json
-{
-  "direction": "i_owe",
-  "counterparty_contact_id": "0190e5-mom",
-  "counterparty_person_name": "Mom",
-  "amount": 500,
-  "currency": "THB",
-  "note": "Cash loan for parking"
-}
-```
-
-### 3.4 `GET /v1/personal-debts/:id`
-
-### 3.5 `PUT /v1/personal-debts/:id` — direct edit
-
-Editable: `amount`, `settled_amount`, `note`, `status`, `counterparty_*`.
-
-### 3.6 `POST /v1/personal-debts/:id/cancel`
-
-Marks `status='cancelled'`. No money moves.
-
-### 3.7 `POST /v1/personal-debts/:id/settle?direct=<true|false>`
-
-Records a settlement. Default mode (`direct=false`) creates a transaction.
-`direct=true` skips the transaction and just bumps `settled_amount`.
-
-**Errors:** `ALREADY_SETTLED`, `ALREADY_CANCELLED`, `OVERPAYMENT`.
-
-### 3.8 `DELETE /v1/personal-debts/:id`
-
----
-
-### 3.9 Editing a bill's splits, overpaid debts, repayment rows (2026-10-10, migration 052)
-
-**Repayments don't constrain edits (owner).** A split debt's `amount` can be edited below what was already repaid. `outstanding = amount − settled_amount` may then be **negative = overpaid**. Apps show it as `|outstanding|` owed the **other way** (e.g. Pond owed Lee 100, Lee repaid 50, the split is edited to 20 → outstanding −30 → "Pond owes Lee 30"). DB checks are now `amount >= 0` and `settled_amount >= 0` (the old `settled_amount <= amount` is gone).
-
-- **Status:** `settled` only when repaid exactly matches the amount (incl. 0/0); otherwise `open`. Overpaid rows stay `open` so they show. `cancelled` is sticky.
-- **People / dashboard totals:** an overpaid row counts on the opposite side (`owed_to_me` overpaid → adds to `i_owe`, and vice versa). Net is unchanged.
-- **Settle** on an overpaid debt → `400 DEBT_OVERPAID`. Auto-bump never runs on an overpaid row.
-- **Removing a person** from a split (`PUT /v1/transactions/:id/splits`, spec 04): an unpaid debt is deleted. A debt with repayments is **kept at amount 0**, so what they paid shows as overpaid. The repayment transaction is untouched.
-- **Repayment rows** (`transactions.source_personal_debt_id`): deleting one takes its amount off the debt's `settled_amount` (floored at 0). Editing / unlinking repayments is deferred to the debt-repayment round.
-- **Linked partner** (ledger rule): deleting MY repayment changes only my debt. The partner's book isn't touched and no notification is sent for it (their recorded receipt is theirs). Split re-amounts / removals reach them as `split_changed` (spec 13 §2.8).
-
-### 3.10 `POST /v1/personal-debts/split-changes/:notification_id/apply`
-
-"อัปเดตตาม" on a `split_changed` notification, **one shot**. It makes the caller's own (mirror) debt match:
-- `change: amount` → their amount = `new_amount`;
-- `removed` → their debt is deleted, or kept at 0 if they recorded repayments.
-
-→ `200 {result: "updated" | "deleted" | "zeroed", debt}`, and the notification is marked actioned.
-
-Errors:
-- `409 NOTIFICATION_ACTIONED` — already used
-- `409 SPLIT_CHANGE_STALE` — superseded by a newer change, or the split changed or was deleted since
-- `400 NOT_SPLIT_CHANGE`
-- `404` — their debt is gone
-
-`POST /split-requests/:id/accept` also answers `409 SPLIT_CHANGE_STALE` when the split was removed before it was added.
+| `GET /personal-debts/people?page&per_page&q&all&side&sort` | One row per person (`DebtPerson`) + `totals` (`DebtTotals`). |
+| `GET /personal-debts/people/:key?cycle&page&per_page` | The person page in one call: `DebtPerson` + `counts` + the statement (`items`, §2.3) + `summary_message`. A contact key with no lines answers zeros; a typed key with none → 404. |
+| `GET /personal-debts/people/:key/entries` | DEBTS only: `q`, `sort`, `direction`, `paid`, `cycle`, `money=true` (has a linked tx), `account_id`, `from` / `to`. Feeds the "mark paid" list (`paid=false`). |
+| `POST /personal-debts/people/:key/entries` | Record a DEBT: `{direction, amount, date?, account_id?, create_transaction?, description?, note?, tag_ids?, mark_paid_ids?, person_name?}` → 201 `DebtEntryWriteResult {entry, person_balance, previous_person_balance, transaction, account_balances}`. |
+| `POST /personal-debts/people/:key/repayments` | Record a REPAYMENT: `{kind pay \| receive, amount, date?, account_id?, description?, note?, tag_ids?, mark_paid_ids?, person_name?}` → 201 `DebtRepaymentResult {transaction (full row), item (statement line), person_balance, account_balances}`. `account_id` optional (as on POST /transactions). `mark_paid_ids` labels debts of the same person paid (label only; 400 `ENTRY_NOT_FOUND` otherwise). |
+| `GET /personal-debts/:id` | A debt in tx-detail debt mode: `{entry, person_balance, transaction (full row \| null)}`. |
+| `PUT /personal-debts/:id` | Partial; `account_id: null` = ledger-only (tx deleted), a value creates / moves the tx; `key` moves a manual debt to another person (`previous_person_balance` set). |
+| `DELETE /personal-debts/:id` | `{id, transaction_id, person_balance, account_balances}`. A `paid_by` debt → 409 `DEBT_MANAGED_BY_TX` (§1.5a). |
+| `POST /personal-debts/split-requests/:nid/accept` | Mirror debt (`partner`) → `DebtEntryWriteResult`. |
+| `POST /personal-debts/split-changes/:nid/apply` | `{result updated \| deleted, entry, person_balance}`. |
+
+`GET /transactions?counterparty_key=<key>` lists a person's money: their debts' linked transactions AND their repayments. `Dashboard.debts` and `/me/counts.debts_summary` are `DebtTotals` (the same query as the people header). No notifications on pay / receive (`split_paid` retired).
 
 ## 4. Design decisions
+- **Repayments are transactions (owner 2026-10-21).** Money paid back is real cash with a wallet, so it is a transaction; it belongs to the person (one balance per person), not to a single debt — no allocation of a payment across debts, no "settled amount".
+- **The paid label is a label.** Users tick off debts they consider done; it never moves a number, so the balance stays honest.
+- **Two rows for a linked-contact split.** Each user's book is independent (ledger, not sync); the partner gets `split_created` / `split_changed` prompts with one-tap actions.
+- **Accounts stay cash; reports count my share.** `accounts.balance` is real cash; reports, budgets and list totals count `my_share` (`shared.ShareAmountExpr`: amount − the bill's split debts in its author's book − for an event bill the other members' board splits). Debt Paid / Debt Received rows are out of reports.
 
-### 4.1 Why bidirectional in one table
-
-Splits + debtor-only personal_debts (the original 1b.1 design) caused
-semantic overlap and FE confusion: the same "obligation between two people"
-was tracked in two tables with different shapes, two screens, with the
-"owed to me" view computed from one and "I owe" from the other.
-
-Unified: every obligation is one row. Direction column says which side
-the row owner is on. People view nets directions trivially. The FE has
-one screen, one mental model.
-
-### 4.2 Why two rows for linked-contact splits (not one)
-
-Each user's book is independent. Bob can delete his row, edit his note,
-mark it settled via a barter agreement — none of which should mutate
-Alice's view. A shared row would force conflict resolution (who wins
-when both edit?). Two rows = no conflict, each user owns their truth.
-
-Trade-off: the views can drift. Alice says "Bob owes me ฿2000"; Bob says
-"I deleted that, never agreed to it". This is realistic — and matches
-real life. Linked notifications at create-time alert the partner; both
-sides can add notes if they disagree.
-
-### 4.3 No more `shared_expense_splits` table
-
-Removed in migration 24. The factual record of "this transaction was
-split this way" lives in `personal_debts` rows with non-NULL
-`source_transaction_id`. Querying `WHERE source_transaction_id = T` gives
-the breakdown.
-
-### 4.4 Direct edit vs transaction-settle
-
-Both paths exist because real life has both. Money-moves cases create
-transactions (audit trail, account balance updates). No-money cases
-(forgiveness, barter, math fixes) skip transactions and just adjust
-`settled_amount`. Users can pick per-case.
-
-### 4.5 Account stays cash-basis; reports compute share-basis
-
-`accounts.balance` and the transactions table track real money flow.
-Spending reports (transactions summary) subtract the SUM of open
-`personal_debts` rows where `direction='owed_to_me'` and
-`source_transaction_id` matches — giving "my share". The user sees
-฿4000 actually went out (cash truth) AND ฿2000 was their real cost
-(share truth). Both are correct, neither is fudged.
-
-**Implemented 2026-10-10** (one SQL fragment, `shared.ShareAmountExpr`):
-share = amount − the bill's split debts in its author's book (both
-directions — an income bill's `i_owe` splits too; open or repaid, a
-forgiven one doesn't come off) − for an event bill the other members' board
-splits (spec 10 §4.25). Floored at 0. Used by the transactions summary
-(→ dashboard), list `totals`, a wallet's income / expense summary and
-budgets' spent; exposed per row as `my_share` (spec 04 §3.3).
-
-### 4.6 Auto-bump on transaction with `source_personal_debt_id`
-
-When a transaction with `source_personal_debt_id` lands, the BE looks
-up the matching debt row owned by the same user and bumps
-`settled_amount`. Single source of settlement state — no two-sided
-handshake, no global flag.
-
-If the transaction is rolled back (parent edit, account deletion),
-the auto-bump rolls back too (same DB tx).
-
-### 4.7 Manual debts and creditor-side bookkeeping
-
-Manual debts (`source_transaction_id IS NULL`) cover:
-- Cash I borrowed yesterday but didn't record the income
-- "Bob broke my phone, owes me ฿8000"
-- "I'll pay you ฿500 next time we meet" agreements
-
-Both directions can be manual. The key constraint: `counterparty_person_name`
-is always set — even free-text entries get displayed by name in the
-people view.
-
----
-
-## 5. Open questions / Phase 2+
-
-- **Notifications** — `debt_created`, `debt_settled` triggers (replacing
-  `split_*` types from the deprecated splits design)
-- **Bulk settle** — "settle all my open debts with Alice in one tap"
-- **Multi-currency dashboard** — nets across currencies (Phase 3+)
-- **Auto-archive** — settled debts older than X months hidden from
-  default views (user setting)
-- **Project-context** — 1b.2's `source_project_transaction_id` and
-  `project_id` columns ship dormant; project_transactions with splits
-  not yet wired post-refactor
-
----
+## 5. Data history
+- **054 (0.3.1-10):** `owed_to_me` → paid, `i_owe` → received; `settled` → the paid label; each old repayment transaction became its own opposite-direction debt row (its wallet side); cancelled debts and splits at 0 deleted; `settled_amount` / `status` dropped.
+- **070 (0.4.0-3):** `transactions.paid_by_amount` (CHECK: null, or > 0, ≤ amount, expense only), `personal_debts.paid_for_transaction_id` (unique, ON DELETE CASCADE), `source_kind` gains `paid_by`. No data converted.
+- **069 (0.4.0-3):** `transactions.repay_contact_id` / `repay_person_name` + CHECK + indexes. Old repayment-like debt rows (from 054 or recorded before 0.4.0-3 as opposite-direction entries) are NOT converted: they can't be told apart from real debts; they keep counting as debts with the same sign, so balances don't change.
 
 ## 6. Status
-
-- **Phase** — 1b refactor complete (BE + FE + schema)
-- **Last updated** — 2026-09-16
-- **Version** — 1.1 (splits on income transactions: debt direction now follows the parent type — §1.4)
-- **Version 1.0** — post-merge of splits + debts
-- **Predecessor** — `06-shared-expenses.md` v0.3 (deprecated)
-- **Migration** — 24 (drop splits, rebuild personal_debts) + 25 (rename source_split_id)
+- **Last updated** — 2026-10-21 (0.4.0-3: repayments as transactions; paid by someone else §1.5a; this file rewritten: the 1b-era settle / cancel / settled_amount sections are gone)
+- **Migrations** — 24 (bidirectional table), 054 (person ledger), 069 (repayment transactions), 070 (paid_by)

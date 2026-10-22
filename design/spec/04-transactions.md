@@ -122,6 +122,38 @@ Replaces the 0.3.1-10 flow, where a future date made or moved the row into a one
 - Deleting the transaction always releases its occurrence (§3.5). The app asks "ลบรายการนี้?" with two choices plus cancel: "ลบรายการอย่างเดียว (งวดกลับเป็นค้าง)" → `DELETE /v1/transactions/:id`, the occurrence goes back to due / upcoming by its date (to paid if it had been marked paid before); "ลบรายการและข้ามงวดนี้" → `?skip_occurrence=true`, the occurrence becomes skipped in the same DB transaction. Unlinking keeps the transaction and releases the occurrence the same way.
 - `DELETE ?also_delete_link=true` stays for event bills; for a recurring link `skip_occurrence` takes its place.
 
+### 2.8 Link modes and "paid by someone else" (0.4.0-3, migration 070)
+
+Owner 2026-10-21 (`ai/decisions.md` "Paid by someone else", REVISED / REFINED). Quick create's ผูกกับ row has four tabs, **ส่วนตัว | แบ่ง | จ่ายแทน | อีเวนต์**, and the top amount is the BILL. A bill is shared ONE way at a time.
+- **`link_mode`** on every row (list, detail, write answers) and on every pending draft (`resolved.link_mode`): `event` = an event bill or a copy of one; `split` = it has splits; `paid` = someone paid (part of) it for me; `personal` = all mine. It tells the form which tab to reopen; the data for it is `splits` / `paid_by` / `event_bill`.
+- **paid_by.** `POST /transactions`, `PUT /transactions/:id` and pending drafts take `paid_by {contact_id | person_name, amount}` (one payer). Bill 123, Lee paid 13 → ONE expense with `amount 123`, `paid_by_amount 13`:
+  - reports, budgets, list totals and `my_share` count **123** (my consumption);
+  - the wallet moves the cash part only, **110** (`wallet_amount` = amount − paid_by.amount). It drives the cached balance, the future-dated effective balance (`shared.SignedTxSQL`), the wallet card's month out and the wallet summary (`LEAST(my_share, cash)`). `paid_by.amount = amount` → no wallet (any `account_id` sent is dropped);
+  - the debt "I owe Lee 13" is made in the same call (spec 12 §1.5a). The write answer's `person_balance` is Lee's new balance.
+  - Row view: `paid_by {debt_id, key, person, amount, my_paid, source me | partner, paid}` (author only).
+- **Rules.** Expense only (400 `PAID_BY_EXPENSE_ONLY`). `paid_by.amount ≤ amount`, and a later lower amount is refused too (400 `PAID_BY_EXCEEDS_AMOUNT`). A person is required (400 `VALIDATION_ERROR`); a foreign contact → 400 `CONTACT_NOT_FOUND`. Exclusive with splits and events: paid_by with `splits` / `source_project_transaction_id`, paid_by on a row that has splits or is in an event, splits on a paid row (`PUT /:id/splits`), and pulling a paid row into an event all give 400 `LINK_MODE_CONFLICT`. `can_join_event` is false on a paid row. Switching modes on an existing row (split ↔ paid ↔ event, with a preview) is 0.4.0-3 B3.
+- **PUT.** `paid_by` absent = unchanged (the debt still follows the row's date and description); an object sets or replaces it (another person = the old debt goes, a new one comes, a linked payer gets `split_changed` "removed" + `split_created`); `null` removes it (the wallet then takes the whole amount).
+- **Partner mirror.** A linked user's split on me also lands as my expense of my share with `paid_by.source partner` (spec 12 §1.5a): its amount / date / wallet / paid_by follow their bill (409 `PAID_BY_LOCKED`); category, description, note and tags are mine.
+- **DELETE.** My own paid_by debt goes with the row (a linked payer gets "removed"); a partner mirror's debt stays, unlinked. `person_balance` is returned.
+- **Event tab (B2).** The อีเวนต์ tab saves through the event bills endpoints with `payer` / `members` (spec 10 §0.4a); someone else paid → my row is my share with no wallet. The row's `event_bill {payer, bill_amount, members}` rebuilds the tab.
+
+### 2.9 Switching link modes, preview, linked pair (0.4.0-3 B3)
+- **One call per switch.** `PUT /transactions/:id` takes `link_mode` (personal | split | paid | event) with that mode's data: `splits` (SplitEdit[], as `PUT /:id/splits`), `paid_by`, or `event {project_id, payer?, members?}`. Order inside one DB transaction:
+  1. The old mode's data goes. Leaving an event: the bill made from the row is removed from the board (its board splits are NOT brought back), a copy just unlinks. Leaving split: the split debts are deleted and linked partners get `split_changed` "removed". Leaving paid: the paid-by debt is deleted and the wallet takes the whole amount.
+  2. The field edits (amount, wallet, …).
+  3. The new mode's data. Into an event: I paid → the row becomes the bill; someone else paid → the row becomes my share with no wallet (its money comes back). Another event = a move.
+  - Repayments are never touched (they belong to the person).
+  - Author only (403 `SPLITS_AUTHOR_ONLY`); not on a debt's wallet side or a repayment (400 `SYSTEM_TRANSACTION_IMMUTABLE`).
+  - 400 `LINK_MODE_INPUT`: the new mode came without its data. 400 `LINK_MODE_CONFLICT`: another mode's data was sent. Without `link_mode`, `splits` edits a split / personal row and `event` is refused.
+  - A partner-mirrored row is money-locked (409 `PAID_BY_LOCKED`, includes any mode switch).
+  - The write answer adds `person_balances` (every person the row touched before / after).
+- **Preview.** `PUT /transactions/:id?preview=true` runs the whole edit in a savepoint and rolls it back. It answers `TransactionPreview {preview, rows, people [{key, person, before, after, delta}], wallets [{account_id, before, after, delta}]}`, for the confirm dialog. Nothing is saved and no notification goes out. People = the row's split / paid-by / debt / repayment persons; event-board positions are not part of it.
+- **My book vs the event book** (owner 2026-10-21). A row linked to an event bill is the bill's **origin** (the bill was made from it: amount = the bill) or my **copy** (amount = my share). Neither side changes the other by itself:
+  - `event_bill` (detail / write answers) carries `kind origin | copy`, `in_sync` and `differences [{field amount | date | description | note, mine, event}]`, computed live. Tags are copied on apply, never compared.
+  - My row → the bill: `apply_to_event: true` on PUT (also `also_update_link`). An origin sends amount / date / description / note / tags (as event tags). A copy sends date / description / note and its amount as my share (my split, or the bill's rest when I am its payer). The bill's other people get `project_tx_changed`.
+  - The bill → my row: `apply_to_my_tx: true` on the bill edit (spec 10 §0.4b), or later `POST /transactions/:id/apply-event`. Both read the bill as it is NOW; matching personal tags are added; my `project_tx_changed` notices for the row are marked actioned.
+  - Deleting either side unlinks (as before).
+
 ### 2.7 Resolve back-references
 
 Two nullable FKs on `transactions` capture the source of personal entries created via the unified shared-expenses flows:
@@ -566,7 +598,7 @@ Implementable but adds edge cases. Deferred to Phase 2 as "Move transaction to d
 ## 6. Status
 
 - **Phase** — spec; Phase 1a implementation pending
-- **Last updated** — 2026-04-26; 0.4.0-2 notes 2026-10-20 (future-dated rows + recurring links §2.6, list §3.2, delete §3.5, summary §3.6, list numbers)
+- **Last updated** — 2026-04-26; 0.4.0-2 notes 2026-10-20 (future-dated rows + recurring links §2.6, list §3.2, delete §3.5, summary §3.6, list numbers); 0.4.0-3 2026-10-21 (link modes + paid_by §2.8, list totals skip debt categories)
 - **Version** — 0.2 (unified shared-expenses model)
   - Renamed `settles_split_id` → `source_split_id` for naming consistency
   - Added `source_project_transaction_id` for the actor-claim mirror (links a personal entry back to the project_transaction it mirrors)
@@ -581,3 +613,5 @@ Implementable but adds edge cases. Deferred to Phase 2 as "Move transaction to d
 `GET /transactions` also returns `avg_daily_spend` and `daily`: both follow the list's date range (`from` / `to`; with only `from`, that month; with neither, the CURRENT month in the user's timezone) and every other filter. `daily` = one `{date, income, expense}` per day of the range (my share, zero-filled, the whole range even past today; empty when the range is over 366 days). `avg_daily_spend` = the range's expense / the days of it that have happened (up to today, at least 1). `totals` is unchanged (it follows the filters as before).
 
 0.4.0-2 (updated 2026-10-20): `daily` and `totals` count rows up to today only, so the days after today stay 0 even when future-dated rows exist (§2.6).
+
+0.4.0-3 (2026-10-21): like reports, `totals.income` / `totals.expense` and `daily` leave out rows whose category is kept out of reports (`include_in_report = false`: Debt Paid / Debt Received repayments, opening balance, adjustments, and any user category set that way). `totals.count` still counts them. The wallet card's `month_in` / `month_out` (spec 03) also skip Debt Paid / Debt Received, and `month_out` counts a paid_by row's cash part (§2.8).

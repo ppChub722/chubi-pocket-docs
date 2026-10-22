@@ -352,8 +352,11 @@ Owned by [`../spec/04-transactions.md`](../spec/04-transactions.md).
 | `note`                          | `TEXT`          | NULLABLE                                   | Free-text note (≤ 500 chars, API-enforced) |
 | `project_id`                    | `UUID`          | FK → `projects.id`, NULLABLE               | **Auto-set only on rows that mirror a project**: a claim (`source_project_transaction_id` set) or a debt-settle (`source_personal_debt_id` set, where the debt is project-context). Never settable directly via `POST /v1/transactions`. |
 | `transfer_group_id`             | `UUID`          | NULLABLE                                   | Required when `type = 'transfer'`; pairs the two rows of a transfer                                                                                                                                                                      |
-| `source_personal_debt_id`       | `UUID`          | FK → `personal_debts.id`, NULLABLE         | Set when this transaction settles a personal_debt (Pay flow for `i_owe` → expense; Mark-received for `owed_to_me` → income)                                                                                                              |
+| `source_personal_debt_id`       | `UUID`          | FK → `personal_debts.id`, NULLABLE         | A debt entry's own linked wallet transaction (one record with the debt; paid → expense, received → income, Debt Paid / Debt Received). It does NOT count in the person's balance (spec 12 §1.3) |
 | `source_project_transaction_id` | `UUID`          | FK → `project_transactions.id`, NULLABLE   | Set when this transaction was created via the actor's claim of a project_transaction                                                                                                                                                     |
+| `repay_contact_id`              | `UUID`          | FK → `contacts.id` ON DELETE SET NULL, NULLABLE | Migration 069 (0.4.0-3). A REPAYMENT's debt person when it is a contact (mirrors `personal_debts.counterparty_contact_id`) |
+| `repay_person_name`             | `VARCHAR(100)`  | NULLABLE                                   | Migration 069. Set on every REPAYMENT: the person's name snapshot (mirrors `counterparty_person_name`). A repayment = an expense (I pay back, Debt Paid, balance +) or income (they pay me back, Debt Received, balance −) tied to the PERSON; person key = `c:<repay_contact_id>` or `n:<lower(trim(repay_person_name))>` (spec 12 §1.4) |
+| `paid_by_amount`                | `DECIMAL(15,2)` | NULLABLE                                   | Migration 070 (0.4.0-3). The part of this EXPENSE someone else paid for me. `amount` stays the bill (reports / budgets / my_share); the wallet moves only `amount − paid_by_amount` (the balance delta, `shared.SignedTxSQL`, wallet month flow). Its debt is the `personal_debts` row with `paid_for_transaction_id` = this row (spec 04 §2.8, spec 12 §1.5a) |
 | `created_at`                    | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                  |                                                                                                                                                                                                                                          |
 | `created_by_user_id`            | `UUID`          | FK → `users.id`, NULLABLE                  | NULL = system                                                                                                                                                                                                                            |
 | `updated_at`                    | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                  | Trigger-updated                                                                                                                                                                                                                          |
@@ -364,13 +367,16 @@ Owned by [`../spec/04-transactions.md`](../spec/04-transactions.md).
 - `type IN ('expense', 'income', 'transfer')`
 - `amount > 0`
 - At most one of `source_personal_debt_id` / `source_project_transaction_id` is set
+- `transactions_repay_person_check` (migration 069): both `repay_*` NULL, OR `repay_person_name` non-blank AND `type IN ('expense', 'income')` AND `source_personal_debt_id IS NULL` AND `transfer_group_id IS NULL` (a repayment is never a debt's linked tx or a transfer leg)
+- `transactions_paid_by_check` (migration 070): `paid_by_amount IS NULL` OR (`paid_by_amount > 0` AND `paid_by_amount <= amount` AND `type = 'expense'`)
 - `project_id IS NOT NULL` ⇒ at least one source is set (one-way implication: project_id can never appear without a source, but a source CAN exist with `project_id = NULL` — the personal-context debt settle case where the debt has no project)
 
 **API-layer cross-field rules:**
 
 - `type = 'transfer'` → `transfer_group_id IS NOT NULL` AND `category_id IS NOT NULL` (must be system `Transfer IN` or `Transfer OUT`)
 - `type IN ('expense', 'income')` → `transfer_group_id IS NULL`
-- If `source_personal_debt_id` set → `type` must match the debt's direction: `expense` for `i_owe` (paying back), `income` for `owed_to_me` (receiving back); `project_id` auto-set from debt's `project_id` (NULL for non-project personal debts)
+- If `source_personal_debt_id` set → `type` follows the debt's direction: `expense` for `paid`, `income` for `received`; category = the system Debt Paid / Debt Received
+- If `repay_person_name` set → category = the system Debt Paid (expense) / Debt Received (income); only made by `POST /v1/personal-debts/people/:key/repayments` (or a pending `settle_debt`); the category can't be edited
 - If `source_project_transaction_id` set → caller must be the actor (linked user behind the project_transaction's `transaction_member_id`); `type` matches source's `type`; `project_id` auto-set from source's `project_id`
 
 **Indexes:**
@@ -383,6 +389,7 @@ Owned by [`../spec/04-transactions.md`](../spec/04-transactions.md).
 - `INDEX idx_transactions_transfer_group ON transactions(transfer_group_id) WHERE transfer_group_id IS NOT NULL`
 - `UNIQUE INDEX idx_transactions_source_personal_debt ON transactions(source_personal_debt_id) WHERE source_personal_debt_id IS NOT NULL` — one wallet transaction per debt entry (unique since migration 054)
 - `INDEX idx_transactions_source_pt ON transactions(source_project_transaction_id) WHERE source_project_transaction_id IS NOT NULL` — claim lookup
+- `INDEX idx_transactions_repay_contact ON transactions(user_id, repay_contact_id) WHERE repay_contact_id IS NOT NULL` and `INDEX idx_transactions_repay_name ON transactions(user_id, LOWER(TRIM(repay_person_name))) WHERE repay_person_name IS NOT NULL AND repay_contact_id IS NULL` — a person's repayments (migration 069)
 - `INDEX idx_transactions_user_updated ON transactions(user_id, updated_at)`, `INDEX idx_transactions_account_updated ON transactions(account_id, updated_at)` — sync fingerprints (`POST /sync`, `X-Sync-Versions`: max(updated_at) + count per user), migration 066
 
 **Dropped:** `scheduled_transaction_id` (+ `idx_transactions_scheduled`) in migration 057 — the recurring link lives on `recurring_items.transaction_id` (§11).
@@ -1049,7 +1056,16 @@ person = Σ paid − Σ received (> 0 = they owe me, < 0 = I owe them). The
 `paid` label never changes a number; there is no cancel, no
 `settled_amount`, no `status`: stop counting = delete. The wallet side of an
 entry is ONE transaction (`transactions.source_personal_debt_id`, unique);
-entry and transaction are one record (spec 12 §0).
+entry and transaction are one record (spec 12 §1.3).
+
+**Debts vs repayments (migration 069, 0.4.0-3)** — a row here is a DEBT;
+its linked transaction does NOT count in the balance. A REPAYMENT is a
+transaction tied to the person (`transactions.repay_contact_id` /
+`repay_person_name`). Balance per person = Σ signed debts (paid +,
+received −) + Σ signed repayments (expense +, income −), computed over both
+tables (`shared.DebtLedgerSQL`). Old repayment-like rows here (054's
+converted repayments, or opposite-direction entries recorded before 069) are
+not converted and keep counting as debts.
 
 | Column                          | Type            | Constraints                                                  | Description                                                                                                                                   |
 | ------------------------------- | --------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1063,6 +1079,7 @@ entry and transaction are one record (spec 12 §0).
 | `project_id`                    | `UUID`          | FK → `projects.id`, NULLABLE, ON DELETE SET NULL             | 1b.2: contextual project                                                                                                                      |
 | `source_kind`                   | `VARCHAR(20)`   | NULLABLE, CHECK                                              | Migration 054. Where a split-made entry came from: `'transaction'` (a split on my bill) \| `'partner'` (another user's split on me, the mirror) \| `'event'` (reserved). NULL = manual entry |
 | `counterpart_debt_id`           | `UUID`          | FK → `personal_debts.id`, NULLABLE, ON DELETE SET NULL       | Migration 045. The mirror entry in the other user's book (a split pair), so a change on one side can notify the other                        |
+| `paid_for_transaction_id`       | `UUID`          | FK → `transactions.id`, NULLABLE, UNIQUE, ON DELETE CASCADE  | Migration 070 (0.4.0-3). The EXPENSE this debt is the "someone paid for me" part of: my own paid_by (`source_kind paid_by`, one record with the expense: deleting the expense deletes it) or a partner's split mirrored into my book (`source_kind partner`, my expense of my share; deleting the expense first unlinks it). Not `source_transaction_id`, so it never lowers my_share (spec 12 §1.5a) |
 | `amount`                        | `DECIMAL(15,2)` | NOT NULL, CHECK > 0 (migration 054)                          | The entry amount                                                                                                                              |
 | `currency`                      | `VARCHAR(3)`    | NOT NULL                                                     |                                                                                                                                               |
 | `date`                          | `DATE`          | NOT NULL (migration 054)                                     | Entry date (backfill: the source transaction's date, else `created_at` in Asia/Bangkok)                                                      |
@@ -1079,7 +1096,7 @@ entry and transaction are one record (spec 12 §0).
 **Check constraints:**
 
 - `direction IN ('paid', 'received')`
-- `source_kind IS NULL OR source_kind IN ('transaction', 'event', 'partner')`
+- `source_kind IS NULL OR source_kind IN ('transaction', 'event', 'partner', 'paid_by')` (`paid_by` added in migration 070)
 - `amount > 0`
 
 **Indexes:**
@@ -1091,6 +1108,7 @@ entry and transaction are one record (spec 12 §0).
 - `INDEX idx_personal_debts_source_pt ON personal_debts(source_project_transaction_id) WHERE source_project_transaction_id IS NOT NULL`
 - `INDEX idx_personal_debts_project ON personal_debts(project_id) WHERE project_id IS NOT NULL`
 - `INDEX idx_personal_debts_user_updated ON personal_debts(user_id, updated_at)` — sync fingerprints (migration 066)
+- `UNIQUE INDEX idx_personal_debts_paid_for_tx ON personal_debts(paid_for_transaction_id) WHERE paid_for_transaction_id IS NOT NULL` — one paid-by debt per expense (migration 070)
 
 **Reports — "my share" computation:**
 For a transaction whose splits live in `personal_debts`
@@ -1242,7 +1260,8 @@ user's email etc. come from a join on `users`.
 
 ## Status
 
-- **Last updated** — 2026-10-20
+- **Last updated** — 2026-10-21
+- **Version** — 0.15 (2026-10-21 — **070** paid by someone else: `transactions.paid_by_amount` + `transactions_paid_by_check`, `personal_debts.paid_for_transaction_id` + unique index, `source_kind` gains `paid_by`. **069** repayment transactions: `transactions.repay_contact_id` / `repay_person_name`.)
 - **Version** — 0.14 (2026-10-20 — synced against migrations 039–068; the file had stopped at 051 (plus 043 / 047 / 048 / 052 notes). **068** recurring on computed occurrences: one-off items + their drafts deleted, `recurring_items.rule_id` NOT NULL, unrecorded untouched rows deleted, `recurring_rules.tracked_from` / `due_notified_until` / `auto_create` / `auto_created_until` / `paused_from`, `recurring_items.cleared_at` / `auto_created_at`, `recurring_auto_created` notification type, `recurring_due` → `/recurring?focus=due`. **067** many auto-saves per goal: `saving_auto` `rule` / `start_date` / `end_rule` / `last_produced`, `day` / `last_month` / the unique index dropped. Backfilled: 039 `account_members` as built (nullable `joined_at`, live-unique index; §14 no longer "planned"), 040 `projects.planned_amount` (no longer planned), 041 / 052 / 057 notification types, 042 nullable `transactions.account_id`, 044 `account_members.sort_order`, 045 `muted_types` / `auto_types` + `personal_debts.counterpart_debt_id`, 046 + 060 `pending_transactions` (new section), 053 contact `nickname` / `show_nickname`, 054 person ledger (`personal_debts` direction paid / received, `date`, `paid`, `source_kind`; `settled_amount` / `status` gone), 055 `event_tags` / `project_transaction_tags` / `project_my_tags` (`projects.type`, `project_transactions.tags` gone), 056 `project_transactions.linked_transaction_id`, 057 `recurring_rules` / `recurring_items` (§11 rewritten, `scheduled_transactions` + `transactions.scheduled_transaction_id` gone), 058 `accounts.track_balance`, 059 budgets v2 (+ `budget_categories` / `budget_wallets` / `budget_periods`), 060 goals v2 (+ `saving_entries`), 061 `categories.status` gone, `accounts` closed → archived, nullable `saving_entries.account_id`, 062 `saving_auto`, 063 event deep links, 064 recurring `kind` / `trial_until` / amount ≥ 0, 065 nullable `saving_goals.target_amount`, 066 sync-fingerprint indexes. TOC gains §15.)
 - **Version** — 0.13 (Migration 051: name / description / note standard — `description` on transactions, tags, contacts, personal_debts, saving_goals, scheduled_transactions; `note` on tags, projects; `contacts.notes` → `note`; `budgets.name` added, old `budgets.description` labels moved into it.)
 - **Version** — 0.12 (§14 reworked: dropped planned `shared_transactions` + `transactions.source_shared_transaction_id` — wallet rows are ordinary `transactions`; `account_members` gains `report_scope`.)

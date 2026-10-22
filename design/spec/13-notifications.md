@@ -60,9 +60,15 @@ The full set of notification types in Phase 1b. Each entry: when it fires, recip
   "splitter_display_name": "Alice",  // creditor's display name
   "amount": 1000.00,
   "currency": "THB",
-  "note": "Hotel split"
+  "note": "Hotel split",
+  "recipient_debt_id": "...",        // the recipient's mirror once it exists
+  "recipient_direction": "received"  // 0.4.0-3, see below
 }
 ```
+
+**`recipient_direction` (0.4.0-3):** the recipient's side of the debt. `received` = they owe the splitter (a split on the splitter's bill). `paid` = the splitter owes them: the splitter recorded that the recipient paid (part of) the splitter's expense (`paid_by`, spec 04 §2.8; `parent_id` = that expense). Notices from before 0.4.0-3 have no key, which means `received`. The FE words the notice from it ("X แบ่งบิล …" vs "X บันทึกว่าคุณจ่ายแทน …").
+
+**Accepting** (auto or the tap) makes the recipient's mirror debt. A `received` mirror of a split on an EXPENSE also makes the recipient's expense of their share: no wallet, paid in full by the splitter, category = the recipient's same-named category if any (spec 12 §1.5a). `split_changed` applied later moves both the debt and that expense.
 
 **Deep-link:** project view (if `project_id` set) → split detail; otherwise personal split detail.
 

@@ -34,3 +34,16 @@ Gotchas:
 - App uses HASH routes (`/#/route`); `goTo` = full reload, `hashTo` = in-app. Read the screen via semantics (`readScreen`), tap by coordinates; use exact RegExp for taps like `/^บันทึก$/` (substring matches hit titles).
 - Only on-screen list rows are in the semantics tree: use search/`scrollTo`. Selectors that need fixing first after a UI change: `pages/debts.mjs` (debts), the other `pages/*.mjs` (contacts, categories, transactions, accounts, saving-goals, dev-widgets).
 - Screenshots go to `ai/qa/shots/<date>/` (git-ignored); `fullPageShot` (lib/screen.mjs) = whole detail page cropped to content. Last-known open FAILs (debts): save-as-contact creates no contact; deleted-debt URL shows a generic error.
+
+## 0.4.0-3 debt seed for ppond (sub-agent, 2026-10-21)
+
+All PASS, no API errors. LOCAL only (localhost:8080). Backup: `chubi-pocket/backups/local-before-debt-seed-2026-10-21.dump` (160,605 B, pg_dump -Fc).
+- User: ppond `01a0a9a9-35bf-75a3-b6b9-dbaf1bfbc49a` (only match). Auth: self-minted HS256 JWT (sub, jti, iat, exp, type=access; local secret), script in scratchpad only.
+- Wallet: `test2` (type cash, `01a126da-be86-73e5-bb0c-00a6319c7d27`): 300 → 172 (−128 = +500 −400 −328 +100) PASS.
+- A ลี ทดสอบ `c:01a15d77-444b-734d-b6fd-41e639113538`: net −230 (exp −230), days 23 (oldest open = 09-28, the 60 labelled paid), cleared null, open 2 / entries 4. Statement interleaved: rep +400, debt −70, debt −500 (tx 01a15d77-44c4…), debt −60 paid. PASS
+- B มิ้นท์ ทดสอบ `c:01a15d77-45be-7211-bb85-3412f502dfb9`: net +64 (exp +64), days 9, cleared null. Split tx `01a15d77-45d6-7c4e-ac49-58e4b7329f87` (expense 328) → debt +164 source {transaction, Food Delivery}; rep −100. PASS
+- C บอส ทดสอบ `c:01a15d77-4640-7506-9089-c48638f31a0a`: net +45, cleared_at 2026-08-20, days 3; current = 1 item (+45), earlier = 2 items (debt +150, rep −150 no wallet). PASS. Note: open_count 2 (the earlier-cycle 150 debt is not labelled paid; matches the open_count rule).
+- D แบงค์ ทดสอบ `n:แบงค์ ทดสอบ` (typed name): net +300, days 50, cleared null. PASS
+- Totals before → after: owed_to_me 1959.34 → 2368.34 (+409 = 64+45+300), i_owe 0 → 230, open_count 4 → 8, over_30_days_people 1 → 2 (แบงค์). PASS
+- repayment_person on GET /transactions/{id}: set on all 3 repayments (ลี 400 expense, มิ้นท์ 100 income, บอส 150 income no wallet); null on the 500 debt-linked tx. PASS
+- Observations (not bugs per spec): GET /transactions?counterparty_key=<มิ้นท์> lists only the 100 repayment, not the split bill (spec: debts' wallet txs + repayments; a split debt has no own tx). The POST /transactions response did not expose the id at top level or `.transaction.id` (id taken from DB).

@@ -29,7 +29,7 @@ This document is the **canonical API contract**. Postman / OpenAPI exports are d
 | [09 — Saving Goals](#09--saving-goals) | Goal CRUD, progress *(pending)* |
 | [10 — Projects](#10--projects) | Projects, members, invites, project transactions (with splits), per-row marks |
 | [11 — Recurring](#11--recurring-replaces-scheduled-transactions) | Recurring rules, computed occurrences, by-slot writes, auto-create, occurrence names, readers |
-| [12 — Personal Debts](#12--personal-debts) | Debt tracking *(pending)* |
+| [12 — Personal Debts](#12--personal-debts) | Debts (ledger records) + repayments (transactions tied to the person) |
 | [13 — Notifications](#13--notifications) | Inbox, settings *(pending)* |
 | [14 — Shared Wallets](#14--shared-wallets) | Members, ownership transfer, report scope *(planned — not implemented)* |
 
@@ -658,6 +658,21 @@ Recent additions (2026-10-20, 0.4.0-2, C7): a credit-card wallet (`credit_card` 
 
 *Pending — see [`../spec/04-transactions.md`](../spec/04-transactions.md).*
 
+Recent additions (2026-10-21, 0.4.0-3 B3, no migration): **switching link modes + the linked pair** (spec 04 §2.9, spec 10 §0.4b). **Source of truth: `chubi-pocket-be/internal/apidoc/openapi.yaml`.**
+- `PUT /v1/transactions/:id` takes `link_mode` + its data (`splits` | `paid_by` | `event {project_id, payer, members}`) and switches in one call (old data goes, new data written; repayments untouched); answer adds `person_balances`. Errors 400 `LINK_MODE_INPUT` / `LINK_MODE_CONFLICT`. `?preview=true` = dry run → `TransactionPreview {preview, rows, people[{key, person, before, after, delta}], wallets[{account_id, before, after, delta}]}`.
+- `apply_to_event` on PUT: my row → its bill (all fields; a copy's amount = my share). `event_bill` gains `kind origin | copy`, `in_sync`, `differences` (live; detail / write answers).
+- NEW `POST /v1/transactions/:id/apply-event` (`applyEventToTransaction`): my row takes its bill as it is now; marks my project_tx_changed notices actioned → `TransactionWriteResult`.
+- Bill edit takes `apply_to_my_tx` (and `also_update_link` now does the same, for copies too, all fields); the patch adds `my_transaction` (my linked row after the edit). project_tx_changed also reaches copy owners (incl. copies pointing at split rows).
+- Event members gain `contact_id` (my contact for them). `POST /v1/projects/:id/members` with `ad_hoc` is open to any writable member. `POST /v1/personal-debts/people/:key/entries` takes `bill_id` (source event, editable money; 400 `BILL_NOT_FOUND`).
+
+Recent additions (2026-10-21, 0.4.0-3 B1 — migration 070): **link modes + paid by someone else** (spec 04 §2.8, spec 12 §1.5a). **Source of truth: `chubi-pocket-be/internal/apidoc/openapi.yaml`.**
+- Every row gains `link_mode` (`personal | split | paid | event`), `paid_by` (`PaidBy {debt_id, key, person, amount, my_paid, source me | partner, paid}` or null) and `wallet_amount` (amount − paid_by.amount). Pending drafts take `draft.paid_by` and return `resolved.paid_by {person, amount, my_paid}` + `resolved.link_mode`.
+- `POST /v1/transactions`, `PUT /v1/transactions/:id` and pending submit take `paid_by {contact_id | person_name, amount}`. Bill 123, Lee paid 13 → one expense `amount 123` (reports / budgets / my_share count 123), the wallet moves 110, and the debt "I owe Lee 13" is made in the same call; `person_balance` = Lee's balance. `paid_by.amount = amount` → no wallet. PUT: absent = unchanged, `null` = removed, an object = set / replaced.
+- Errors: 400 `PAID_BY_EXPENSE_ONLY`, `PAID_BY_EXCEEDS_AMOUNT`, `LINK_MODE_CONFLICT` (paid_by with splits / an event, splits on a paid row, pulling a paid row into an event), 409 `PAID_BY_LOCKED` (the money of a partner-mirrored row). Pending submit codes: `INVALID_PAID_BY`, `PAID_BY_EXPENSE_ONLY`, `PAID_BY_EXCEEDS_AMOUNT`, `LINK_MODE_CONFLICT`.
+- A linked user's split on me now also makes MY expense of my share (no wallet, `paid_by.source partner`, category = my same-named one); "อัปเดตตาม" moves it with the debt.
+- `GET /v1/transactions` `totals.income` / `totals.expense` and `daily` leave out non-report categories (Debt Paid / Debt Received, …) like reports; `totals.count` unchanged. Wallet `month_in` / `month_out` skip Debt Paid / Received and count a paid_by row's cash part (the account summary too).
+- **Breaking for the current app:** none beyond new keys (all additive). The FE must send `paid_by` for the จ่ายแทน tab and read `link_mode` to reopen the right tab.
+
 Recent additions (2026-10-20, 0.4.0-2, C1 — migration 068): **a future-dated transaction is a plain transaction.** The one-off "upcoming" item is gone and so is its path.
 - `POST /v1/transactions` and `PUT /v1/transactions/:id` with a date after today (in the user's timezone) answer like any write: `rows` holds the row(s), `account_balances` follow. `TransactionWriteResult.upcoming` is removed and so is 400 `FUTURE_DATE_NOT_ALLOWED` (transfers, debt entries and event bills may carry a future date too). Editing a row to a future date keeps it where it is (before: it moved to an upcoming item).
 - The row stays in `GET /v1/transactions` (the list shows future rows; the pagination `total` counts them). Everything that COUNTS stops at today until the row's day: the wallet `balance` (also `account_balances` in write results, form-options wallet balances and the saving "available"), `month_in` / `month_out` and the account summary, category month figures, `GET /v1/transactions` `totals` and the `daily` series, `GET /v1/transactions/summary` (dashboard, reports) and the budget `used`. On its day the number moves into place by itself; the accounts and recurring sync datasets hash the user's today, so the app re-syncs.
@@ -722,7 +737,15 @@ Recent additions (2026-10-20, 0.4.0-2, C4): the goals page can show any month's 
 - Not month-aware: `saved_total`, `unallocated` and every other balance (they are "now"). The spare (`GET /v1/saving-goals/spare`) has no `month_plan`, so it takes no `month`. Writes keep returning this month's numbers.
 - Goal and spare pages carry `auto_saves[]` (see the 2026-10-20 note under 08 — Budgets, migration 067).
 
+Recent additions (2026-10-21, 0.4.0-3): long-term hero totals on `GET /v1/saving-goals` `summary` (no migration, additive).
+- `target_total` / `target_saved_total` / `target_short_total`: Σ target, Σ min(saved, target) and Σ max(0, target − saved) per goal, over the listed ACTIVE goals that have a target (completed / archived lists report 0). Saved is capped per goal, so `target_total` − `target_saved_total` = `target_short_total` always.
+- `target_percent`: floor(`target_saved_total` / `target_total` × 100) from the capped sum (100 only when nothing is short); 0 when `target_total` is 0.
+- `count_short` (has a target, not reached, not completed), `count_done` (reached or completed), `count_no_target` (no target, not completed): every listed goal is in exactly one; their sum = `data` length.
+- `month_*` totals and `?month=` unchanged. Details: spec 09 §0.10; shapes: the OpenAPI yaml (`SavingGoalList.summary`).
+
 ## 10 — Projects
+
+Recent additions (2026-10-21, 0.4.0-3 B2): **a new bill with any payer and members** (spec 10 §0.4a). `POST /v1/projects/:id/bills`, `POST /v1/projects/quick` and pending event drafts take `payer` (`BillPerson`: `{me}` default | `{member_id}` | `{contact_id}` | `{person_name}`) + `members: [BillMember {…person, share}]` next to `new_transaction` (`amount` = the bill). Non-members (contacts, typed names) are added by any member who may add bills. Someone else paid → the board bill is theirs, my transaction = my share, no wallet (a copy; `new_transaction_id` null when I have no share). Tx `event_bill` gains `payer`, `bill_amount`, `members` (detail / write answers). Errors: 400 `VALIDATION_ERROR` (bad / duplicate person, income paid by another, payer / members without new_transaction), `SPLITS_EXCEED_AMOUNT`, `MEMBER_NOT_IN_PROJECT`, `CONTACT_NOT_FOUND`, `LINK_MODE_CONFLICT` (with splits / paid_by). Pending: `draft.payer` / `draft.members`, `resolved.bill_people`, codes `INVALID_BILL_PEOPLE`, `NO_SHARE`. Additive. **Source of truth: `chubi-pocket-be/internal/apidoc/openapi.yaml`.**
 
 Recent additions (2026-10-13, 0.3.1-10): page-ready `Event` rows (no `type`, my tags, totals, flags), `GET /v1/projects/:id/detail` (one call), the board with nested splits / event tags / `linked` / `source_tx`, event tags CRUD + `POST /v1/projects/:id/tags/import`, my tags via `PUT /v1/projects/:id {tag_ids}`, every write returns `EventPatch`, a pulled bill's money is linked BY PROMPT (`also_update_link`; another member's edit notifies the tx owner, `409 BILL_MONEY_LINKED` dropped), `DELETE /v1/projects/:id?delete_linked_txs=true` → `EventDeleteResult`, `Event.linked_tx_count` — spec 10 §0. **Source of truth for shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`.** The sections below describe the pre-0.3.1-10 shapes.
 
@@ -1041,7 +1064,20 @@ They read the recurring service through `shared.Expecter.ExpectedBetween(userID,
 
 Recent additions (2026-10-13, 0.3.1-10): the person ledger — `GET /v1/personal-debts/people`, `GET /v1/personal-debts/people/:key`, `GET|POST /v1/personal-debts/people/:key/entries`, `GET|PUT|DELETE /v1/personal-debts/:id`; entries paid | received, a paid label, an optional wallet transaction (one record); `GET|POST /v1/personal-debts`, `/cancel`, `/settle` and `split_paid` retired — [`../spec/12-personal-debts.md`](../spec/12-personal-debts.md) §0. **Source of truth for shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`.**
 
+Recent additions (2026-10-21, 0.4.0-3, migration 069): **repayments are transactions tied to the PERSON** (owner's debt model, spec 12 §1).
+- NEW `POST /v1/personal-debts/people/:key/repayments` (`createDebtRepayment`): body `{kind: "pay" | "receive", amount > 0, date?, account_id?, description?, note?, tag_ids?, mark_paid_ids?, person_name?}` → 201 `DebtRepaymentResult {transaction, item, person_balance, account_balances}`. pay = expense in Debt Paid (balance +), receive = income in Debt Received (balance −); `account_id` optional (as on POST /transactions); `mark_paid_ids` = label only. Errors 400 VALIDATION_ERROR / INVALID_PERSON_KEY / CONTACT_NOT_FOUND / TAG_NOT_FOUND / ACCOUNT_NOT_FOUND / ENTRY_NOT_FOUND, 409 ACCOUNT_ARCHIVED.
+- `POST /v1/personal-debts/people/:key/entries` now records DEBTS only (its optional linked transaction moves the wallet, never the balance). `GET …/entries` lists debts only.
+- Balance (`net`), `cleared_at` / cycles, `days_outstanding`, `entry_count`, the people list, `totals`, `/me/counts.open_debts` and the summary message are computed over debts + repayments (signed, book order date, created_at, id). Listing rule unchanged (|net| > 0.005 OR an unpaid debt).
+- BREAKING: `GET /v1/personal-debts/people/:key` `items` are `DebtStatementItem` `{kind debt | repayment, id (debt id | tx id), key, direction paid | received, amount, signed_amount, date, description, note, paid (null on a repayment), source (null on a repayment), transaction {id, account}, in_current_cycle, created_at, updated_at}` interleaved newest first; `cycle` = current (default) | earlier | all; `counts` are over both (`money` = debts with a tx + repayments).
+- Every transaction row gains `repayment_person` `{key, name, contact_id, person}` (null unless a repayment, shown to its author). `PUT /v1/transactions/:id` edits a repayment (amount, date, wallet, text, tags; category locked: 400 SYSTEM_TRANSACTION_IMMUTABLE; author only) and returns `person_balance`; `DELETE` removes the repayment and returns `person_balance`. `GET /v1/transactions?counterparty_key=` also lists the person's repayments.
+- Pending `settle_debt` submits as a repayment transaction (opposite direction of the target debt), not a debt row.
+- Old repayment-like debt rows are not converted (can't be told apart).
+
+Recent additions (2026-10-21, 0.4.0-3 B1, migration 070): **paid-by debts** (spec 12 §1.5a). An expense someone paid (part of) for me carries its debt `received`, `source.kind paid_by` (`source.id` = the expense): only description / note / paid change here (409 ENTRY_MANAGED_BY_SOURCE), `DELETE /v1/personal-debts/:id` → 409 `DEBT_MANAGED_BY_TX` (edit / delete the transaction). A `partner` mirror's `source.id` is now my expense of it (null on older mirrors); deleting such a mirror deletes that expense too. "อัปเดตตาม" (`split-changes/:nid/apply`) moves the mirror AND my expense.
+
 ## 13 — Notifications
+
+Recent additions (2026-10-21, 0.4.0-3 B1): `split_created` payload gains `recipient_direction` (`received` = the recipient owes the splitter, a split; `paid` = the splitter owes the recipient: they recorded that the recipient paid for them, `parent_id` = that expense). Missing on older notices = `received`. Accepting a `received` split on an expense also makes the recipient's expense of their share (spec 12 §1.5a). Spec 13 §2.1.
 
 Recent additions (2026-10-13, 0.3.1-10): types `recurring_due` (grouped, `{count}`, `/pending`) and `recurring_ending` (`{recurring_id, name, left}`, `/recurring/{id}`); `GET /v1/notifications` and `/unread-count` run the recurring due check first — [`../spec/13-notifications.md`](../spec/13-notifications.md) §2.9–2.10.
 

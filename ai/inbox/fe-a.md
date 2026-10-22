@@ -928,3 +928,500 @@ A read-only agent built and verified the list (every candidate was grepped for u
 - Both are on top of `c25af30` (count 132). I couldn't read the hashes back: git reads were blocked right after (see below). Get them with `git log --oneline -3`.
 
 **BLOCKED (permission, not a code problem):** the next step (bump pubspec to `0.4.0-2+133`, commit "chore: version 0.4.0-2+133", annotated tag `v0.4.0-2`, push main + tag) was denied by this session's permission check ("unrequested commit"). The owner's go reached me only as a relay, which this session doesn't accept for push / tag. Nothing from that step ran: pubspec is still `0.4.0-1+126`, there is no tag, and nothing is pushed. N stays **133** as long as no other app commit lands first (count + 1). Remaining: bump + commit + tag + push, by the owner or in a session where the owner approves it.
+
+## 0.4.0-3 (2026-10-21, FE session on Lead's briefs) — uncommitted on app main
+### ITEM 1 — list hero head in ONE row: DONE
+- **Kit (root fix):** `HeroHeader` gains `fill:` (`lib/ui/organisms/hero/hero_header.dart`). With `fill` the header is the list-hero head: ONE row `[leading] [fill = Expanded] [actions]`. A local `ControlSizes.control = HeroModuleTile.size` (40) makes the stepper and 🔍 exactly as tall as the tile; the row is 40 high, so everything shares one centre line. The fold ⌃ stays in the corner (owner correction), with the same reserve as before. Without `fill`, HeroHeader is unchanged (Wrap row, control 36).
+- `StepperPill` needed no change: its label box already grows to any bounded width, which is why it used to drop to a full-width second row inside the Wrap. In an `Expanded` it fills, with ‹ › at its ends.
+- **Pages:** the transactions list hero (`leading: [tile]`, `fill: TxPeriodPill`, `actions: [🔍]`) and the recurring list hero (`fill: StepperPill.month`, no actions: the stepper runs to the edge). `MoneyVisibilityToggle` was dropped from both heads: privacy is off and it rendered nothing, but it still took a gap (decisions: leave it out of new designs). The budgets head (tile + summary chip) and the goals head (HeroSummaryHead) have no stepper, so they are unchanged. The embedded tx list (wallet tab) has its own row, not the hero: unchanged.
+- **Hub:** `/dev/organisms/app-hero-card` "List summary — folds (the transactions list)" uses the new head; there is a new demo "List head without actions (the recurring list)".
+- **Test:** `test/ui/hero_list_head_test.dart` (4): tile / stepper / 🔍 are 40 high on one centre line; stepper width = row − tile − 🔍 − 2 gaps, ‹ › at its ends, the label between; a foldable card keeps ⌃ in the corner (above the row centre, right of 🔍); a header without `fill` keeps control 36.
+
+### ITEM 2 — inline settings in VIEW mode: DONE
+- **Kit:** `LiveSetting<T>` in `lib/ui/organisms/settings_section.dart` wraps any settings row (`builder(context, value, onChanged)`).
+  - A change shows at once (optimistic) and makes ONE `save` call.
+  - `save` returning false (the person closed a sheet it opened) puts the old value back quietly.
+  - A throw puts the old value back, with a danger snackbar (`failedMessage(error)`) and a Retry that repeats the same change.
+  - Taps during a save are ignored. The row stays enabled, so there's no grey flash.
+  - `save: null` = read-only.
+  - Hub: `/dev/templates/detail-sections` "LiveSetting", with a fake 600 ms call and a "the next saves fail" switch. `LiveSetting` is registered in hub_registry.
+- **Pages covered:**
+  - **Wallet detail** (owner): "ติดตามยอดเงิน" flips in view. Off = `PUT /accounts/{id} {track_balance:false}`. On asks the current balance in the existing set-balance sheet first (closing it puts the switch back), then sends `{track_balance:true, current_balance}`: still one call. New `AccountsRepository/AccountsCubit.setTrackBalance`. Members still see the read-only `SettingSwitchViewRow` (no long-press any more).
+  - **Wallet detail** "ในรายงานของฉัน": now LiveSetting (optimistic + retry), in view and edit (it is the viewer's own setting); `_scopeBusy` is gone.
+  - **Category detail:** "นับในรายงาน" in view now sends ONLY `{include_in_report}` (new `CategoriesRepository/CategoriesCubit.setIncludeInReport`; it used to PUT the whole category); edit / create keep it in the form. "หมวดค่าธรรมเนียม" also goes through LiveSetting (the users fee-category call).
+  - **Spare savings page:** the auto-save switch (off = one DELETE; on = one PUT with the plan, or the sheet first) is now LiveSetting (it used to wait under the saving overlay).
+- **BE:** none needed. The account and category PUT DTOs are presence-tracked (only the fields sent change), so a one-field body is already a single-field update.
+- **Not changed, and why:**
+  - **Contact detail:** its settings section ("แสดงชื่อเล่น") exists only in EDIT mode, and `contact_detail_page_test` asserts the view has NO show-nickname setting (an earlier decision). I tried adding it to view, the test caught it, and I reverted it (the file has no diff). If the owner wants it in view, it's a few lines (`ContactsRepository.update` already sends only the fields given).
+  - **Event detail:** its settings section is one SettingSummaryRow that opens a page (no value to save).
+  - **Goal detail:** auto-saves are a read-only list in view; they are edited in the form (several per goal).
+  - The app Settings page is not a detail page.
+- **Tests:**
+  - new `test/ui/live_setting_test.dart` (4): optimistic + one call + taps ignored while saving; failure → revert + message + Retry → one more call; false → quiet revert; null save = read-only.
+  - `wallet_track_balance_test`: +3 view cases (on→off one call, no edit mode; off→on asks the balance then one call with it; failure → revert + Retry).
+  - `category_detail_page_test`: the 2 view-toggle cases now expect `setIncludeInReport('cat1', false)` once and never `update` (optimistic, revert + Retry).
+
+### Runs (own tests only)
+- `flutter analyze` on lib + test/ui + the touched test folders: no issues.
+- `test/ui/hero_list_head_test` 4/4 · `live_setting_test` 4/4 · `test/features/{accounts,categories,contacts,saving_goals}` + `test/hub` + hub_coverage / layering / feature_visuals: green · `transactions_list_summary_test` + `recurring_pages_test`: green.
+- Slip, fixed: one `dart format` run reformatted `accounts_page.dart` (not mine); I put the original text back (no diff).
+
+### ITEM 3 — transactions list hero in the page colour: DONE
+- **Page:** `transactions_list_page.dart` hero `HeroStyle.plain()` → `HeroStyle.tinted(color: primary)`, the same teal as its ▤ tile and the same call the other list heroes use (budgets / goals / wallets / recurring). The soft tint fading to white comes from HeroStyle.tinted.
+- **Kit (root fix: pieces read `HeroColors` inside a hero, keep their look outside one):**
+  - `StepperPill`: soft fill, the card line as border, accent ‹ ›, muted ▾, flat (no shadow, like other in-hero chips). This also applies to the recurring hero, the goals list (no stepper any more, see item 4), and anything else that puts a stepper in a hero. Outside a hero (dashboard, the wallet-tab tx list row): unchanged.
+  - `DailyBars`: past = accent 35 %, today = accent, future = track, captions muted. Outside a hero it keeps the expense red (only the tx hero uses it).
+  - The 🔍 (`AppIconButton`) already read HeroColors.
+  - Status colours still win: the signed net (red / green) and the income / expense SummaryTiles are untouched.
+- **Hub:** the "List summary — folds" note says what takes the card colours.
+- **Test:** `hero_list_head_test` +1: in a tinted hero the pill = soft fill, elevation 0; today bar = accent, future = track. Outside a hero: the raised pill and the expense-red bar.
+
+### ITEM 4 — saving goals list: no month stepper: DONE
+- No one else held the saving-goals files (the uncommitted tree had only my 0.4.0-3 files).
+- **Cubit / repo:**
+  - `SavingGoalsState.month`, `copyWith(month / clearMonth)`, `setMonth`, `resetMonth` are gone.
+  - `SavingGoalsRepository.list` no longer has `month` (no `month=` query).
+  - `load()` keeps the closed-cubit guard (comment updated: there is no month reset on leave any more).
+- **Page:**
+  - The hero plan head is plain text via `HeroStepperHead(title:)`: "แผนการออมเดือนนี้ | ตุลาคม 2026" (new arb key `fpGoalsPlanHeadMonth`, th + en, gen-l10n run). It isn't tappable, and the "เลือกเดือน" tooltip went with the stepper.
+  - Rows: always "เดือนนี้ …", and the pace tick + bubble show for every active goal (the other-month variants are gone).
+  - The ring is untouched (the owner may change what it shows).
+- **Kit:** `HeroStepperHead.stepper` is now optional (no stepper = the plain title); the hub demo has the text-only variant first.
+- **Tests:** saving_goals_pages_test: the stepper case → "always this month — a plain head, no stepper, not tappable, one call"; the ring-hero case checks the new head. The `month` param / log is dropped from the fakes (also `quick_create_saving_mode_test`'s fake).
+- **Leftovers for the cleanup pass (arb is append-only, so not deleted):** `fpGoalsPlanTitleNow`, `fpGoalsPlanTitle` are unused now. The BE still accepts `?month=` on `GET /saving-goals`; the app no longer sends it, so it's dead on the BE side (BE / docs call).
+
+### ITEM 5 — contact "แสดงชื่อเล่น" in VIEW mode: DONE
+- The owner overrides the earlier "no show-nickname in view" rule. `contact_detail_page.dart` view mode now has the settings section with "แสดงชื่อเล่น" as a `LiveSetting`: one `ContactsCubit.update(id, showNickname: v)` = `PUT /contacts/{id} {show_nickname}` (only that field), optimistic, revert + Retry on a failure, the page patched from the answer. Edit mode keeps the form switch.
+- `contact_detail_page_test`: the view case now expects the setting; +2 cases (one update with only that field, no edit mode; failure → flips back + "boom" + Retry). Contacts 13/13; analyze clean.
+- The item 2 list of LiveSetting pages now includes the contact detail.
+
+### ITEM 6 — saving goals list hero = LONG-TERM progress: DONE (on the PROPOSED BE names)
+- Built to the mock (board "เป้าออม · hero ระยะยาว (B)"). All pieces already exist (HeroSummaryHead, HeroRing, HeroFactList, HeroFilterChips), so there's no new kit piece.
+- **Model:** `SavingSummary` gains `targetTotal / targetSavedTotal / targetShortTotal / targetPercent / countShort / countDone / countNoTarget`, parsed from `target_total`, `target_saved_total`, `target_short_total`, `target_percent` (0–100), `count_short`, `count_done`, `count_no_target`. **These are the PROPOSED names**, all read in one place (`SavingSummary.fromJson`), so the final names are a one-line change each. They default to 0 when missing, so an older BE shows an empty ring and zero chips rather than crashing.
+- **Hero:**
+  - head unchanged (tile + เงินออมทั้งหมด ฿saved_total + 🔍)
+  - **the month row and its "แผนการออมเดือนนี้ | <month>" text are gone** (item 4's text dropped)
+  - ring: arc = `target_percent / 100`; centre "ออมแล้ว N%" (rounded) / ฿target_saved_total / "จาก ฿target_total" (no "จาก" line when the total is 0)
+  - facts in this order:
+    - ยังขาดถึงเป้า ฿target_short_total (flag icon, warning colour when > 0)
+    - เดือนนี้ต้องออม ฿month_short_total (calendar)
+    - ยังไม่จัดสรร ฿unallocated › (wallet, opens the spare page)
+    - เป้าหมาย <count> (target icon)
+- **Chips:** same labels, but the counts are now the BE's (`count_short / count_done / count_no_target`); "ทั้งหมด" stays the list length. The on-device filter is long-term too: new `SavingGoalProgress.of(goal)` in `domain/saving_goal_plan.dart`, picked from fields only: no target → ไม่มีกำหนด; BE status `reached` or closed → ครบแล้ว; otherwise ยังขาด. The rows and the "ต้องออมก่อน" sort are unchanged (still this month's plan, `SavingGoalPlan`).
+- **New arb keys** (th + en, gen-l10n run): `fpGoalsRingSavedPct` "ออมแล้ว {pct}%", `fpGoalsFactTargetShort` "ยังขาดถึงเป้า", `fpGoalsFactMonthToSave` "เดือนนี้ต้องออม".
+- **Tests:**
+  - parse test: the fixture `prodList` gains the 7 fields plus a `summary:` override; the parse case asserts them.
+  - pages test, ring-hero case: ring value 0.65, "Saved 65%" / $52,000 / "of $80,000"; facts in mock order (by y) with their amounts; no stepper and no month text.
+  - New chips case: BE counts 7/5/4 shown as-is (not counted on the device); ครบแล้ว / ยังขาด / ไม่มีกำหนด each filter to the right goal; no extra call.
+  - New edge case: no targets → empty ring, "Saved 0%", no "of" line.
+  - saving_goals + quick_create_saving_mode: 49/49; analyze clean.
+- **BE reported (2026-10-21):** the final names are exactly the proposed ones, so there's nothing to rename. The `target_*` sums cover ACTIVE goals only, so with the status filter on "Reached" / "Archived" the ring reads "ออมแล้ว 0%" with no "จาก" line. The counts cover the whole status list. Owner question, if it matters: hide the ring outside the active filter? Not changed.
+- **Cleanup list (arb append-only, not deleted):** `fpGoalsPlanHeadMonth` (item 4's text, now unused), `fpGoalsRingShortLabel`, `fpGoalsPlanTitleNow`, `fpGoalsPlanTitle`. `HeroStepperHead` is now used only by its hub demo (no page uses it); it could go, or stay for future steppable plans.
+
+### ITEM 7 — section / group head trailing flush with the row cards: DONE
+- **Root cause (kit, `lib/ui/molecules/section_header.dart`), two parts:**
+  1. The row was `[Flexible(title)] [count] [Spacer] [trailing]`. A loose Flexible and the Spacer each get half the free space; the title uses only part of its half and the rest stays EMPTY at the END of the row, after the trailing. So the gap varied with the title / trailing widths: a probe at 412 wide put the + of the recurring head 97.5 px short and the long totals text 8 px short (the owner saw ~46 px).
+  2. The default padding had an 8 px end inset (`sm`), while the template already gives the gutter.
+- **Fix:** title + count sit in ONE `Expanded`, so the trailing always sits at the end, and the default end inset is 0, so the trailing ends at the same gutter as the cards. Also hardened for narrow screens (the new test caught a 21 px overflow at 360 with the long totals): the end is capped at `width − 120` via a LayoutBuilder, so the title keeps 120 px (it ellipsizes first, then a long trailing text wraps). It never overflows.
+- **Pages with the same misalignment, all fixed by the kit change:**
+  - recurring list: the "รายการประจำทั้งหมด" head (🔍 +), the kind group heads (totals), the paused group
+  - wallets list: the type group heads (subtotal)
+  - home: the recent-items head ("ดูทั้งหมด ›" + trailing)
+  - debt person page and the item picker group labels have no trailing (only the end inset changed; no visible change)
+  - the More page, home "ต้องจัดการ" and the dashboard hub demos pass their own padding (unchanged)
+- **Test:** new `test/ui/section_header_alignment_test.dart`. At 412 and 360 wide, plus a very long title: the 🔍/+ head's right edge == the SectionCard's right edge, the totals' right edge == the card's right edge, the head starts at the card's left, no overflow. (A temporary probe test was used, then deleted.)
+- **Runs:** test/ui + test/hub + recurring + accounts + home + personal_debts + test/app: 550 pass; analyze of the file clean.
+
+### ITEM 8 — ONE tab style app-wide (pill): DONE
+- **Kit (restyled in place; pages changed only for icons):** `lib/ui/molecules/app_tab_bar.dart`
+  - Track: 40 high, radius 20, 1 px `outlineVariant` border, `surfaceContainerHigh` fill, 3 px padding; equal segments.
+  - Selected pill: radius 17, a 1 px primary-wash border (60 %), a soft primary fill (24 %; 32 % in dark), a tiny shadow (0/1/2, 12 %). Selected label w700 in a dark primary (primary lerped 50 % to black; to white in dark); others w500 `onSurfaceVariant`, 14 px.
+  - **Theme primary only:** `AppTab.color` is removed; quick create no longer colours its tabs per mode (`QuickCreateModeColors` stays for the + button and the saving form).
+  - **Icons:** `AppTab.icon` shows on every tab with 2–3 tabs, only on the selected tab with 4+. The badge (`badgeCount`) is kept, now floating at (-10, -8).
+  - **Motion:** a tap slides the pill AND the pager content, 300 ms, `Cubic(.2,.8,.2,1)` (`AppTabBar.duration / curve`, which `AppTabPager` now uses).
+  - **Swipe on BOTH (owner correction):**
+    - A drag on the bar moves the pill with the finger, and with a pager the content follows too (`jumpTo`); on release both snap to the nearest tab.
+    - A content swipe still changes tabs, and the pill rides `pager.page`.
+    - `AppTabPager.enabled` / `TabbedListPageBody.swipeEnabled` keep turning off only the CONTENT swipe (edit mode, category reorder); the bar still works.
+    - The underline and `AppTabBar.underlineKey` are gone; there is a new `AppTabBar.pillKey`.
+  - `PinnedTabBarDelegate.height` = 8 + 40 + 8 (padding now top AND bottom). `TabbedListPageBody` pads the bar `lg / sm` (it used to be full-width).
+  - PageDots unchanged.
+- **Spots:**
+  - account detail: its private `_PinnedTabBar` copy is DELETED and folded into the kit `PinnedTabBarDelegate`
+  - categories, budget detail, saving goal detail, recurring detail (badge kept), quick-create mode tabs, event resolve sheet, icon maker sheet
+  - **recurring home** "ภาพรวม | ปฏิทิน": `SegmentedChoice(expand)` → `AppTabBar` (no pager there: the pill animates, but the content switches without a slide because that page is one scroll list with the tab in the middle; a slide would need a content-switcher piece, so say if wanted)
+  - SegmentedChoice value pickers and the icon-maker layer switcher are untouched
+- **Icon picks (AppIcons):**
+  - wallet: ภาพรวม `pie` · รายการ `transactions`
+  - categories: รายจ่าย `expense` · รายรับ `income`
+  - budget: รายการ `receipt` · รอบงบ `history`
+  - goal: ภาพรวม `pie` · รายการออม `receipt`
+  - recurring detail: งวดที่ผ่านมา `history` · งวดถัดไป `date`
+  - recurring home: ภาพรวม `pie` · ปฏิทิน `date`
+  - event resolve: เป็นรายการ `transactions` · เป็นหนี้ `debt`
+  - icon maker: สไตล์ `iconPicker` · สี `colorPicker`
+  - quick create: its own (`transactions` / `debt` / `quickSaving`)
+- **Hub:**
+  - `molecules_bars_page`: the playground has an icons toggle (4 tabs shows the selected-only rule) and a new note; In-the-app uses have icons and fixed page names; the pager demo says "tap, drag the bar or swipe here".
+  - `molecules_blocks_page` (pinned), `templates_detail_page`, `templates_tabbed_detail_page`: icons on the tabs.
+  - `domain_bottom_bar_page`: the quick-create note (no per-mode colour).
+  - No new public classes, so the registry covers are unchanged.
+- **Tests:** `test/shared/app_tab_bar_test.dart` rewritten (8):
+  - geometry: 40 high, equal segments, pill = segment width at the selected segment, labels centred in their own segments
+  - the icon rule for 3 vs 4 tabs
+  - a drag on the bar → next tab, with the pill moving mid-drag and page 1 shown; a short bar drag snaps back
+  - a content swipe → next tab, with the pill on it (stays at the end, swipes back)
+  - content swipe disabled → the bar still works
+  - a tap slides the pill mid-way (not a jump) together with the page
+  - without a pager, a bar drag still changes the tab
+  - `recurring_pages_test` finds `AppTabBar<RecurringHomeTab>` instead of the SegmentedChoice
+- **Runs:** whole-app analyze no issues; test/ui + hub + shared + app + accounts / categories / budgets / saving_goals / recurring / transactions / projects / personal_debts: **991 pass / 0 fail**.
+
+### ITEM 9 — ONE hero bottom chip row, all CHIP size (28): DONE
+- **Kit:**
+  - new `HeroChipRow` (`lib/ui/organisms/hero/hero_chip_row.dart`, exported): a Wrap, 6 px gaps both ways, inside the new `ChipSizeScope.force(size: chip)`.
+  - **Root:** `ChipSizeScope.force` wins over a chip's own `size:`. `AppChip` (so StatusChip, ChipPath, wallet / tag chips) and `MemberChip` now resolve their size through `ChipSizeScope.resolve(context, own, fallback:)`. Outside a forced scope nothing changes.
+  - Every chip in the row therefore has one height, padding, radius, font and icon size (the ChipSize.chip metrics) and keeps its own colour.
+  - The StatusChip with `onTap` keeps its ▾. Labels ellipsize, so the row never overflows.
+- **Heroes with a bottom chip row (a read-only scan of every detail hero), all on HeroChipRow now:**
+  1. **recurring detail:** status dropdown · kind · category path · wallet(s) · tags (were mini) · auto-create
+  2. **budget detail:** "overridden" + the plan status. **The plan status moved LAST** (it was first).
+  3. **saving goal detail:** status chips (completed / short / on track / behind)
+  4. **wallet detail** (newly found): type · report scope · members. It was a sideways-scrolling `ChipRow`; it now wraps like the others.
+- **No bottom chip row (checked):** event detail (status / date chips are in the HEADER; footer = tiles), debt person / debts list (no chips; footer = tiles), tx detail and debt entry detail (pick cards; tags are below the hero), contact, category, pending, quick create (EntryCard pick cards). Header chip rows were not part of this item and are unchanged.
+- **Hub:** `/dev/organisms/app-hero-card` "HeroChipRow" demo (status ▾, kind pill, a control-size chip, a wallet, a red mini tag, the plan status last; all render at 28); registry cover added.
+- **Test:** new `test/ui/hero_chip_row_test.dart` (3). At 412 and 320 wide, with the recurring mix (status dropdown, kind, control, mini red tag, a 2-segment category path, a very long label): every AppChip in the row is 28 high; the ▾ is kept; no overflow; the long chip stays inside the card. Outside the row a mini chip is still 20.
+- **Runs:** whole-app analyze no issues; test/ui + hub + accounts / budgets / recurring / saving_goals / projects: 540 pass.
+
+### ITEM 10 — quick create debt mode: จดหนี้ vs จ่ายคืน (+ the BE adaptations): DONE
+**The form** (`debt_entry_form.dart`, controller + view; saved in `quick_create_sheet.dart`):
+- Top: a compact `SegmentedChoice` value picker [จดหนี้ | จ่ายคืน] (a choice, not tabs). `DebtEntrySub {record, repay}` + `DebtRepaymentKind {pay, receive}` live in `personal_debts/domain/debt_direction.dart`.
+- **จดหนี้** (`POST …/entries`, debts only now):
+  - Direction chips say **เขาติดฉัน / ฉันติดเขา** (kit: `txTypeChip(debt:)` now uses `debtDirectionOwedToMe / IOwe`, also on debt-entry detail heroes; EN They owe me / I owe them).
+  - Hints per direction: "ค่าอะไร? เช่น จ่ายแทนค่าข้าว, ให้ยืม" / "ค่าอะไร? เช่น เขาจ่ายแทนค่าข้าว, ยืมเงิน" ("รับคืนค่าอะไร?" is gone).
+  - The switch is renamed **"มีเงินเข้า/ออกกระเป๋า"** and defaults OFF; ON shows wallet + tags as before.
+  - The "ปิดหนี้" multi-pick is removed from this side (`mark_paid_ids` no longer sent here).
+- **จ่ายคืน** (`POST …/repayments`, createDebtRepayment, final contract):
+  - **Kit:** new `repay:` flag on `EntryCard / TransactionHeroCard / txTypeChip` → จ่ายคืน / รับคืน words; no transfer chip.
+  - **Person:** the picker (kit `ItemPickerSheet`) lists only people with a non-zero balance (from the debts directory, each with รอรับ / รอจ่าย ฿x; empty = "ไม่มีใครค้างกันอยู่"). The person card's label is "จ่ายคืนให้" / "รับคืนจาก".
+  - **Kind** comes from the balance (they owe me → รับคืน) and can be switched (chip or the ⇄ on the flow cards).
+  - **Amount** is prefilled with the full open balance (|net|), editable. A typed amount, or a preset amount, is kept.
+  - **Defaults:** description "จ่ายคืน ‹name›" / "รับคืนจาก ‹name›", replaced when the person or kind changes, kept once typed over.
+  - **Wallet:** always shown (flow wallet ↔ person) and REQUIRED ("เลือกกระเป๋า" toast; no "none" in its picker). The BE takes it as optional; the form follows the owner's model.
+  - **Also:** tags, note, date, and "ติดป้ายจ่ายแล้ว" (the existing open-entries multi-pick → `mark_paid_ids`).
+  - **Result line:** "หลังบันทึก เหลือ ฿x" / "เคลียร์ครบ"; past zero it falls back to the who-owes-whom line.
+  - Save = ONE call → patches wallets, the tx list (the returned tx) and the debts directory (`person_balance`). Typed names send `person_name`.
+- **Presets:**
+  - `QuickCreatePreset.debt(person, debtSub: DebtEntrySub.repay, amount: 82)` works now; `showQuickCreateSheet(debtSub:)` too.
+  - A sheet `account:` preset now also seeds debt mode's wallet.
+  - The person page's "รับคืนแล้ว ฿82" button itself isn't built (later).
+- **Hub:** `/dev/domain/transactions` EntryCard demo has debt / repay words (tap the result line to switch) and a new note; `page_flows`: debt mode has separate save steps for จดหนี้ (createDebtEntry) and จ่ายคืน (createDebtRepayment); the mark-paid step moved to the repay side.
+
+**BE adaptations (Lead's list):**
+1. **Person statement:** `DebtEntry.isRepayment` (`kind: "repayment"`; `paid` null → false; `id` = the tx id). EVERY line now opens (B1):
+   - a repayment → `/transactions/{id}`
+   - a debt → the new route **`/personal-debts/entries/:id`** → `DebtEntryDetailPage` (a ledger-only debt opens too; it used to be dead)
+2. **`repayment_person` on transactions:**
+   - `RepaymentPerson` model (`debt_link.dart`), `Transaction.repaymentPerson / isRepayment` (kept by copyWith).
+   - **Tx detail:**
+     - such a row is EDITABLE (it used to be a read-only system row with the "can't be edited" banner)
+     - its category is locked (`categoryLockedHint` "รายการจ่ายคืนใช้หมวดของระบบ เปลี่ยนไม่ได้"; the card has no tap)
+     - a view-mode row "จ่ายคืนให้ / รับคืนจาก ‹name› ›" opens the person page
+     - Old repayment rows without a person keep the old read-only path.
+   - **PUT / DELETE:** `TransactionWriteResult.personBalance` / `DeleteTransactionResult.personBalance` are parsed and applied to the debts directory (`saveTransactionEdit`, tx detail delete; new `DebtDirectoryCubit.maybeOf`).
+3. **Pending `settle_debt`:** nothing in the FE expected a new debt row (only the source tag). No change.
+
+**Tests:**
+- `quick_create_debt_mode_test` rewritten + extended (9):
+  - debt words, switch OFF by default, no close row, per-direction hints
+  - record = one createEntry with `create_transaction: false`; switch ON sends it with tags
+  - repay preset: kind from the balance, full amount, default description, "All cleared", "50 left", wallet required (nothing sent without one)
+  - repay save = ONE createRepayment (kind receive, w1, preset amount 82, description), no debt row
+  - switching to repay + swapping the kind updates the words and the description
+- New `repayment_model_test` (4): statement kind, `repayment_person` (+ copyWith), the repayment result, person_balance on PUT / DELETE.
+- `debt_pages_test` +1: all 3 lines (repayment, debt with tx, ledger-only debt) are tappable; the repayment has no paid label.
+- `tx_detail_link_rows_test` +1: a repayment shows "Got back from Mom ›", has no banner, is editable, and its category card is locked.
+
+**Runs:** whole-app analyze no issues; transactions + personal_debts + pending + app + hub + ui + shared: **842 pass / 0 fail**.
+
+**HOTFIX (2026-10-21): the app wouldn't start (duplicate route): FIXED**
+- **Cause:** for adaptation #1 I added `GoRoute('/personal-debts/entries/:id', name: 'personal-debt-entry')`, but that route ALREADY existed in `app_router.dart`. My check searched `lib/app` + `lib/features`, not `lib/core`. GoRouter asserts on a duplicate name at start-up (configuration.dart:595), so the app showed nothing. No test built the real router, so 842 green tests missed it.
+- **Fix:** my copy is removed; the original route stays (same path, name and page; now only a comment line differs from HEAD). Callers: statement debt lines push `/personal-debts/entries/{id}`; tx detail opens `DebtEntryDetailPage` directly for a tx with a debt link (unchanged).
+- **Guard:** new `test/app/app_router_config_test.dart` builds the REAL router (`buildAppRouter`, every shell tab) and walks it, asserting route names and full paths are unique and that `personal-debt-entry` has exactly one path. **Proven:** with the duplicate put back for one run it fails with the same assertion the owner saw; it passes without it.
+- **Runs:** analyze lib/core + test/app clean; test/app + personal_debts + tx_detail_link_rows + quick_create_debt_mode: 140 pass.
+
+**Follow-up (owner): direction colours SWAPPED to the debt-state colours: DONE**
+- **Kit:** new `debtStateColor(context, owedToMe:)` (`ui/domain/money/net_balance.dart`) = THE source for รอรับ (green) / รอจ่าย (red); `NetBalance` and `DebtAmountLine` now take their colour from it too.
+- New `txWordsColor(context, type, debt:, repay:)` (transaction_hero_card.dart): with debt words, เขาติดฉัน = รอรับ green and ฉันติดเขา = รอจ่าย red; with repay words, รับคืน = green and จ่ายคืน = red (same source). Plain tx words keep the money colours.
+- `txTypeChip` uses it, and so does the hero's tint, so the card matches its selected chip. This also applies to the debt-entry detail hero, which uses the same card.
+- Hub: covers `debtStateColor` + `txWordsColor`; the EntryCard demo note is updated.
+- Test: `quick_create_debt_mode_test` +1: They owe me = green, I owe them = red; on Repay, Got back = green, Pay back = red. Analyze clean; ui + hub + transactions + personal_debts: 638 pass.
+
+**Notes / questions:**
+- Unused now (arb append-only, cleanup list): `debtTitleHintPaid`, `debtTitleHintReceived`.
+- Repaying needs the BE with migration 069 (the local docker isn't rebuilt yet).
+
+### Runs (items 3–4)
+- `flutter analyze` (whole app): no issues.
+- test/ui + test/hub + test/features/{transactions, recurring, budgets, saving_goals}: 684 pass (after item 3).
+- test/features/saving_goals + quick_create_saving_mode + hub_coverage + hub smoke: 97 pass (after item 4).
+
+## 0.4.0-3 quick create ผูกกับ — analysis (READ-ONLY, no code changed; variant B as refined 2026-10-21, A dropped)
+**(a) NEW pieces** (all in lib/ui, each with a hub demo + registry cover)
+
+| Piece | Purpose | Path | Hub |
+|---|---|---|---|
+| `PersonInputField` | `( ) name ______`: a typeable name with avatar; tap → the person picker; typed = level 1 | ui/domain/people/person_input_field.dart | yes |
+| `ShareCard` | the card shell: header + action chips (หารเท่ากัน / เพิ่มคน) + rows + status line (✓ ครบ / ยังขาด / เกินยอด) | ui/domain/transactions/share_card.dart | yes |
+| `ShareRow` | a row: person (field or name) + amount input + × / the AUTO "A" toggle + an optional tag ("ใหม่ · เพิ่มเข้าอีเวนต์") | ui/domain/transactions/share_card.dart | yes |
+| `AutoToggleChip` | the "A" toggle: auto = the remainder, typing turns it off (today: an icon-only toggle inside `_MeRow`; moves to the kit) | ui/atoms/auto_toggle_chip.dart | yes |
+| `LinkModeBar` | ONE row: the "ผูกกับ" label + `AppTabBar` [ส่วนตัว / แบ่ง / จ่ายแทน / อีเวนต์] | ui/domain/transactions/link_mode_bar.dart | yes |
+
+**(b) REUSED**
+
+| Piece | file:class | Change |
+|---|---|---|
+| Tab pill | ui/molecules/app_tab_bar.dart:AppTabBar | small: show the selected icon only when it fits (see Width) |
+| Entry card | ui/domain/transactions/entry_card.dart:EntryCard | small: amount label จำนวนเงิน / ยอดบิล per mode; `amountNote` = "ส่วนของคุณ …" (exists) |
+| Wallet card | ui/domain/money WalletPickCard | small: a muted state + "ไม่ออกจากกระเป๋า" |
+| Split rows | ui/molecules/split_row.dart:SplitRow / SplitRowName / SplitRowAction | as-is, under ShareRow |
+| Person mark | ui/domain/people/person_mark.dart:PersonMark | as-is |
+| Person picker | features/contacts/…/contact_picker.dart:ContactPicker | small: an optional pinned "ฉัน" first row (for ใครจ่าย) |
+| Event pick | features/projects EventPicker.one + split_event_section.dart:SplitEventSlot | small: the event chip moves INSIDE the อีเวนต์ card's header |
+| Recurring row | split_event_section.dart:SplitRecurringSlot | as-is, now ABOVE ผูกกับ |
+| แบ่ง logic | features/transactions/…/splits_section.dart:SplitsSection (+ `_MeRow`, `_DraftRow`) | its look moves into ShareCard / ShareRow; the logic stays |
+
+**Width:** label + 4 equal tabs in one row (sheet gutter 16):
+- 390 wide: about 75px per tab; the selected "จ่ายแทน" + icon needs about 74px, so it just fits.
+- 320 wide: about 57px per tab, so the selected tab with its icon would ellipsize.
+- Plan: AppTabBar drops the selected icon when it doesn't fit (measured), plus a 320 / 390 geometry test. These are estimates; the test settles them.
+
+**State (DraftFormController, draft_form.dart:38)**
+- Today it holds personal `splits` (`SplitDraft`, :155; "me" is NOT a row: `meAuto` / `meAmount` :243) and a SEPARATE event-board model (`payerId` / `memberSplits` :50/:53). Quick create keeps `EventTarget _event` and the recurring handle outside it (quick_create_sheet.dart:302/:304).
+- Add: `mode {personal, split, paid, event}`; `paidBy` (person | typed) + `myPaidAuto` / `myPaid` (ฉันจ่ายเอง = bill − what they paid); `eventPayer` (me | person); event shares (per person + `meAuto`).
+- The people are ONE list shared by the three views. The event members are computed: me + split people + paidBy.
+- The carry-over rules become controller methods. Save branches on `mode` only; the inactive views are kept, not sent.
+- The event payer's amount stays synced with ยอดบิล (one payer pays the whole bill).
+
+**BE (be-A builds it; not a DB design)**
+- จ่ายแทน: POST /transactions (and PUT / pending submit) has no payer today. Need `paid_by {contact_id | person_name, amount}`: the expense with my share, the wallet only for "ฉันจ่ายเอง" (> 0), and the debt "I owe them" in the same call; the answer returns `person_balance` + wallet balances.
+- อีเวนต์: today's /projects/quick and /projects/{id}/bills (`new_transaction`) make the bill with payer = ME. Need a `payer` (member | contact | name), `members [{member | contact | name, share}]`, and AUTO-ADD by anyone, not only the owner (today `ad_hoc` add is owner only). When the payer ≠ me: no wallet tx, only my share.
+- Pending drafts and tx view need these fields back to show "the view it was saved with" (Q4).
+
+**Step plan:**
+- S1 kit (the 5 new pieces + the small changes + hub + geometry tests): M
+- S2 the controller's mode / shared data + save branching, with unit tests: M
+- S3 quick create UI (recurring above, LinkModeBar, 4 cards): M
+- S4 จ่ายแทน on BE `paid_by`: S–M (waits BE)
+- S5 event bill payer / members / auto-add: M (waits BE)
+- S6 pending + tx detail read back / edit: M
+- Tests each step.
+
+**Risks / open:**
+- DraftForm is shared with pending and tx detail, so a mode refactor can regress them (S2 behind tests).
+- The mock's event line uses the EQUAL share even after a share is edited. It should use my real share; confirm.
+- In "ส่วนตัว" every other view's data is ignored on save. Keep it until the sheet closes? (assumed yes)
+- Other screens: pending confirm + batch add (same DraftForm); tx detail view / edit (shows the saved view); the event board bill sheet (payer / members overlap `_MemberSplits`).
+
+## 0.4.0-3 ผูกกับ build (variant B; owner GO 2026-10-21)
+### S1 — kit + hub: DONE (no feature code yet)
+- **New pieces** (exported through ui.dart, hub demos, registry covers):
+  - `AutoToggleChip` (ui/atoms/auto_toggle_chip.dart): the "A" toggle (on = takes the remainder; off = typed).
+  - `ShareAmountField` (ui/molecules/split_row.dart): the split rows' amount box, moved to the kit (`auto` greys the number).
+  - `ShareCard` + `ShareRow` + `ShareStatus` (ui/domain/transactions/share_card.dart): header (+ `headerLeading` for the event chip) + chips, rows (SplitRow + optional tag), status line (✓ green / ยังขาด·เกินยอด red).
+  - `LinkModeBar<T>` (ui/domain/transactions/link_mode_bar.dart): "ผูกกับ" + AppTabBar on ONE row.
+- **Small changes:**
+  - `AppTabBar` shows an icon only when icon + word fit the segment (measured with TextPainter at the current text scale), so a 320 phone drops the selected icon rather than cutting the word.
+  - `WalletPickCard` gets `muted` (dimmed, still tappable) + `note` (replaces the balance line: "ไม่ออกจากกระเป๋า" / "−฿110 จาก ฿172").
+- **No person-input piece needed:** `SplitRow` + `SplitRowName.input` (typeable) / `.picked` + a tappable `PersonMark` already make the `( ) name ______` row; the picker opens from the avatar / the picked name as today. The pinned "ฉัน" in ContactPicker comes with S3 (feature picker).
+- **Hub:** split-row page: ShareAmountField + AutoToggleChip demo; transactions page: LinkModeBar + the three ShareCards (tap the tabs).
+- **Tests:** new `test/ui/link_mode_share_card_test.dart` (5).
+  - At 320 and 390, for each selected tab: label and bar on one row, no overflow, only the selected tab has an icon, and when it shows, its word is never cut (RenderParagraph). At 900 the icon shows.
+  - ShareCard at 320 with a long name: amounts in one column, inside the card, status + tag shown.
+  - The A toggle / typing flow.
+  - Tests draw text in the square test font (the Thai font comes from google_fonts at run time), so they check the rules, not exact Thai widths.
+- **Runs:** analyze lib/ui + lib/hub clean; new test + app_tab_bar_test + hub_coverage + hub smoke: 61 pass.
+
+### S2 — controller + save on the active tab: DONE (the tabs aren't in the UI yet → today's behaviour unchanged)
+- **Model:** new `lib/features/transactions/domain/link_draft.dart`.
+  - `LinkMode` personal / split / paid / event; the wire names `personal` / `split` / `paid_by` / `event`.
+  - `LinkPerson`: a contact id or a typed name. `key` = `c:<id>` | `n:<name>`.
+  - `LinkDraft`:
+    - จ่ายแทน: payer + amount (null = the whole bill); "ฉันจ่ายเอง" on A = bill − what they paid; `payDiff` (< 0 ยังขาด, > 0 เกินยอด)
+    - อีเวนต์: payer (null = me); typed shares per person, the rest equal; ฉัน on A takes the rest; `eventDiff`
+    - carry-over `switchTo`; `walletOut`
+- **One data set:** the แบ่ง people stay in `DraftFormController.splits`. Members of the event are the แบ่ง people + whoever paid for me + the event payer, each once.
+- **Controller** (draft_form.dart):
+  - `linkMode(hasEvent:)` infers the tab until one is picked (event → แบ่ง → ส่วนตัว)
+  - setters for every card action; `myShareFor` / `walletOutFor` / `linkBalanced`
+  - `removeEventMember` drops that person from every view
+  - `linkSave(m)` = what the save sends
+- **Save** (quick_create_sheet.dart): only the active tab is sent.
+  - ส่วนตัว: no splits.
+  - แบ่ง: the complete rows.
+  - จ่ายแทน: no splits; the wallet only if I paid part; `paid_by {contact_id | person_name, amount}`.
+  - อีเวนต์: the bills endpoint; the wallet + member splits only while I'm the payer; plus `event {payer: {me:true} | person, members: [{person, share}], my_share}`.
+  - Every picked tab adds `link_mode`.
+  - The repo / cubit `create` takes `link` (spread into the body).
+- **Checks before save:**
+  - จ่ายแทน: needs a payer, and the amounts must add up
+  - อีเวนต์: needs an event, and the amounts must add up
+  - a wallet is needed for an event only when I pay
+  - half-typed แบ่ง rows are asked about only when แบ่ง is what's saved
+- **Before a tab is picked** (the form today): no link fields; the body is exactly as before.
+- **Wire names are PROPOSED** (`link_mode`, `paid_by`, `event`). The BE ignores unknown fields (no DisallowUnknownFields), so this is safe before B1. S4 / S5 rename them to be-A's contract.
+- **arb:** +3 (`txLinkModeNeedsPayer`, `txLinkModeNeedsEvent`, `txLinkModeUnbalanced`).
+- **Tests:**
+  - new `test/features/transactions/link_draft_test.dart` (25): LinkPerson, จ่ายแทน maths, อีเวนต์ maths + wire, carry-over, controller inference / my share / A freeze / member removal, and `linkSave` per tab
+  - the 2 repo fakes gained `link`
+- **Runs:**
+  - analyze lib/features/transactions + the new test: clean
+  - link_draft + cubit_placement + tx_list_redesign: 55 pass
+  - every quick create test (mode, pending gate, entry sheet, debt, draft skeleton, saving, offline): 46 pass
+
+### S2 follow-up — B1 / B2 contracts applied
+- **Wire per be-A:**
+  - `link_mode` is read-only (values `personal` / `split` / `paid` / `event`); `LinkMode.parse` reads it.
+  - Writes send no `link_mode`. จ่ายแทน sends `paid_by {contact_id | person_name, amount}` (amount = what they paid; the tx amount = the bill).
+  - อีเวนต์ sends `payer` + `members` BESIDE `new_transaction` on POST /projects/quick and /projects/{id}/bills (new `people:` param on both repo calls), with no splits:
+    - payer = `{me:true}` or a person
+    - members = everyone in the bill, me first `{me:true, share}`, then `{contact_id|person_name, share}`
+- **Quick create pins the tab on screen at save**, so an inferred tab (an event preset, people already typed) saves exactly what the card shows.
+
+### S3 — UI in quick create: DONE (+ S4 / S5 write side wired)
+- **Layout (new expense only):** DraftForm `linkTabs` → new `LinkSection` (feature wiring, kit pieces only):
+  - the รายการประจำ row on top, then `LinkModeBar` [ส่วนตัว | แบ่ง | จ่ายแทน | อีเวนต์] (wallet / split / contact / project icons), then the active card
+  - income and transfer keep today's section
+- **Hero:**
+  - the amount label reads "ยอดบิล" in every tab but ส่วนตัว (`EntryCard.amountLabel` → the inline hero label)
+  - the line under it shows my REAL share per tab: แบ่ง = today's line; จ่ายแทน "ส่วนของคุณ ฿123 | ค้าง ลี ฿13"; อีเวนต์ = my share + "รอรับจากคนอื่น" when I pay, else "ค้าง <payer> <my share>"
+- **Wallet card:** `muted` + "ไม่ออกจากกระเป๋า" when nothing leaves it (จ่ายแทน all / an event someone else paid); "จ่ายจากกระเป๋า ฿x" when part does.
+- **แบ่ง card** = `SplitsSection(card: true)`:
+  - ShareCard "แบ่งให้ใคร" with [หารเท่ากัน] [+ เพิ่มคน]
+  - ส่วนของฉัน with the A chip, the people rows, and the status line (✓ แบ่งครบแล้ว / ยังขาด / เกินยอด)
+- **จ่ายแทน card:**
+  - "ใครจ่าย และจ่ายเท่าไหร่" + [หารเท่ากัน]
+  - "ฉันจ่ายเอง (จากกระเป๋า)" with A (auto = bill − theirs)
+  - one payer row ("+ เลือกคนที่จ่าย" until picked; ContactPicker with free text + create), × to remove
+  - status ✓ จ่ายครบแล้ว / ยังขาด / เกินยอด
+- **อีเวนต์ card:**
+  - `EventPickChip` fills the header
+  - "ใครจ่าย": me or a person, chosen in the new `ContactPicker.payer` with "ฉัน" pinned on top; the amount is the bill, read-only
+  - "ใครอยู่ในบิล" + [หารเท่ากัน] [+ เพิ่มคน]; ฉัน with A (no ×); the others with amount + ×
+  - the "ใหม่ · เพิ่มเข้าอีเวนต์" tag (see open points)
+  - status line
+  - carry-over as agreed: from จ่ายแทน the payer = that person, from แบ่ง = me
+- **Checks:** จ่ายแทน needs a payer and must add up; อีเวนต์ needs an event and must add up. "เก็บเป็นร่าง" is off in จ่ายแทน / อีเวนต์ (a draft can't hold them yet).
+- **Kit / root fixes:**
+  - `ShareCard` title is optional (the header chip takes the row)
+  - new `ShareSubhead`, `EventPickChip` (EventRow uses it)
+  - the card / subhead header wraps its chips under the title when they don't fit (it overflowed at 320 in the test font)
+  - `ShareAmountField` no longer snaps a cleared, focused box back to its computed value (it syncs on blur)
+  - `SplitMeRow` / `SplitDraftRow` / `MyAvatar` / `applyContactPick` / `linkCardStatus` are public in splits_section.dart
+  - Hub: the อีเวนต์ card demo uses the real layout; registry covers ShareSubhead + EventPickChip
+- **arb:** +22 `txLink*` keys.
+- **Tests:**
+  - new `link_section_test.dart` (8): at 320 and 390 every tab lays out on one row inside the screen with no overflow; ส่วนตัว plain; แบ่ง card + status; จ่ายแทน ✓ / part / ยังขาด + wallet muted / note; จ่ายแทน → อีเวนต์ carry-over; the new-event tag; income without tabs
+  - new `quick_create_link_save_test.dart` (3, the real sheet): จ่ายแทน all → no wallet, `paid_by` = the bill; no payer → message, nothing sent; ส่วนตัว plain
+  - link_draft_test updated to the B1 / B2 wire (27)
+- **Runs:**
+  - analyze lib/features/transactions + contacts + projects/data + lib/ui + lib/hub + the new tests: clean
+  - 31 related test files (quick create suite, splits, hero, event pick, pickers, hub smoke / coverage / duplicates): 297 pass, 0 fail
+- **Open / for Lead:**
+  1. The "ใหม่ · เพิ่มเข้าอีเวนต์" tag shows only for a NEW event. For an existing event the FE can't tell who is already a member: event members carry no contact_id. Either be-A adds contact_id to the members in tx-form options, or we drop the tag for existing events.
+  2. Income keeps the old section. จ่ายแทน is expense-only on the BE. Should income get [ส่วนตัว | แบ่ง | อีเวนต์]?
+  3. The new BE error codes (LINK_MODE_CONFLICT, PAID_BY_*, MEMBER_NOT_IN_PROJECT) show the BE message; the FE checks block them first.
+  4. The local BE needs migrations 069 + 070 + a rebuild (owner's word) before the owner can try จ่ายแทน.
+- **Next — S6** (tx detail: read `link_mode` / `paid_by` / `wallet_amount` / `event_bill.payer|members`, summary rows, the edit form on the saved tab): the read side is ready; edit-switching waits for B3.
+- **My slip:** I ran `dart format` on all of lib/features once. It rewrote 3 untouched files (accounts_page, budget_detail, recurring), each a pure format diff vs HEAD. I restored those 3 with git checkout; nothing else changed.
+
+### S6 (part 1) — read side + tx VIEW rows: DONE (edit part waits for B3)
+- **Model (`refs.dart` / `transaction.dart`):**
+  - `Transaction.linkMode` (`LinkMode.parse`), `paidBy` (`TxPaidBy`: debtId, key, person, amount, myPaid, fromPartner, paid), `walletAmount`
+  - `EventBillLink.payer` (`BillMemberRef`), `billAmount`, `members` (`BillShare`); these are null / 0 on list rows
+- **Tx detail VIEW** (`LinkViewRows`, under the form; nothing shown for a plain tx):
+  - "จ่ายโดย | ลี ฿13 | ฉันจ่ายเอง ฿110 ›" → the จ่ายแทน card read-only; the payer's name opens their person page
+  - "บิลอีเวนต์ | ลีจ่าย | 3 คน ›" → the อีเวนต์ card read-only (the event chip opens the event; payer + bill; everyone's share)
+  - Deviation: the event row doesn't repeat the event name, because the event chip row above already shows it.
+  - แบ่ง keeps today's split list. Folding it into one summary row + sheet would move the per-row "open debt" taps into the sheet; I'll do it with the edit part if Lead wants it.
+- **arb:** +6 `txLinkView*`.
+- **Tests:**
+  - new `link_view_test.dart` (6): prod-shaped B1 / B2 JSON incl. list rows with nulls; both rows + their read-only sheets; a plain tx shows nothing
+  - all 19 test files that read Transaction / the detail page: 120 pass
+  - analyze lib/features/transactions: clean
+- **Waiting on B3:**
+  - edit on the saved tab with tab switching + the ONE confirm of balance deltas (preview)
+  - the linked-pair ask "แก้ในอีเวนต์ด้วยไหม?" (apply_to_event / apply_to_my_tx)
+  - locks: a partner mirror is locked; repayment / borrow have no tabs
+  - pending drafts with paid_by / payer (B1 / B2 accept them; the draft form has no tabs yet)
+
+### Open point 1 closed — "ใหม่ · เพิ่มเข้าอีเวนต์" for an existing event
+- **Data:** be-A's event members now carry `contact_id`; `ProjectMember.contactId` reads it.
+- **When an existing event is picked,** quick create loads its members once (GET /projects/{id}/members). A failure only leaves the tags off; the save still adds whoever is missing.
+- **Matching** (`LinkPerson.isMember`, pure):
+  - a contact matches by the member's contact_id, or by the member's user_id = the contact's linked user (the contact look now carries `linkedUserId`)
+  - a typed name matches the member's name, any case (as the BE does)
+- **Tags:** only the people not in the event get the tag. A new event still tags everyone.
+- **Tests:**
+  - link_draft +2 (the matching)
+  - link_section +1 (existing event: only the non-member is tagged)
+  - quick create suite + splits + every ProjectMember test: 100 pass
+- **Runs:** analyze of the touched files: clean.
+
+### Wording sweep: no "ติด" (owner via Lead): DONE
+- **Debt mode chips:**
+  - "เขาติดฉัน" / "ฉันติดเขา" → [รอรับ | รอจ่าย] (`debtDirectionOwedToMe` / `debtDirectionIOwe`, value changed in place)
+  - a small line under each chip: "เขาต้องคืนฉัน" / "ฉันต้องคืนเขา" (new `debtDirection*Sub`). It's in the kit hero (`TransactionHeroCard`), only when recording a debt, not in repay mode.
+- **ผูกกับ share line:** `txLinkShareIOwe` "ค้าง ลี ฿13" → "รอจ่ายให้ลี ฿13".
+- Doc comments + the hub note use the new words; the debt mode test is updated (it checks the subtitles too).
+- **Runs:**
+  - analyze of the touched files: clean
+  - debt mode, hero, alignment, skeleton, link section / save, quick create mode, debt entry detail, hub smoke: 127 pass
+- **NOT mine; Lead to assign** (all still use ติด for owing):
+  - arb: `projectTxOwes` "ติด {name}", `projectTxSplitsHint` "แต่ละคนติดคนจ่ายเท่าไร…", `txSplitOwes` "ติด", `moreDebtsDesc` "ใครติดใครเท่าไร", `transactionSplitShareTitle` "แบ่งให้... (เราติดเงินเขา)", `txShareOthersOwe` "คนอื่นติด {amount}"
+  - hub: domain_debts_page `_owedToMe` 'ติดคุณ' / `_iOwe` 'คุณติด' (+ a sample line); page_flows note "ติดคุณ / คุณติด"
+
+### S6 part 2 — edit on the saved tab (B3): DONE on tx detail
+- **Data:**
+  - repo `update(link:)`; `previewUpdate` (same PUT body, `?preview=true`) → `TxEditPreview` (people / wallets before → after)
+  - `applyEvent(id)` (POST /transactions/{id}/apply-event)
+  - `TransactionWriteResult.personBalances`
+  - `EventBillLink.isOrigin` (kind), `inSync`, `differences`
+  - `LinkPerson.memberId` → `{member_id}`; `LinkDraft.eventExtra` (a saved bill's people)
+- **Controller:**
+  - `prefillLink(tx)` opens on the saved tab: จ่ายแทน payer + amount; อีเวนต์ payer / members / shares by member_id
+  - `linkSnapshot` (change detection); `linkEditJson(m, projectId:)` = `{link_mode, splits | paid_by | event{project_id, payer, members}}`
+- **Tx detail edit mode** shows LinkSection (same cards as quick create) when `txLinkTabsEditable`: my own expense, not a repayment / debt entry, not a partner mirror, not my copy of someone else's bill.
+- **On save:**
+  - When another tab is picked, or จ่ายแทน / อีเวนต์ data changed: the preview → ONE confirm "ยอดที่จะเปลี่ยน" with "ลี: ฿0 → −฿419" / "KBank: …" lines → then the PUT with link_mode + the tab data.
+  - Into อีเวนต์ uses the picked event (a new one is made first with POST /projects).
+  - A แบ่ง edit on a แบ่ง tx keeps today's splits call (no confirm). Text-only edits: no link_mode, no confirm.
+  - The แบ่ง checks / the incomplete-rows ask run only when แบ่ง is what's saved.
+  - The linked-pair ask stays the existing "แก้ทั้งคู่ / แค่ของฉัน" prompt: also_update_link, which B3 treats like apply_to_event.
+- **View:** when `in_sync` is false, the row "บิลในอีเวนต์ถูกแก้ | อัปเดตตามอีเวนต์ ›" → apply-event → "อัปเดตตามอีเวนต์แล้ว".
+- **Sheet edit:** `txEditsInSheet` now also excludes จ่ายแทน rows (they edit on the detail page).
+- **Hub:** page_flows adds the preview / tab-switch save + apply-event (both ratchets pass).
+- **arb:** +6 (`txLinkPreview*`, `txLinkOutOfSyncLabel`, `txLinkApplyEvent`, `txLinkApplied`).
+- **Tests:**
+  - new `tx_detail_link_edit_test.dart` (6): opens on the saved tab; ส่วนตัว → จ่ายแทน = preview body + the confirm lines + the PUT carrying the same link; cancel saves nothing; text edit = no link / no preview; a partner mirror has no tabs; out of sync → apply-event
+  - link_draft +4 (prefill จ่ายแทน / อีเวนต์ by member_id, snapshot, แบ่ง edit json)
+  - link_view +1 (B3 parse)
+  - tx_detail_link_rows: the long-press test now expects the tabs (edit opens on ส่วนตัว; แบ่ง shows "Add person")
+- **Runs:**
+  - every test in test/features/transactions + test/hub + the hub ratchets + quick create / pending / offline / share card / debt pieces / every projects-repo test: 428 pass, 0 fail
+  - analyze lib/features/transactions, projects, lib/hub, lib/ui, test/features/transactions: clean
+- **The older "ติด" strings (Lead's follow-up):**
+  - `projectTxOwes` "รอจ่ายให้{name}"
+  - `projectTxSplitsHint` "แต่ละคนรอจ่ายให้คนจ่ายเท่าไร | คนจ่ายรับส่วนที่เหลือ"
+  - `txSplitOwes` "รอจ่าย"
+  - `moreDebtsDesc` "รอรับ / รอจ่ายกับใครเท่าไร"
+  - `transactionSplitShareTitle` "แบ่งให้... (เรารอจ่ายเขา)"
+  - `txShareOthersOwe` "รอรับจากคนอื่น {amount}"
+  - en to match; hub debts demo + page_flows note → รอรับ / รอจ่าย
+  - none left app-wide (grep); 69 related tests pass
+- **Open / for Lead:**
+  1. A plain tx edited from a list's ✏️ still opens the quick create sheet without tabs. The tabs are on the detail page. Should the sheet edit get them too, or should expenses edit on the detail page?
+  2. Not done (outside tx detail): the event board's bill edit asking "แก้ในสมุดของฉันด้วยไหม?" (apply_to_my_tx, EventPatch.my_transaction); the resolve sheet's "as debt" with bill_id; pending drafts with paid_by / payer / members. They're for whoever owns those screens, or tell me to take them.
+  3. For be-A: switching INTO อีเวนต์ with someone else paying, I still send `amount` = the bill (the form's number) next to `event`. I assume the BE sets my tx to my share; please confirm.
+  4. My copy of someone else's bill has no tabs (it follows the board; "อัปเดตตามอีเวนต์" covers it).
+- Open point 3 closed (be-A): when switching into อีเวนต์ with someone else as payer, the BE reads `amount` as the BILL total (the field edits apply first, then the board bill, then my tx becomes my share with no wallet). The FE already sends it, in the preview too. No change.

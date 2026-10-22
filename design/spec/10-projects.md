@@ -64,6 +64,26 @@ Global conventions (base URL, error envelope, data types, HTTP verbs) are in [`o
 - A split labelled paid blocks the pull (422 `TX_SPLIT_PAID`; was repaid / forgiven). Bill candidates: `GET /transactions?can_join_event=true`.
 - The transaction shows `event_bill {event, bill_id, linked}`; the bill shows `linked` to everyone and `source_tx` to the transaction's owner.
 
+### 0.4a A new bill with any payer and members (0.4.0-3, quick create tab อีเวนต์)
+Owner 2026-10-21 (`ai/decisions.md` "Paid by someone else" REVISED / REFINED). `POST /projects/:id/bills`, `POST /projects/quick` and pending event drafts take, next to `new_transaction` (whose `amount` is the BILL):
+- `payer`: ONE person, `{me: true}` (the default) | `{member_id}` | `{contact_id}` | `{person_name}`.
+- `members`: `[{<same person forms>, share}]`, everyone in the bill with their share. The payer's share is the rest of the bill (its listed share is ignored). Σ the other shares ≤ the bill (400 `SPLITS_EXCEED_AMOUNT`); a person listed twice → 400 `VALIDATION_ERROR`.
+- A contact or typed name that isn't a member yet is **added to the event** by whoever adds the bill (any member who may add bills, not only the owner). A linked contact joins as a linked member and gets `project_added`. A typed name matches an existing typed member case-insensitively.
+- With payer / members, `new_transaction.splits` and `paid_by` must be empty (400 `LINK_MODE_CONFLICT`); payer / members without `new_transaction` → 400 `VALIDATION_ERROR`.
+- **I paid**: as before. My transaction is the whole bill on my wallet (`event_bill.linked`), and the other members' shares are its board splits.
+- **Someone else paid** (expense only, else 400 `VALIDATION_ERROR`): the board bill's payer is them, and every other member's share (mine too) is a board split. MY transaction is my share only: an expense with NO wallet (any `account_id` is ignored), with my category, description, note and tags, as a copy of the bill (`source_project_transaction_id`, `event_bill.linked false`). `new_transaction_id` is that copy, or null when I have no share. A linked payer gets `project_tx_recorded_for_you`. The board keeps who owes whom; no `personal_debts` rows.
+- Tx detail / write answers: `event_bill` gains `payer` (MemberRef), `bill_amount` and `members [{member, share}]` (payer first with the rest), so the form reopens the อีเวนต์ tab with the same data (null on list rows). Pending drafts: `draft.payer` / `draft.members` and `resolved.bill_people {payer, members}` with names; submit codes `INVALID_BILL_PEOPLE`, `NO_SHARE` (someone else paid, no share of mine).
+- `POST /projects/:id/members` with `ad_hoc` (a typed person) is also open to any writable member (not viewers; Lead / owner rule 2026-10-21: same power, two doors). An email invite (a real account) stays owner-only (403 `FORBIDDEN_ROLE`).
+
+### 0.4b My book vs the event book (0.4.0-3 B3)
+Owner 2026-10-21 (`ai/decisions.md`): my transactions are my book (only I edit them); an event is a shared book (any member edits its bills fully). A linked pair never changes by itself; every edit asks.
+- **Bill edit** (`PUT /projects/:id/project-transactions/:pt_id`) takes `apply_to_my_tx` ("แก้ในสมุดของฉันด้วย"; `also_update_link` is the same). My transaction linked to the bill takes the bill as it is after the edit: amount (the bill for the transaction it was made from, my share for my copy), date, description, note, plus matching personal tags. The linked transaction may be the origin, my copy, or a copy pointing at one of the bill's split rows. Without the flag, the patch's `my_transaction` (the full row) shows `event_bill.in_sync` / `differences` so the app can ask.
+- **Someone else's bill edit**: everyone with a transaction linked to the bill (the bill's people, and now any copy owner, also of split-row copies) gets `project_tx_changed` as before. The opt-in auto-apply (their own `auto_types`) stays. Answering later: `POST /transactions/:id/apply-event` (live, from the bill as it is now; marks those notices actioned).
+- **My transaction → the bill**: `apply_to_event` on `PUT /transactions/:id` (spec 04 §2.9).
+- **Switching a transaction into / out of an event** in one call: `PUT /transactions/:id {link_mode: "event", event: {project_id, payer?, members?}}` / `{link_mode: "personal" | "split" | "paid", …}` (spec 04 §2.9). Leaving removes the bill made from it (its board splits are not brought back) or unlinks my copy.
+- **Members carry `contact_id`**: MY contact for that member (a linked member → my contact linked to that user; a typed member → my contact with the same name), so the bill form can tell a picked contact that is already a member from a new person.
+- **Resolve sheet "as debt"**: `POST /personal-debts/people/:key/entries {…, bill_id}` keeps the bill (spec 12 §1.5).
+
 ### 0.5 On hold (owner)
 The resolve endpoint (A6), settlement (A9), members as a tab, member candidates / add-by-contact (A8).
 

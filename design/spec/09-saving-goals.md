@@ -113,6 +113,16 @@ Fields: [`api-document.md` §09](../api/api-document.md#09--saving-goals) and it
 - Rows: no group sections, all in ONE SectionCard; each row shows its kind itself. The default sort is "ต้องออมก่อน" (short → done → no deadline → ongoing); any other sort orders the whole list. On another month the rows follow it too ("เดือนนี้" becomes the month name), and the pace tick with its "ควรมีตอนนี้ ฿x" bubble shows only on this month.
 - Goal detail hero facts have icons too: เดือนนี้ออมแล้ว = piggy bank, ยังขาด = hourglass, ควรมีตอนนี้ = trend up, เหลืออีก / เป้าหมาย = target, ถึงเป้าเมื่อ = calendar; an ongoing goal: saved this month = piggy bank, the auto-save = repeat.
 
+### 0.10 List summary: long-term totals and chip counts (0.4.0-3)
+
+Owner 2026-10-21: the list hero drops the month stepper (always this month) and its ring shows LONG-TERM progress instead of this month's plan. `GET /saving-goals` `summary` gains (page-ready, the app does no math):
+- `target_total` = Σ `target_amount` of the listed **active** goals that have a target. Completed goals (they hold no money after closing) and archived goals (out of every calc) are left out, so `?status=completed|archived` report 0.
+- `target_saved_total` = Σ min(saved, target) per goal of the same set (owner 2026-10-21, option A: capped per goal, so one goal's surplus never covers another's gap).
+- `target_short_total` = Σ max(0, target − saved) per goal of the same set. Always `target_total` − `target_saved_total` = `target_short_total`.
+- `target_percent` = floor(`target_saved_total` / `target_total` × 100) from the capped sum, so it reads 100 only when nothing is short; 0 when `target_total` is 0.
+- Chip counts, over every listed goal (each in exactly one; their sum = `data` length = "ทั้งหมด"): `count_done` = completed, or has a target and reached it; `count_no_target` = no target (ongoing) and not completed; `count_short` = the rest (has a target, not reached, not completed).
+- Unchanged: `month_plan_total` / `month_saved_total` / `month_short_total` (the app shows เดือนนี้ต้องออม = `month_short_total` of this month); `?month=` still works but nothing new depends on it.
+
 ## Phase summary
 
 | Concern | Phase 1c | Phase 2 | Phase 3 |

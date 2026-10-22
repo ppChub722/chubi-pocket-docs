@@ -1175,3 +1175,214 @@ Tests: `TestBulkOccurrences` / `TestRecurringKinds` count only `status = due` it
 
 ### 2026-10-20 — C1 gap: future-dated EVENT bills in budgets (นายA's find) — fixed, budgets tests ok
 Confirmed: the budgets event branch (`budgets/count.go`) had no today cut, so a future-dated event bill counted as `used` while a future tx stopped at today. Fix: the event branch now emits `counts_as = used` when the bill's date ≤ today (user TZ) and `expected` when it is after today (only inside the expected window of the current period, the same `$8 / $9 / $10` as the other expected rows); source stays `event`, kind `event_bill`. New test `TestBudgetFutureEventBillIsExpected` (a past bill 100 → used, a future one 70 → expected). Ran only `./internal/modules/budgets` on the test DB: ok. The local BE still runs the build from before this fix (restart it to get it).
+
+## 0.4.0-3 saving goals long-term totals (sub-agent)
+DONE · `GET /saving-goals` `summary` gains (additive, no migration, nothing breaks for the FE):
+- `target_total` = Σ target of the listed ACTIVE goals with a target · `target_saved_total` = Σ saved of the same goals (uncapped) · `target_short_total` = Σ max(0, target − saved) per goal · `target_percent` = floor(saved/target × 100), cap 100, 0 when target_total is 0.
+- `count_short` (target, not reached, not completed) · `count_done` (completed, or reached) · `count_no_target` (no target, not completed). Precedence: completed → done; no target → no_target; reached → done; else short. Sum = `data` length for every status filter.
+- Scope chosen: the target_* sums use the same status-filtered goal set as the summary, but only state `active` (a closed goal holds 0 after closing, archived = out of all calcs), so `?status=completed|archived` report 0 sums; counts cover every listed goal. `month_*` totals and `?month=` unchanged.
+- Files (be): `internal/modules/saving_goals/{model.go, service.go (longTermTotals), goals_test.go}`, `internal/apidoc/openapi.yaml` (SavingGoalList.summary). Docs: spec 09 §0.10 (new), api-document §09 recent-additions line.
+- Tests: new `TestListLongTermTotals` (DB: empty list, over-target, reached, short, ongoing, completed + the completed list) and `TestLongTermTotalsBuckets` (pure: archived, completed with/without target, floor, cap). `go vet` clean; `TEST_DATABASE_URL=…/chubi_test_043 go test -count=1 ./internal/modules/saving_goals/ ./internal/apidoc/...` → both ok, 0 SKIP.
+- Surprising: (1) the old test DBs are unusable (`chubi_test` at 060; `chubi_test_040` / `_033` have no schema_migrations), so I created a fresh throwaway `chubi_test_043` migrated 001→068. (2) `target_percent` can read 100 while `target_short_total` > 0 (one goal's surplus offsets another's gap, as briefed: uncapped Σ saved) — FE may want to show the short amount anyway. (3) gofmt realigned the pre-existing misaligned GoalView / ListSummary fields in model.go (whitespace only). No commit; local docker BE not rebuilt.
+**Addendum (owner option A, 2026-10-21):** `target_saved_total` = Σ min(saved, target) per goal (capped per goal); `target_percent` is floor of that capped sum / `target_total`, so it reads 100 only when nothing is short, and `target_total − target_saved_total == target_short_total` always. Point (2) above no longer applies.
+Tests: identity asserted in both tests; DB test now Over 1500/1000 next to Short 2500/10000 → saved 5500, short 7500, 42 %; unit test adds over-only → 100 %. openapi, spec 09 §0.10 and the api-document note updated.
+`go vet` clean; `go test -count=1 ./internal/modules/saving_goals/ ./internal/apidoc/...` on `chubi_test_043` → both ok, 0 SKIP. No commit, no docker rebuild.
+
+## 0.4.0-3 repayments as transactions (sub-agent)
+DONE (2026-10-21) — owner's debt model: a repayment is a TRANSACTION tied to the person. No commit, no docker rebuild.
+- **Migration 069** `repayment_transactions` (BREAKING for the current app: person page `items` shape): `transactions.repay_contact_id` UUID NULL FK contacts ON DELETE SET NULL, `transactions.repay_person_name` VARCHAR(100) NULL (mirror of `counterparty_contact_id` / `counterparty_person_name`); CHECK `transactions_repay_person_check` (both NULL, or name non-blank + type expense|income + no `source_personal_debt_id` + no transfer group); 2 partial indexes. Up/down/up tested on `chubi_test_043` (now at 069). Old repayment-like debt rows are NOT converted (can't be told apart; they keep counting as debts, balances unchanged).
+- **NEW `POST /personal-debts/people/{key}/repayments`** body `{kind: "pay"|"receive", amount>0, date? (default today), account_id? (optional, same as POST /transactions), description?, note?, tag_ids?, mark_paid_ids? (label only), person_name?}` → 201 `{transaction: Transaction (full row, = GET /transactions/{id}), item: DebtStatementItem, person_balance: DebtPerson, account_balances: [WalletBalance]}`. pay = expense / Debt Paid (net +), receive = income / Debt Received (net −). Errors as entries (INVALID_PERSON_KEY, CONTACT_NOT_FOUND, ENTRY_NOT_FOUND, TAG_NOT_FOUND, ACCOUNT_NOT_FOUND, 409 ACCOUNT_ARCHIVED).
+- **Balance/cycles** over one ledger (`shared.DebtLedgerSQL` = debts ∪ repayment txs, signed, book order date, created_at, id): net, cleared_at, days_outstanding (unpaid debts only), entry_count (debts + repayments), open_count (unpaid debts), people list/totals, `/me/counts.open_debts`, summary message ("ฉันจ่ายคืน" + / "ได้รับคืนจาก" −). A debt's linked tx never counts. Listing rule unchanged.
+- **Statement** (`GET /personal-debts/people/{key}?cycle=current|earlier|all`): `items: DebtStatementItem[]` newest first: `{kind: "debt"|"repayment", id (debt id | tx id), key, direction: paid|received (= sign), amount, signed_amount, date, description, note, paid (bool; null on repayment), source (DebtSource|null; null on repayment), transaction: {id, account}|null (debt's linked tx | the repayment tx itself), in_current_cycle, created_at, updated_at}`. `counts` over both (`money` = debts with tx + repayments).
+- **Transaction rows** gain `repayment_person: {key, name, contact_id|null, person: PersonRef}|null` (author only). PUT /transactions/{id} on a repayment: amount/date/wallet (droppable)/text/tags OK, category → 400 SYSTEM_TRANSACTION_IMMUTABLE, non-author → 403 DEBT_TX_AUTHOR_ONLY; write result `person_balance` = the person's new balance. DELETE removes it, also returns `person_balance`. `?counterparty_key=` lists the person's debt txs + repayments.
+- **Pending `settle_debt`** → `RepayEntry` now creates a repayment tx (opposite of the target debt's direction; debt untouched). `POST …/entries` = DEBTS only (mark_paid_ids kept); `GET …/entries` = debts only.
+- Also: contacts delete/absorb/unlinked-names/delete-preview cover repayments; sync `debt_people` fingerprint includes repayment txs; an `n:` write without `person_name` keeps the person's current spelling (was: the lower-cased key text).
+- Files (be): migrations/000069_repayment_transactions.{up,down}.sql; internal/shared/debts.go; transactions/{model,store,debt_link,service,detail}.go; personal_debts/{model,service,store,cycle,message,handler}.go + handler_test.go, NEW repayment_test.go; pending/ NEW settle_test.go; contacts/store.go; me/me.go; sync/fingerprint.go; cmd/api/main.go (route); internal/apidoc/openapi.yaml (also holds the earlier uncommitted saving-goals edit). Docs: spec 12 rewritten (stale settle/cancel/settled_amount gone), api-document §12 note, schema.md (transactions + personal_debts).
+- Tests (`chubi_test_043`): NEW TestRepaymentLeeScenario (−60, −500 w/ linked income tx (net stays −560, wallet +500), pay 400, −70 → −230; pay 230 → 0 + cleared_at; statement 5 items interleaved repayment/debt/repayment/debt/debt; edit 400→300 → −100; delete 230 → −330; counterparty_key), TestRepaymentReceiveAndKeys (receive for "they owe me" contact, mark_paid label, typed name vs contact keys, validation, contact delete → typed name), TestRepayEntryMakesRepaymentTx, pending TestSubmitSettleDebtMakesRepaymentTx. `go vet` clean; `go test -count=1 -v` personal_debts, transactions, pending, contacts, me, shared, apidoc, sync → all ok, 0 SKIP.
+- **FE must know:** record a repayment with POST …/repayments (not an opposite-direction entry); person page `items` are now DebtStatementItem (switch on `kind`; repayment → open GET /transactions/{id}); tx detail reads `repayment_person`; repayment tx edit/delete via /transactions; a local BE rebuild + migrate 069 is needed before testing.
+
+## 0.4.0-3 ผูกกับ — B1: paid-by + link_mode + totals fix (BE session, 2026-10-21)
+DONE. Not committed, no docker rebuild. Builds on the uncommitted 069 tree (it now holds 46 changed files).
+
+**Representation (migration 070 `paid_by`, Lead GO 2026-10-21; additive):**
+- `transactions.paid_by_amount` DECIMAL NULL. CHECK: NULL, or > 0, ≤ amount, and expense only.
+  - Bill 123, Lee paid 13, I paid 110: `amount = 123` (the bill = my consumption), `paid_by_amount = 13`.
+  - Reports, budgets, dashboard, list totals and `my_share` (ShareAmountExpr) are unchanged, so they count 123.
+  - The wallet moves only the cash part, `amount − paid_by_amount` = 110. That drives the cached balance delta on create / update / delete (`Transaction.Cash()`), the future-dated effective balance (`shared.SignedTxSQL` → new `shared.CashAmountSQL`), the wallet card `month_out` (accounts/enrich) and the wallet summary (accounts SummaryAggregate: `LEAST(my_share, cash)`).
+  - paid_by = the bill → no wallet: `account_id` is dropped.
+- `personal_debts.paid_for_transaction_id` UUID NULL, UNIQUE, FK → transactions ON DELETE CASCADE. `source_kind` gains `paid_by`.
+  - The debt "I owe Lee 13" is `received`, source paid_by, with amount = paid_by_amount and date / description = the row's. It is written in the same DB tx by `DebtLinks.SetPaidByTx`.
+  - It is a NEW link, not `source_transaction_id`, so it never lowers my_share.
+  - From the debts page it is managed by its tx: money edits → 409 ENTRY_MANAGED_BY_SOURCE (existing rule); DELETE → 409 DEBT_MANAGED_BY_TX (new).
+- Migration up/down/up tested on `chubi_test_043` (now at 070).
+
+**Behaviour:**
+- **Create, pending submit, PUT `paid_by {contact_id | person_name, amount}`:**
+  - PUT: absent = unchanged (the debt still follows date / description); an object sets it; another person = the old debt is removed (the partner is told) and a new one is made; `null` = removed (the wallet takes the whole amount).
+  - A lower amount below paid_by → 400 PAID_BY_EXCEEDS_AMOUNT.
+  - Income → 400 PAID_BY_EXPENSE_ONLY. No person → VALIDATION_ERROR. A foreign contact → CONTACT_NOT_FOUND.
+  - One way at a time, 400 LINK_MODE_CONFLICT for: paid_by + splits; paid_by + source_project_transaction_id; paid_by on a split or event row; `PUT /:id/splits` on a paid row; pulling a paid row into an event (projects quick / pull). `can_join_event` is false on paid rows.
+  - Write answers carry `person_balance` (the paid-by person; on removal the old one). DELETE removes the own debt with the row and returns `person_balance`.
+- **Linked payer:** the usual split_created goes out. Its payload gains `recipient_direction` (`paid` here; `received` = a normal split; missing on old notices = received). Their mirror is a plain `paid` debt with no expense. A paid_by change sends split_changed (amount / removed).
+- **Partner side (Lead: in B1):**
+  - When a `received` mirror of a split on an EXPENSE is created (auto or accept), the partner also gets an expense: amount = share, paid_by_amount = share, no wallet, description = the splitter's. Category = the partner's non-system expense category with the same name as the splitter's (case-insensitive, trimmed, top-level first), else none. The name match is one indexed join, so it isn't costly.
+  - It is linked by `paid_for_transaction_id`; `paid_by.source = partner`.
+  - Money-locked: amount / date / account_id / paid_by → 409 PAID_BY_LOCKED. Category, text and tags are free.
+  - "อัปเดตตาม" (apply, or auto-apply) sets both the debt and the expense amount. A removed split deletes both.
+  - Deleting the expense keeps their debt (unlinked). Deleting the mirror debt from the debts page also deletes the expense (it has no wallet).
+  - Mirrors from before 070 have no expense (no backfill).
+- **Read side:**
+  - Every row: `link_mode` (event if project / source_project_transaction / event bill; split if it has splits; paid if paid_by; else personal), `paid_by {debt_id, key, person, amount, my_paid, source me|partner, paid}` (author only) and `wallet_amount`.
+  - Pending `resolved.paid_by {person, amount, my_paid}` + `resolved.link_mode`, and `draft.paid_by`. New submit codes: INVALID_PAID_BY, PAID_BY_EXPENSE_ONLY, PAID_BY_EXCEEDS_AMOUNT, LINK_MODE_CONFLICT.
+  - DebtSource: `paid_by` → `{id: the expense, title}`; `partner` → `id` = my expense of it (was always null).
+- **Totals fix:**
+  - `GET /transactions` totals income / expense + `daily` skip categories with `include_in_report = false`, like reports. This covers Debt Paid / Received; opening / adjustment and any user category set that way are skipped too, the same rule as reports. `totals.count` is unchanged (still counts them).
+  - Wallet card `month_in` / `month_out` skip DEBT_PAID / DEBT_RECEIVED. The account summary already skipped non-report categories.
+
+**Files (be):**
+- migrations/000070_paid_by.{up,down}.sql.
+- transactions: model.go (PaidByAmount, Cash(), link modes, PaidByInput / PaidBy, detail + request fields), NEW paid_by.go, service.go (create / update / delete, cash deltas, EditSplits guard), store.go (columns, UpdateRowTx paid_by arg, totals reportable, can_join filter), detail.go, debt_link.go (DebtLinks gains SetPaidByTx / PaidByDeletingTx; CreatePaidForTxInTx, SetPaidForAmountTx), daily.go, handler.go (codes).
+- personal_debts: NEW paid_by.go, model.go, store.go (column, entry view source), service.go (DeleteEntry), split_flow.go (mirror expense, recipient_direction), split_apply.go (method; moves the expense), split_edit.go (ParentID for paid_by), handler.go.
+- pending: model.go, resolve.go, service.go. accounts: enrich.go, store.go. projects: quick.go, handler.go. notifications: model.go. shared: future.go. apidoc/openapi.yaml.
+- gofmt also realigned pre-existing misaligned structs in the files I touched (whitespace only).
+
+**Docs:** spec 04 §2.8 (+ list numbers note, status), spec 12 §1.5a (+ endpoints, data history, status), spec 13 §2.1 (`recipient_direction`), spec 03 (month flow), api-document §04 / §12 / §13 recent additions, schema.md (transactions + personal_debts, v0.15).
+
+**Tests** (`chubi_test_043`, 0 SKIP): `go build ./...`, `go vet ./internal/...` clean.
+- `go test -count=1` on transactions, personal_debts, pending, accounts, projects, notifications, shared/..., apidoc/... → all ok.
+- NEW personal_debts/paid_by_test.go:
+  - TestPaidByLeeScenario: 123 / 13 → wallet −110, net −13, debt source; 409s; bill 150; paid 20; paid all → no wallet; lower bill refused; Mom replaces Lee; note-only keeps it; null removes it; delete.
+  - TestPaidByRules: income / over / no person / with splits / foreign contact; paid by a contact in full; splits ↔ paid conflicts.
+  - TestListTotalsSkipDebtCategories.
+  - TestPartnerSplitMakesMyExpense: category name match, lock, note edit, อัปเดตตาม 30→45, delete keeps the mirror.
+  - TestPaidByLinkedPayer: recipient_direction paid, mirror has no expense, removed notice.
+- accounts TestWalletFlowCashAndDebtCategories. Pending settle_test gains a paid_by draft (resolved + submit + wallet). The pending test env now wires `WithDebtLinks` (as prod does).
+
+**Breaking for the current app:** none (additive keys). **Needs a local BE rebuild + migrate 069 + 070 before FE testing** (waits for the owner's word).
+
+**Open / notes for Lead:**
+- (1) The brief's "top amount = the BILL" vs decisions.md "Paid by someone else" ("The top amount = MY share"): I followed the brief / mock B (amount = bill). Decisions.md still says MY share.
+- (2) B3's mode switching (split ↔ paid ↔ event with preview) is not in B1: today those switches answer LINK_MODE_CONFLICT, and only paid ↔ personal works via PUT.
+
+## 0.4.0-3 ผูกกับ — B2: event bill with any payer / members (BE session, 2026-10-21)
+DONE. No migration, additive, not committed, no docker rebuild.
+
+**Request:** `POST /projects/{id}/bills`, `POST /projects/quick` and pending event drafts (`draft.payer` / `draft.members`) take these next to `new_transaction` (amount = the BILL):
+- `payer: BillPerson` = `{me: true}` (default) | `{member_id}` | `{contact_id}` | `{person_name}`.
+- `members: [BillMember {…same person forms, share ≥ 0}]`.
+- Built in `projects/bill_people.go` (`addPeopleBillTx`), called from `pullBillsTx` when payer or members are set.
+
+**Rules:**
+- The payer's share = the rest of the bill (its listed share is ignored).
+- Σ the other shares ≤ the bill → else SPLITS_EXCEED_AMOUNT.
+- 400 VALIDATION_ERROR (`ErrBadBillPeople`): a person listed twice (a typed name matched case-insensitively), or payer / members without new_transaction.
+- With payer / members, splits or paid_by → LINK_MODE_CONFLICT.
+- member_id not in the event (or left) → MEMBER_NOT_IN_PROJECT. Foreign contact → CONTACT_NOT_FOUND.
+- **Auto-add by any member:** the bills path already let any writer (AssertCanWrite) add people through `quickMemberBuilder`; B2 reuses it. A contact linked to a user becomes a linked member (+ project_added); other contacts and typed names become typed members.
+- **Follow-up (Lead GO):** `POST /projects/{id}/members` with `ad_hoc` is now open to any writable member (not viewers); an email invite stays owner-only. Covered by a test at the end of TestBillPeopleSomeoneElsePaid. Spec 10 §0.4a and openapi are updated.
+- **I paid:** unchanged model. My tx = the bill on my wallet, the linked bill (`linked_transaction_id`), the other shares as board splits.
+- **Someone else paid** (expense only, else VALIDATION_ERROR):
+  - The board parent's `transaction_member_id` = the payer, with no linked tx, and every other member's share (mine included) as a split.
+  - My tx = my share: expense, NO wallet (account_id ignored), my category / description / note / tags, `source_project_transaction_id` = the bill. It is a copy, `event_bill.linked` false.
+  - `new_transaction_id` = it, or null when I have no share. Pending then answers NO_SHARE.
+  - A linked payer gets `project_tx_recorded_for_you` (existing `notifyRecordedTx`; it auto-copies for them if their setting is auto).
+
+**Read side:**
+- Tx detail / write answers: `event_bill` gains `payer` (MemberRef), `bill_amount` and `members [{member, share}]` (payer first with the rest). These are null / 0 / null on list rows, to keep lists lean.
+- New `shared.LoadEventBillPeople`. `LoadMemberRefs` moved to shared; projects keeps a wrapper.
+- Pending `resolved.bill_people {payer, members}` = `ResolvedBillPerson {me, member_id, contact_id, name, share?}`; name is empty for a plain me.
+- Submit codes: INVALID_BILL_PEOPLE, NO_SHARE, PROJECT_NOT_MEMBER, LINK_MODE_CONFLICT (payer / members without project_id, or with splits / paid_by).
+
+**Files (be):**
+- projects: NEW bill_people.go, model.go (BillPeople / BillPerson / BillMember embedded in QuickCreateRequest / AddBillsRequest), quick.go (pullBillsTx / AddNewBillTx take people), pt_store.go (LoadMemberRefs → shared), handler.go (codes).
+- shared: NEW members.go.
+- transactions: model.go (EventBillLink fields), detail.go.
+- pending: model.go, resolve.go, service.go.
+- apidoc/openapi.yaml: BillPerson / BillMember / BillShare / ResolvedBillPerson, EventBillLink, AddBillsRequest / QuickCreateEventRequest, Draft / DraftResolved, SubmitError codes.
+
+**Docs:** spec 10 §0.4a (new), spec 04 §2.8 (event-tab line), api-document §10 recent additions.
+
+**Tests** (`chubi_test_043`, 0 SKIP): `go build` / `go vet` clean; projects, pending, transactions, personal_debts, shared, apidoc all ok.
+- NEW projects/bill_people_test.go:
+  - TestBillPeopleIPaid: linked contact + typed name auto-added, shares, event_bill people, no personal_debts.
+  - TestBillPeopleSomeoneElsePaid: Bee paid → my copy of 100 with no wallet, payer's rest 80, recorded-for-you notice; rules: income, over, twice, with splits, no new bill, foreign member; a bill without me → no tx.
+- pending TestEventDraftWithPayer: resolved bill_people; submit → my share with no wallet; payer without an event → LINK_MODE_CONFLICT.
+
+## 0.4.0-3 ผูกกับ — B3: mode switching, preview, linked pair (BE session, 2026-10-21)
+DONE. No migration, additive (except one behaviour note below). Not committed, no docker rebuild. Also in this entry: Lead's small add (event members `contact_id`).
+
+**1. Mode switch on `PUT /transactions/{id}`** (transactions/link_mode.go `switchModeTx`):
+- `link_mode` personal | split | paid | event, plus that mode's data: `splits` (SplitEdit[]), `paid_by`, or `event {project_id, payer?, members?}`. One DB tx.
+- Order: drop the old mode first, then the field edits, then the new mode.
+  - Leaving an event: `EventLinks.LeaveTx` = detachBillTx(restore=false). The bill made from the row is removed from the board and its board splits are NOT restored; a copy just unlinks.
+  - Leaving split: splitsEditor(nil). Debts are deleted; linked partners get split_changed "removed".
+  - Leaving paid: paid_by → null, so the debt is deleted and the wallet takes the full amount.
+- Entering split: `applySplitsTx` (same checks as PUT /:id/splits).
+- Entering an event: `EventLinks.JoinTx` reuses B2's addPeopleBillTx with the EXISTING row.
+  - I paid → the row becomes the bill.
+  - Someone else paid → the row becomes my share, no wallet (its money comes back); my share 0 → 422 NO_SHARE_TO_COPY.
+  - A different event = a move.
+- Repayments are untouched ("Repayments stay").
+- Rules:
+  - Author only → 403 SPLITS_AUTHOR_ONLY. Debt wallet side / repayment → 400 SYSTEM_TRANSACTION_IMMUTABLE.
+  - Missing data → 400 LINK_MODE_INPUT. Another mode's data → LINK_MODE_CONFLICT.
+  - Without link_mode, `splits` edits a split / personal row (conflict on paid / event) and `event` is refused.
+  - A partner-mirrored row is locked (PAID_BY_LOCKED covers mode switches too).
+- The answer adds `person_balances` (every person the row touched before / after; omitted when none).
+
+**2. Preview `?preview=true`:**
+- Runs the full edit in a SAVEPOINT. It reads the after-state (rows, person nets, wallet balances), rolls the savepoint back, then reads the before-state in the outer tx. Then everything is rolled back: no notification goes out.
+- Answer: `TransactionPreview {preview, rows, people [{key, person, before, after, delta}], wallets [{account_id, before, after, delta}]}`.
+- People = the row's split / paid-by / debt / repayment persons. Event-board positions are not in it.
+- New `DebtLinks.PersonNetTx(q)` (querier-aware) supports it.
+
+**3. Linked pair, my tx ↔ the event bill** (projects/event_link.go; Lead's gap list):
+- Gap 4, live link state: `event_bill` gains `kind origin|copy`, `in_sync`, `differences [{field amount|date|description|note, mine, event}]`. Detail / write answers only; null on lists and on another member's row.
+  - Computed from `shared.LoadEventBillPeople` (it now also returns date / description / note / linked tx).
+  - Tags are copied on apply but not compared (personal vs event tags would never be "in sync").
+  - Lead asked for `event_link {…}`; I put it on the existing `event_bill` object to avoid two links. Say if you want a separate key.
+- Gap 1, all fields both ways:
+  - My tx → bill: `apply_to_event` on PUT. `also_update_link` now does the same for events, and also reaches copies.
+    - Origin: amount, date, description, note, tags (as event tags by name).
+    - Copy: date, description, note, and its amount as my share. My split is replaced, or if I'm the payer the bill becomes my share + others.
+    - Copies do NOT push tags: one member's tags would replace everyone's event tags.
+  - Bill → my tx: `apply_to_my_tx` on the bill edit (`also_update_link` now = the same, all fields, copies too). Matching personal tags are ADDED, never removed.
+- Gap 2: a bill edit's patch carries `my_transaction` (my linked row after the edit, with in_sync / differences), so the FE asks even when I edited the bill myself.
+- Gap 3, resolve later: NEW `POST /transactions/{id}/apply-event`. It reads the bill as it is NOW and marks my project_tx_changed notices for that row actioned.
+  - Copies pointing at split CHILD rows are now found everywhere: personalCopyTx, myLinkedTxTx, PTRecipientsForChange.
+- Gap 5: `POST /personal-debts/people/{key}/entries {bill_id}` → source event + bill + project. Must be an active member, else 400 BILL_NOT_FOUND. Its money stays editable (UpdateEntry lets source event through; its wallet tx syncs like a manual one).
+- Gap 6: project_tx_changed auto-apply is kept as is.
+- Deleting either side still unlinks (unchanged).
+- **Behaviour note:** `also_update_link` used to push / pull only amount + date and only for the origin. It now carries all fields and copies too, because Lead's gap 1 asks for that. Say if old clients rely on the narrow behaviour.
+
+**4. Lead adds:**
+- `POST /projects/{id}/members` ad_hoc is open to any writable member (reported earlier).
+- `EventMember.contact_id` = my contact for that member: a linked member → my contact with that linked_user_id; a typed member → my contact with the same name. Null on my own row. fe-A has been told.
+
+**Refactors:** BillPerson / BillMember / BillPeople moved to `shared` (projects keeps type aliases). LoadMemberRefs is in shared. `billWriterTx` / `dispatchAddedTx` were extracted from addBillsTx / pullBillsTx.
+
+**Files (be):**
+- transactions: NEW link_mode.go, service.go (`updateOrPreview`, `Preview`, person_balances), model.go (UpdateRequest link_mode / splits / event / apply_to_event, EventTarget, PersonDelta / WalletDelta / PreviewResult, EventBillLink kind / in_sync / differences, PersonBalances), event_link.go (EventLinks), debt_link.go (PersonNetTx), detail.go, handler.go (preview, LINK_MODE_INPUT).
+- projects: NEW event_link.go, bill_people.go (existing tx), quick.go (billWriterTx, dispatchAddedTx), pt_service.go (apply_to_my_tx, my_transaction), pt_store.go (recipients), personal_copy.go (child-row copies), service.go (ad_hoc), views.go (contact_id), model.go, handler.go (ApplyEventToTx).
+- personal_debts: paid_by.go (PersonNetTx), service.go (bill_id, event money editable), model.go, store.go, handler.go.
+- shared: NEW billpeople.go, members.go (differences).
+- cmd/api/main.go (WithEventLinks, route). apidoc/openapi.yaml.
+
+**Docs:** spec 04 §2.9 (new), spec 10 §0.4b (new) + §0.4a member rule, spec 12 §1.5 (event source), api-document §04 B3 note.
+
+**Tests** (`chubi_test_043`, 0 SKIP): `go build` / `go vet ./internal/...` clean.
+- transactions, personal_debts, pending, accounts, projects, notifications, contacts, recurring, shared/..., apidoc/... → all ok.
+- NEW personal_debts/link_mode_test.go TestLinkModeSwitchAndPreview: split → paid preview (Bee 100 → 0, Lee 0 → −50, wallet 700 → 750, nothing saved), then the real switch (person_balances 2); LINK_MODE_INPUT / CONFLICT cases; paid → split; split → personal (no debts left).
+- NEW projects/event_link_test.go TestLinkModeEventSwitches:
+  - personal → event (I paid; origin, in sync, share 100) → personal (board row gone).
+  - → event paid by Bee (copy 120, wallet back to 1000).
+  - apply_to_event 150 → my share 150.
+  - Bill description edit → my_transaction out of sync (description) → apply-event → in sync; apply_to_my_tx date.
+  - "as debt" with bill_id (source event, amount editable, unknown bill → BILL_NOT_FOUND).
+  - Members contact_id.
+- The projects test fixture now wires `WithEventLinks` (as main.go does).
+
+**Not done / open:**
+- (a) Preview shows person and wallet moves only, not event-board positions.
+- (b) Editing a bill's payer / members from tx detail when the row is already in the same event is not part of PUT. Use the bill edit (project-transactions PUT with splits).
+
