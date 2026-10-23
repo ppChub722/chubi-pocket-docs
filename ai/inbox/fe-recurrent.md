@@ -1,5 +1,17 @@
 # FE-RECURRENT: scheduled / recurring transactions (รายการประจำ)
 
+## 2026-10-23 — recurring edit page + ล่วงหน้า tab redesign (DONE) · chubi-pocket-4c
+DONE · files: recurring_detail_page.dart, recurring_rows.dart (`recurringKindIcon`) · kit: new `OccurrenceTile` / `OccurrenceTileGrid` (lib/ui/domain/recurring/occurrence_tile.dart, exported, hub demo + covers), `SettingDropdownRow.icon` (optional), `AppIcons.subscription` · arb: 8 keys (recurringAhead{CustomizeHint,Next,Summary}, recurringTile{Moved,Edited}, recurringField{Kind,Dates}, recurringSectionPeriod) · analyze: changed paths clean · test: not run (owner's word).
+- Edit page: kind chips left the hero. Section ช่วงเวลา = เริ่ม / ทำซ้ำ (chips: round + end; opens `showRecurrenceSheet`, which also sets the end / installment count) / เลือกวันเอง (multi-date picker). The old ทำซ้ำ option list, สิ้นสุด and จำนวนงวด rows are gone. Second section = ประเภท + แบบ as `SettingDropdownRow` + `OptionMenuAnchor` with icons, then category / wallets / trial / auto-create (`SettingToggleRow`, its hint as the caption).
+- ล่วงหน้า tab: sections ถัดไป / สรุป (summary row → edit mode + repeat sheet; ปรับแต่งล่วงหน้า row) / ที่ปรับไว้ n. ปรับแต่งล่วงหน้า = `PickerSheet` (✕) with a year `StepperPill`, a 3-column tile grid (weekly / daily grouped by month); ดูปีถัดไป / ไปที่เดือน removed.
+- Open: recurring_pages_test still targets the old keys (hero kind chips, upcomingNextYear / upcomingGoToMonth).
+
+## 2026-10-23 — recurring rows moved to AppListRow (DONE) · chubi-pocket-4c
+DONE · files: recurring_rows.dart (RecurringRow → AppListRow; helpers occurrenceWalletChip / waitingChip; old walletChip removed), due_boxes.dart (DueBoxes rows → AppListRow with checked/onCheck, ListRowAction.amount + .button; OccurrenceQuickConfirm / bigAmount removed, confirmOccurrenceRow helper), recurring_home_page.dart (calendar month / day rows → AppListRow; installments' OccurrenceChain in the row footer), recurring_detail_page.dart (occurrence rows → AppListRow, DateTile leading, 2-line title) · removed from lib/ui: OccurrenceRow, DueAmountField, DueConfirmButton (+ their hub covers / demos); OccurrenceAction / OccurrenceActions kept (detail focus card + ⋯ menu) · analyze: `dart analyze lib` clean · test: not run (owner's word).
+- Rows follow the hub list-row examples: state pill (รอใส่ยอด / รอยืนยัน, warning) as line2.lead, wallet = walletRowChip in titleChips, date in parts, ⏲ progress glyph for n/total, due chip "อีก n วัน" on RecurringRow, paused / archived / ใกล้ครบ as status chip.
+- Also this round (owner, same day): "ค้าง" → "รอยืนยัน" (occurrenceStateNotCreated value); legacy pending drafts confirm by slot in place; ต้องจัดการ = one card, 2 sections each with its own select bar + fold; hero = paid bar + joined tiles; calendar edges by tone, today plain outline; ShareAmountField got an optional `hint`.
+- Open: confirm with no amount records 0 only after the BE allows amount 0 (backlog "Recurring ต้องจัดการ: bulk confirm / skip API"); recurring_pages_test needs updating (not run).
+
 ## 2026-10-13 — Plan for 0.3.1-10 (read-only, nothing edited) — SUPERSEDED by rev 2 below (owner replaced the model)
 PLAN · sources: spec `design/spec/11-scheduled-transactions.md` + `design/database/schema.md:745-798`, `openapi.yaml` (scheduled paths), BE `internal/modules/scheduled_transactions`, app `lib/features/scheduled_transactions` + `transactions/.../draft_form_scheduled.dart` + `quick_create_sheet.dart`, `ai/decisions.md`, `ai/backlog.md`, `fe-plans.md` §3/§7.
 

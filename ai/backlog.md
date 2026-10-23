@@ -9,6 +9,11 @@ Release scope comes from `product/roadmap-1.0.md` (owner 2026-10-15). Items here
 - **Income + ผูกกับ tabs**: today income keeps the old section (จ่ายแทน is expense-only). Option A: income gets [ส่วนตัว | แบ่ง | อีเวนต์]; option B: keep as is. Lead recommends A.
 - **Debt open bits**: the earlier-cycle "open count" (a debt in a cleared cycle without the paid label still counts as open; proposal: count only the current cycle); the person tx filter (counterparty_key) doesn't list split-source bills. Both proposals were asked; the owner didn't answer.
 - **B3 leftovers**: the preview shows person + wallet deltas, not event-board positions; editing a bill's payer / members from tx detail goes through the bill edit.
+- **Recurring ต้องจัดการ: bulk confirm / skip API (owner 2026-10-23: "เตรียมแก้ api แต่รอก่อน ขอดู ui ก่อน"; drafted by chubi-pocket-4c, NOT started).**
+  - UI now: ต้องจัดการ is two boxes (รอใส่ยอด with an amount field per row / รอยืนยัน with the amount + ✓); every row has a check; ยืนยันที่เลือก / ข้ามที่เลือก. The app calls `POST /recurring/{rule}/occurrences/{slot}/confirm|skip` once per row.
+  - Owner rule: confirming a row with no amount typed records it as 0 (after a warning) so the user fixes it later. The BE refuses that today: `ErrAmountRequired` in slot.go confirm (amount nil or <= 0). Until the BE allows it, those rows fail with an error snack.
+  - Proposed contract: `POST /recurring/occurrences/bulk`, body `{ "action": "confirm" | "skip" | "mark_paid", "items": [ { "rule_id", "slot", "amount"? } ] }`. One DB transaction. Response `{ "items": [...], "balances": [...], "left_out": [ { "rule_id", "slot", "reason" } ] }` (same shapes as settle-all).
+  - Open for the owner: is a 0-amount transaction allowed everywhere (tx validation, reports, budgets), or should it be a draft-like "recorded, amount pending" state?
 
 ## 0.4.0-2 leftovers (2026-10-20, waiting on the owner's go)
 - **Tests (run 2026-10-20, see STATUS "Where it stands"):** all green except นายD's folders: 13 failures waiting for the owner's "fix" in his session (12 stale `saving_goals_pages_test` cases + `core/data/sync_coordinator_test`, likely pre-existing / flaky, since the sync code is unchanged this round).

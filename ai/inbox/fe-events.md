@@ -255,3 +255,124 @@ DONE (my side) · analyze 0 · full suite 718 pass / 1 fail (hub_coverage: `Occu
   - The 3-choice SAVE prompt lives in quick create (event-bill edit) and tx detail (my linked tx edit): fe-core's files. I briefed fe-core: prompt only when the linked tx is mine (`sourceTx != null`); they should also drop their LinkedFieldHint wording.
   - `also_update_link` on `updateTransaction`: I'll add it the moment BE's spec lands.
 - (spec landed) `updateTransaction(alsoUpdateLink:)` → body `also_update_link` (fe-core wires the save prompt in quick create / tx detail). `delete_linked_txs` is a query param, as sent. Delete now reads `EventDeleteResult.account_balances` and patches the wallets (test checks it). BILL_MONEY_LINKED is gone from the spec, and its mapping is removed (`eventErrMoneyLinked` key left unused, append-only arb). analyze 0 · projects tests 21/21.
+
+## 2026-10-23 — Events LIST page redesign (owner, session chubi-pocket-ad)
+DONE · files: app projects_page.dart, projects_cubit.dart, project.dart (ProjectListSummary), ui/domain/events/event_list_row.dart, hub/pages/domain_events_page.dart, app_th/en.arb (fpEvents*), test event_pages_test.dart + event_fixtures.dart · be projects/numbers.go, service.go, handler.go, touch_test.go, apidoc/openapi.yaml · docs spec 10, decisions.md (Wording) · analyze: lib/features/projects, ui/domain/events, hub page, test/features/projects clean; go build + vet clean · tests NOT run (owner to say)
+- Mock (owner-approved layout, hero "แบบ 2"): https://claude.ai/artifact/ANuVPgowvpWAo5CMU1ikXn
+- Hero like the debts list: HeroSummaryHead (groups icon, "ค้างสุทธิ | N อีเวนต์", net = receivable − payable, signed green/red, 🔍 + CardActionButton +), HeroFactList (ได้คืน | N อีเวนต์ · ต้องจ่าย | N อีเวนต์ · ส่วนของฉัน | กำลังทำ N), HeroFilterChips (ทั้งหมด · กำลังทำ · ยังเคลียร์ไม่หมด · จบแล้ว). The 3 SummaryTiles, MoneyVisibilityToggle and the bottom dashed AddTile are gone (+ in the hero; the empty state keeps its CTA).
+- List: rowCards with SectionHeader กำลังทำ | N / จบแล้ว | N, trailing "ส่วนฉัน ฿x" (sum of the loaded rows).
+- EventListRow (hub piece) gains `members` (mini 👥 N chip), `statusChip` (StatusChip over = เกินงบ), `footer` (ProgressRow budget bar, only with a plan). Subtitle = dates | ส่วนฉัน (share only when unsettled). Right: ได้คืน / ต้องจ่าย, settled = my share + เคลียร์แล้ว. Dimmed = ended and settled.
+- Default filter is now `current` (all but archived), as on the other list pages.
+- BE: summary gains payable_total + counts all / receivable / payable; receivable_total now counts ended events too (was active only); new derived statuses current / payable. NEEDS a BE rebuild (owner's word); the same rebuild carries นายE's 071.
+- Wording: fpEventsOwed / fpEventsOwe = ได้คืน / ต้องจ่าย, which also changes the event DETAIL hero tile. Removed: fpEventsSummaryCaption, fpEventsPaidLine, fpEventsRowSpent.
+- Open (not done): (1) my_net counts bills only. Ticks / resolve don't reduce it, so an event settled outside the bills may stay "ยังเคลียร์". Needs a check. (2) "ค้าง N วัน" like the debts rows would need an event "owing since" date from the BE.
+
+## 2026-10-23 — Events rows → AppListRow (owner split, fe-core 7d) · session chubi-pocket-ad
+DONE · files: lib/ui/domain/events/event_list_row.dart, position_row.dart, event_tags_sheet.dart, lib/features/projects/presentation/pages/projects_page.dart, project_members_page.dart, lib/hub/pages/domain_events_page.dart · analyze: events ui, projects feature, hub page, test/features/projects clean · tests NOT run (owner to say)
+- No ListRow left in the event files. EventBillRow was not in this round (as briefed).
+- EventListRow is now a thin domain wrapper on AppListRow:
+  - members → ListRowChip 👥 N in titleChips
+  - `status` is a ListRowChip (was a statusChip Widget). The list passes เกินงบ with Tone.danger.
+  - `subtitle` String → `meta` List<String>, which becomes line2 parts joined with " | "
+  - money → ListRowTrailing.value(MoneyText); the caption tone is success / danger by MoneyTone
+  - the budget bar → AppListRow.footer
+- PositionRow: title = label, trailing = MoneyText, footer = ProgressRow. A null leading becomes a SizedBox.shrink().
+- Event tags sheet: the ⋯ menu is ListRowAction.menu; the subtitle moved to line2.
+- Members page: role chip → ListRowTrailing.text (owner in Tone.primary). Linked / ad-hoc is on line2.
+- 7d added AppListRow.footer + ListRowAction.menu for this.
+- Visual change from the kit rules: titles are normal weight (EventListRow was w600) and the rows' vertical padding is 8 (was 12).
+
+## 2026-10-23 — Event DETAIL hero like the other detail pages · session chubi-pocket-ad
+DONE · files: project_detail_page.dart (_viewHero, bills toolbar) · analyze: lib/features/projects clean · tests NOT run
+- The hero follows wallet / budget / debt person:
+  - HeroIdentity: icon + name + description, with 🔍 and ✏️ (heroEdit) as its actions. The HeroHeader row is gone.
+  - HeroNumber ใช้ไปรวม + the budget HeroBar.
+  - HeroFactList: ส่วนของฉัน, ได้คืน / ต้องจ่าย (green / red), and รายรับรวม when > 0. These replace the 2 SummaryTiles and the HeroValueLine.
+  - HeroChipRow: the status chip (dropdown for the owner) and the date chip.
+- The "mine" bill filter (it was a tap on the ส่วนของฉัน tile) is now a ส่วนของฉัน chip in the bills toolbar.
+
+## 2026-10-23 — Event edit hero chips + no link badge on bill avatars · session chubi-pocket-ad
+DONE · files: project_detail_page.dart (_editBody), ui/domain/events/event_bill_row.dart, test event_pages_test.dart · analyze clean · tests NOT run
+- Edit hero: the status chip moved from the header to a HeroChipRow at the bottom, next to the dates chip, as in view mode.
+  - The dates chip: tap opens the range picker, ✕ clears it. With no dates it shows a dashed "วันเริ่ม – สิ้นสุด" chip.
+  - The dates InfoRow under the hero is gone.
+- EventBillRow: payer / debtor avatars no longer get the 🔗 CornerBadge (owner). A linked member's level is mapped to contact there only; PersonMark itself is unchanged.
+
+## 2026-10-23 — Event edit: status + dates move to การตั้งค่า (owner: they are settings) · session chubi-pocket-ad
+DONE · files: project_detail_page.dart (_editBody, _statusRow), app_th/en.arb (−fpEventsSettingsDesc) · analyze clean · tests NOT run
+- The edit hero has no chip row now: icon + name + description + planned budget only.
+- SettingsSection (การตั้งค่า), shown in create mode too:
+  - สถานะ: a SettingDropdownRow + OptionMenuAnchor, owner only, as on the wallet page.
+  - วันเริ่ม – สิ้นสุด: a SettingSummaryRow that opens the range picker; with dates set, the trailing chip has ✕ to clear them.
+  - จัดการแท็กอีเวนต์: existing events only.
+- Removed fpEventsSettingsDesc (its tags-only text no longer fits the section).
+- The view hero keeps its status + date chips.
+
+## 2026-10-23 — Event book: event bill sheet + paybacks + สรุป tab (owner) · session chubi-pocket-ad
+DONE (code) · analyze: `flutter analyze lib` + test/features/projects + test/ui clean; go build + vet clean · tests NOT run (owner to say) · BE needs a rebuild: migration 072
+- Spec: ai/briefs/event-book-be.md. Mock: https://claude.ai/artifact/4TN8TnL66353GddKgjZduz.
+- **BE (projects):**
+  - migration 072 `payback` type. A payback is a parent (from) plus one child (to) for the whole amount; it is never auto-copied, and /copy answers 422 PAYBACK_NOT_COPYABLE.
+  - On a payback, PUT can change who paid back (`transaction_member_id`). On a bill it answers 400 PAYER_FIXED.
+  - Positions: sent / received are added, and net = paid − share + sent − received. my_net counts paybacks. transaction_count leaves them out.
+  - `BoardRow.my_booked`: a tx, repayment or debt of mine points at the row.
+  - `GET /projects/:id/settle`: pairs + simplified.
+  - `POST /projects/:id/people`: BillPerson[] → member ids, and non-members are added.
+  - personal_debts (agreed with 28): repayments take `bill_id`.
+  - openapi updated. touch_test got payback / settle checks (not run).
+- **App:**
+  - `features/projects/presentation/widgets/event_bill_sheet.dart`: the event's own sheet on QuickCreateSheetShell.
+    - Top card: TransactionHeroCard with a new optional extraTypeChip (จ่ายคืน). A payback swaps the bill fields for from → to FlowCards.
+    - Then event tags, the note, and "คนในบิล | N" (ShareCard rows in a box that scrolls on its own, each with [จ่าย], [คืนแล้ว], ✕, หารเท่ากัน and + เพิ่มคน).
+    - "ลงบัญชีของฉันด้วย" settles my part on save:
+      - I paid → addBills: my tx is linked to the bill.
+      - Someone else paid → ☑ หนี้ (a debt entry with bill_id and DebtResultBox) and/or ☐ รายการ (a tx with source_project_transaction_id).
+      - A payback I'm in → a repayment with bill_id.
+    - "คืนแล้ว" writes a payback row (plus a repayment when I paid). 🗑 is in the title row.
+  - ContactPicker.people (multi-select): an event-members section on top, then contacts. The debts-mode path is untouched.
+  - Bill rows (EventBillRow / ChildRow, new options):
+    - New options: tick: false, payerVerb (a bold payer), badge, amountColor.
+    - A badge "ยังไม่ลงบัญชี" marks my part when !my_booked.
+    - A payback row shows ⇄ "A → B" | "จ่ายคืน | จดโดย X".
+    - Tapping a row opens the sheet; the old action sheet / tick → resolve flow is gone.
+  - Event detail: TabbedDetailBody [บิล | สรุป].
+    - The สรุป tab shows the PeopleStrip, then "ต้องจ่ายกัน" with SegmentedChoice [ตามคู่จริง | จ่ายน้อยครั้งสุด] and AppListRow lines.
+    - Each line has a ✓ action that opens the payback sheet already filled in.
+    - "เพิ่มบิล" (the AddTile) opens the new sheet.
+  - Repos: projects settle / resolvePeople / updateTransaction(transactionMemberId); debts createRepayment(billId).
+  - Hub demos: EventBillRow (event book), TransactionHeroCard(extraTypeChip), ContactPicker.people.
+  - Strings: evb* (th/en).
+  - Tests updated: event_pages_test (tabs, summary, no ticks) and the list fixtures.
+- **Not done / open:**
+  - (1) The centre capsule "เพิ่มบิล" on event pages is a shell change; a note went to Lead.
+  - (2) The event setting "แก้บิลที่ลงบัญชีแล้ว" (ask / always / never) isn't built. Editing a booked bill doesn't ask "แก้ในสมุดของฉันด้วย" yet.
+  - (3) The bill row's "รายการต้นทาง ›" link (it was in the old action sheet) is gone.
+  - (4) features/projects/.../resolve_sheet.dart is now unused; ui EventResolveSheet is kept (hub). Cleanup is the owner's call.
+  - (5) Quick create's project mode (projectRow) is still in quick create but no longer opened from the event page.
+- (update) Centre capsule: Lead added QuickCreatePreset.custom. The event DETAIL page uses it in view mode ("เพิ่มบิล", the event tint, opening the event sheet). The list page keeps quick create (Lead's call). Not analyzed (owner: no analyze while sessions edit).
+- (update, owner on-device round 1):
+  - Child-row badge layout fixed (the amount sits flush right again), and AppDivider.row between people.
+  - Bills tab: an always-visible [ทั้งหมด | เฉพาะของฉัน] chip row (the mine chip left the toolbar) and topInset 0.
+  - Sheet: the + แท็กอีเวนต์ chip creates an event tag; คืนแล้ว works in edit too; avatars have no 🔗.
+  - ลงบัญชีของฉันด้วย is a ShareCard with an AppSwitch. Options use the new kit piece BookOptionCard (ui.dart export + events covers + hub demo; Lead told), with the person line + DebtResultBox inside.
+  - สรุป tab: AppTabBar [ยอดสุทธิ | แยกรายคู่] (ยอดสุทธิ = simplified, the default) with swipe on the lines.
+- (update) When I paid, ลงบัญชี has two BookOptionCards: รายการ (the bill from my wallet) and หนี้ (ลูกหนี้ N คน: one debt entry each, direction paid, bill_id = the bill; the ones ticked คืนแล้ว are left out and get a repayment instead). Both are ticked by default.
+- (update) Payback resolve is split like a bill:
+  - [จดหนี้]: a debt entry with bill_id = the payback, so the event's debt lands in my books.
+  - [รับคืน / จ่ายคืน]: a repayment with bill_id.
+  - Both ticked = even. จดหนี้ starts unticked when my books already hold that debt in full.
+  - Wording in the sheet: ไม่เป็นหนี้ (was เคลียร์แล้ว). The person-line chip is เพิ่มหนี้ / ลดหนี้ ฿amount (the row's own amount).
+- (update, owner round 2):
+  - The budget bar has a dot, a bubble with what's spent, and the budget at the end, in the facts' font size. There is no "เกินงบ ฿x" line in the list rows or the detail hero.
+  - Bills tab: one toggle chip "เฉพาะของฉัน", at the right end (the "ทั้งหมด" chip is gone). When it's on, a bill someone else paid shows only my split, and a bill I paid shows no splits.
+  - Event sheet, edit mode: "ลงบัญชีของฉันด้วย" starts off, matching the row; only a new bill starts on.
+  - The delete moved to a bottom-left button. Kit change: a new optional QuickCreateSheetShell `deleteLabel`, plus a hub demo variant (Lead acked).
+  - Open: editing a booked bill (switch on with real ticks; off = unlink). It needs BE per-part link info plus an unlink endpoint, and the meaning of unlink (delete vs detach) is waiting on the owner.
+- (update, owner round 3):
+  - Budget bar: the fill pill shows the % again (no amount), since "ใช้ไปรวม" (gross) and the bar (net of income) are different numbers.
+  - Bills tab: one row with the event tags on the left (scroll, no label) and "เฉพาะของฉัน" fixed on the right, all at ChipSize.chip like the toolbar filters.
+  - Unlink / relink (owner chose option ข, unlink):
+    - BE: migration 000073 adds transactions.unlinked_project_transaction_id, personal_debts.unlinked_project_transaction_id and project_transactions.unlinked_transaction_id.
+    - BE: PUT /projects/:id/project-transactions/:pt_id/my-books {link, unlink} with kinds tx | debt | repay. It returns `relinked`, and BoardRow has my_books.
+    - App: an edit shows the switch and ticks as linked. Unticking a linked part unlinks it (it stays in my books). Ticking again relinks the old rows, and only a part the server can't find is created anew. A linked part shows "ลงบัญชีแล้ว" with no pickers and no before → after.
+    - BE redeploy pending (owner). No BE test for it yet.
