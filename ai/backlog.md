@@ -5,7 +5,9 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
 Release scope comes from `product/roadmap-1.0.md` (owner 2026-10-15). Items here that the roadmap puts out of scope (Play Store, monetization, web / admin, receipt photos, multi-currency) are dropped.
 
 ## 0.4.0-4 carried over from 0.4.0-3 (owner 2026-10-24: "ยกไปทำรอบ 0.4.0-4")
-- **FIRST: Flutter tests are red.** v0.4.0-3 was tagged without a green run (owner's word). Fix the failures (AppListRow finders in budgets / saving_goals / recurring pages, test/features/projects/event_pages_test.dart never run, test/ui/app_list_row_test.dart new); the failure list is in STATUS once the run finishes.
+- **FIRST: Flutter tests are red.** v0.4.0-3 was tagged without a green run (owner's word). Fix the failures (AppListRow finders in budgets / saving_goals / recurring pages, test/features/projects/event_pages_test.dart never run, test/ui/app_list_row_test.dart new); the full run was stopped part-way on the owner's word (2026-10-24 03:4x), so the list below is partial.
+  - Files with failures (most first): recurring_pages, contact_detail_page, quick_create_debt_mode, budgets_pages, saving_goals_pages, event_pages, debt_pages, ui/item_picker, auth_cubit, app_version_gate, ui/app_list_row, core/data/sync_repository; fewer in hero_list_head, tx_detail_link_rows, transaction_tile_refs, notifications_inbox_page, wallet_savings_section, page_load_timeouts, hub smoke / page_flows / api_spec_ratchet, and a few ui/* tests.
+  - Next run: per folder, not the whole suite at once (the full run took 40+ min on this machine).
 - **Events** (handoff from the event session; log in inbox/fe-events.md rounds 1–4):
   - Setting "แก้บิลที่ลงบัญชีแล้ว" (ask / always / never) + the prompt when a booked bill is edited. Today an edit never touches my linked tx / debt amounts: the sheet never sends also_update_link / apply_to_my_tx. The BE already has applyBillToTxTx for the tx; debts have no sync at all.
   - BE tests for PUT /projects/:id/project-transactions/:pt_id/my-books:
