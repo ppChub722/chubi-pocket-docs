@@ -4,8 +4,36 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
 
 Release scope comes from `product/roadmap-1.0.md` (owner 2026-10-15). Items here that the roadmap puts out of scope (Play Store, monetization, web / admin, receipt photos, multi-currency) are dropped.
 
+## 0.4.0-4 carried over from 0.4.0-3 (owner 2026-10-24: "ยกไปทำรอบ 0.4.0-4")
+- **FIRST: Flutter tests are red.** v0.4.0-3 was tagged without a green run (owner's word). Fix the failures (AppListRow finders in budgets / saving_goals / recurring pages, test/features/projects/event_pages_test.dart never run, test/ui/app_list_row_test.dart new); the failure list is in STATUS once the run finishes.
+- **Events** (handoff from the event session; log in inbox/fe-events.md rounds 1–4):
+  - Setting "แก้บิลที่ลงบัญชีแล้ว" (ask / always / never) + the prompt when a booked bill is edited. Today an edit never touches my linked tx / debt amounts: the sheet never sends also_update_link / apply_to_my_tx. The BE already has applyBillToTxTx for the tx; debts have no sync at all.
+  - BE tests for PUT /projects/:id/project-transactions/:pt_id/my-books:
+    - unlink tx / debt / repay
+    - relink finds the old rows; relink with nothing remembered → relinked = []
+    - the bill origin round-trip (linked_transaction_id ↔ unlinked_transaction_id)
+    - my_books flags on BoardRow
+  - Cleanup (owner's call): resolve_sheet.dart and quick create's project mode are unused; unused keys fpEventsBudgetUsed, fpEventsBudgetLeft, fpEventsTagsFilterLabel.
+  - Optional: an event-shaped first-load skeleton for event detail (today the generic DetailPageSkeleton; the owner seemed fine with it).
+- **Kit** (handoff from 7d; details in inbox/fe-core.md, top 2 entries):
+  - Buttons not yet on AppButton / AppIconButton:
+    - kit: AppMessage (tone-coloured TextButton; AppButton may need a colour option), ErrorView "ลองใหม่", AppListHeader ListHeaderAction.link, SplitRowAction ✕, ChatDial, the colour dialog in IconMakerSheet, AmountInput ±, HintLine, the fold buttons (AppHeroFoldButton / DueCard)
+    - other pages: DueMoreRow "ดูทั้ง N งวด ›" (recurring), CycleDivider "ดูรอบก่อน ▾" (debts)
+    - borderline: the wallet's "ยังไม่มีเลขบัญชี" tap (maybe AddTile), the top bar back + crumb link, boot_error_app (runs before the theme)
+  - Move pages to AppListHeader + AppListToolbar (hub /dev/ui/molecules/list-header; no page moved yet), then delete SectionHeader / DateGroupHeader / DueGroupHeader / ListToolbar.
+    - Owner rules: header title 14 w600 everywhere; categories / tags / contacts keep the search open.
+    - Recurring calendar: filter beside 🔍, search + sort under 🔍, the picked day as a "วันนี้ ✕" chip.
+  - Detail rows still on DetailRow / SplitRow instead of AppListRow (view mode only; edit keeps SplitRow): tx detail splits (_splitRow), wallet members (_MemberRow), IdentifierRow, the goal page's _autoLine, ShareRow, the contact page's linked-account row.
+  - Open for the owner: a % chip on the budget card (ProgressCard)?
+  - Cleanup (check with the owners first): EventCard, PositionRow, WalletCard, BreakdownRow, ProgressHeroFooter, ProgressSummary, HintLine; key fpWalletCardUsedLabel.
+- **Lead / quick create, open questions for the owner:**
+  - debt wallet card: "ยังไม่ได้เลือก" vs "ตั้งใจไม่ระบุกระเป๋า"
+  - the contact page's edit-mode name size
+  - should the events list page also get "เพิ่มบิล"?
+  - cleanup of unused debt pieces: DebtResultBox, debtSentence* keys, showSettleSheet, SavingMoveSheet (no callers)
+  - BE share message wording: personal_debts/message.go still says ฉันรอรับจาก / ฉันรอจ่ายให้ (app wording is now ลูกหนี้ / เจ้าหนี้)
+
 ## 0.4.0-3 not yet discussed (2026-10-22)
-- **Event pages**: in the 0.4.0-3 scope; not surveyed or discussed yet. Start page by page (list → event detail + tabs → bill sheet). The quick create event card + the linked-pair rules are done; reuse them.
 - **Income + ผูกกับ tabs**: today income keeps the old section (จ่ายแทน is expense-only). Option A: income gets [ส่วนตัว | แบ่ง | อีเวนต์]; option B: keep as is. Lead recommends A.
 - **Debt open bits**: the earlier-cycle "open count" (a debt in a cleared cycle without the paid label still counts as open; proposal: count only the current cycle); the person tx filter (counterparty_key) doesn't list split-source bills. Both proposals were asked; the owner didn't answer.
 - **B3 leftovers**: the preview shows person + wallet deltas, not event-board positions; editing a bill's payer / members from tx detail goes through the bill edit.

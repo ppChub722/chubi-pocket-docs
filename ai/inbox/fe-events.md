@@ -376,3 +376,10 @@ DONE (code) · analyze: `flutter analyze lib` + test/features/projects + test/ui
     - BE: PUT /projects/:id/project-transactions/:pt_id/my-books {link, unlink} with kinds tx | debt | repay. It returns `relinked`, and BoardRow has my_books.
     - App: an edit shows the switch and ticks as linked. Unticking a linked part unlinks it (it stays in my books). Ticking again relinks the old rows, and only a part the server can't find is created anew. A linked part shows "ลงบัญชีแล้ว" with no pickers and no before → after.
     - BE redeploy pending (owner). No BE test for it yet.
+- (update, owner round 4):
+  - List rows: the budget fill pill shows the amount spent (net); the detail hero keeps the %.
+  - Bills tab:
+    - 🔍 (icon chip, active = open, a count of active filters while shut) and "เฉพาะของฉัน" sit on the first date header. While the search is open they get their own row above it.
+    - The hero search button is gone.
+    - Event tags became a "แท็ก ▾" filter in the toolbar: TagPicker.one over the event's tags, with "ทั้งหมด" as none.
+  - Filter loading: a card of skeleton rows (with a date-bar skeleton) replaces the stale list. Load-more skeletons sit in a card above "เพิ่มบิล".

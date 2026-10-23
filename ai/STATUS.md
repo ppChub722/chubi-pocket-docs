@@ -2,9 +2,10 @@
 
 _Last updated: 2026-10-24 by Lead (chubi-pocket-99), joint commit of the one-session-per-page round._
 
-## Where we are: 0.4.0-3 — BUILT, NOT RELEASED
-- Live tag: **v0.4.0-2** (app a77d3ba, build 133 · be feed165 · docs 7d2a9bc). Prod is still off; everything is local.
-- ALL 0.4.0-3 work is committed on branch **`wip/0.4.0-3`** in app / be / docs and pushed. It is NOT merged into main, NOT tagged, and the version is still `0.4.0-2+133`.
+## Where we are: 0.4.0-3 — TAGGED 2026-10-24 (flutter tests NOT green)
+- Live tag: **v0.4.0-3** (app 0233e00, build 138 · be af2bffd · docs = the tag commit). wip/0.4.0-3 merged into main in app / be / docs, pushed. Prod is still off; everything is local. Release note: ai/releases/0.4.0-3.md.
+- The owner chose to tag without waiting for the Flutter run (54+ failures seen while it was still going). First job of 0.4.0-4: fix them (backlog → "0.4.0-4 carried over").
+- Older, kept for history:
 - Lead full run (2026-10-22): flutter analyze clean · flutter test 1274 pass + 1 red (feature_visuals ratchet), which FE fixed (147/0 on re-run) · go vet clean · go test all packages pass, 0 skip.
 - Local BE was rebuilt from the wip tree on 2026-10-24: migration **073**, health 200; backup `chubi-pocket/backups/local-before-rebuild-073-2026-10-24.dump`. Test DB `chubi_test_043` is still at 070 (migrate it before go tests).
 - 2026-10-24 joint commit: all sessions' work on wip/0.4.0-3, with NO analyze or tests run since the 2026-10-22 full run (owner's word). Run both before closing the round.

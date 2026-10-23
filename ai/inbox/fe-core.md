@@ -1,5 +1,15 @@
 # fe-core inbox (newest on top)
 
+## 2026-10-24 — kit follow-ups after AppListRow (in commit fcddfbe) · chubi-pocket-7d
+DONE · analyze: clean when last run (before the no-analyze-while-shared rule) · test: not run
+- AppListHeader + AppListToolbar built hub-first (/dev/ui/molecules/list-header), NO page moved yet. Owner rules: header title 14 w600 everywhere, "| count" muted, value/text trailing typed (ListHeaderTrailing), actions typed (ListHeaderAction.toolbar/button/link/filter<T>), `onClearTitle` = a "วันนี้ ✕" title chip. AppListToolbar = search + filters + sort; `state` = opens from 🔍, none = always open (categories / tags / contacts stay open). Recurring calendar only: quick filters next to 🔍 in the header, search + sort under 🔍. Will replace SectionHeader / DateGroupHeader / DueGroupHeader / ListToolbar after the owner says go.
+- Wallet chip now bare (owner): `AppChip(bare: true)` = no fill / border / side padding, icon +5, label w600 in `color`. `walletRowChip` uses it in the wallet's own colour (ensureContrast), muted without one; `ListRowChip` gained `color` / `bare`.
+- `AppListRow.accent`: wraps the row in HeroColorScope like AppHeroCard, so a footer OccurrenceChain / ProgressRow takes the item's colour (4c told).
+- % pills: `HeroBar.fillLabel` (→ ProgressRow); used on event detail + event list bars, recurring home "จ่ายรวมทั้งเดือน", credit-card wallet detail (label now "ใช้ไป", `fpWalletCardUsedLabel` unused) and wallet cards (written % removed). `HeroBar.split` puts each part's % in a pill at its middle, narrow parts overlap, kept inside the bar. Ring % pill was tried and REMOVED (owner: not a fit).
+- PinnedTabBarDelegate background defaults to the page background (the white band on wallet / budget / recurring / goal detail is gone).
+- New AppIcons: `progress` (timelapse, x/y installments), `shared` (group + head count on a split row: splitCount + 1).
+- Open: non-AppButton buttons found by a sweep (AppMessage, ErrorView, AppListHeader.link, SplitRowAction, ChatDial, icon-maker colour dialog, AmountInput ±, HintLine, fold buttons; DueMoreRow = 4c, CycleDivider = 28) — waiting for the owner's go.
+
 ## 2026-10-23 — AppListRow migration DONE (my pages) + old rows removed · chubi-pocket-7d
 DONE · analyze: `flutter analyze lib` clean; `lib test` clean except 4 errors in test/features/recurring/recurring_pages_test.dart (OccurrenceRow finders, 4c's file, told 4c) · test: not run (owner's word)
 - My pages on AppListRow: TransactionTile (transactions list, home recent, wallet page), budget_detail_page items, pending_page (tx + 🐷 saving draft), saving_goal_detail_page history, categories_page, tags_page (view + edit mode via `titleField`), contacts_page, identifier_widgets (account numbers), notification_tile. Others did theirs: event (5 files), 4c recurring, 28 debts.
