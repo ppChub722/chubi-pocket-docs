@@ -9,11 +9,12 @@
 
 | ของ | ที่ไหน | รายละเอียด |
 |---|---|---|
-| **VPS** | Happy-Host (happy-host.net) | แพ็กเกจ VPS-SSD-01 · 220฿/เดือน · 2C/4GB/40GB NVMe · Ubuntu 22.04 · **ต่ออายุอัตโนมัติรายเดือน (เปิดไว้แล้ว)** — จ่ายรายเดือนไปก่อน ยังไม่ต่อรายปีจนกว่าจะนิ่ง 1-2 เดือน |
-| **IP** | `160.238.13.137` | |
+| **VPS (ตั้งแต่ 2026-10-24)** | Cloud VPS 00 · 150฿/เดือน | 1 vCore / 1 GB / 15 GB SSD · Ubuntu 24.04.5 · hostname `ppForge` · ใช้ส่วนตัว (chubi + อีก ~1 แอป) · **build image บนเครื่อง dev แล้ว `docker save \| ssh … docker load`** (เครื่อง 1 GB ห้าม build เอง) · Postgres จูนเหลือ shared_buffers 64MB / max_connections 30 / mem 256m · chubi_app mem 512m · DB เริ่มใหม่ (ไม่ได้ย้ายข้อมูล prod เก่า) |
+| **IP** | `143.14.147.249` | เข้าเครื่อง: `ssh ppforge` (alias ใน `~/.ssh/config` → `Admin@143.14.147.249`, key `~/.ssh/ppforge_vps`) · root + password login ปิด |
+| **VPS เก่า (เลิกใช้)** | Happy-Host `160.238.13.137` | ล่มบ่อย ย้ายออก 2026-10-24 — **ยกเลิกต่ออายุอัตโนมัติที่ happy-host.net** |
 | **แผงควบคุม VPS** | เว็บ happy-host.net → login | ปุ่มสำคัญ: Power on/off, Reboot, Reset OS |
 | **Domain** | `ppforge.dev` @ **Cloudflare** | บัญชี: Poompich.e@gmail.com · ~430฿/ปี · จัดการ DNS ที่ dash.cloudflare.com → ppforge.dev → DNS → Records |
-| **DNS records** | Cloudflare | `chubipocket-api` → A → 160.238.13.137 → **DNS only (เมฆเทา — ห้ามเปิดส้ม ไม่งั้น cert พัง)** · อนาคต: `chubipocket-web` |
+| **DNS records** | Cloudflare | `chubipocket-api` → A → 143.14.147.249 → **DNS only (เมฆเทา — ห้ามเปิดส้ม ไม่งั้น cert พัง)** · อนาคต: `chubipocket-web` |
 | **API URL** | https://chubipocket-api.ppforge.dev | health check: `/health` → `{"status":"ok"}` |
 | **GitHub** | github.com/ppChub722 | repos: chubi-pocket-be / -app / -web / -docs (private) — push ในนาม ppChub722 (remote URL ฝัง user ไว้แล้ว) |
 | **Firebase** | console.firebase.google.com → project **chubipocket** | App Distribution แจก APK · Project ID: `chubipocket` · Project number: `1059791337506` · บัญชี: Poompich.e@gmail.com |
