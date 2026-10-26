@@ -859,3 +859,32 @@ Folders: test/features/transactions, recurring, pending, notifications, home, pi
 **A real bug found and fixed (my B1 page):** `recurring_home_page.dart` passed `isEmpty: false` to ListPageBody, so it never showed the skeleton or the error view: a failed month load showed an empty month. Now `isEmpty: _items == null`.
 
 **Note for the others:** test/app (main_shell / cross_tab_links, นายE's folders) may open /recurring. The page now shows a skeleton until the month loads, and its fake repo needs `monthItems` / `dueItems`.
+
+## 2026-10-26 — 0.4.1-0 AI-4: A1, H1 app, H5, A7 app, C2, C1 app, G1, A2/A3/A4/F1
+DONE · app only, uncommitted (branch question still open) · analyze: IDE diagnostics clean on every touched file; no flutter analyze / tests run (shared tree)
+
+**A1 currency leaks.** The kit no longer defaults to '฿'. `symbol` / `currencySymbol` is `String?` (null = the user's currency through UiConfig) on EntryCard, TransactionHeroCard, txCompactHeroBar, TxSummaryTitle, EventBillRow, ShareBillRow, DebtAmountLine, DebtNetLine, NetBalance, CloseGoalDialog / showCloseGoalDialog, SavingMoveSheet / showSavingMoveSheet and AmountInput. The pull-to-refresh coin shows the user's symbol. event_card / position_row were skipped (AI-2 deletes them in E4).
+
+**H1 income "ผูกกับ"** (BE by AI-1: migration 080 + a rebuild still needed). `DraftFormController.hasLinkTabs(type)` = expense or income, and it drives:
+- the quick create tabs and the save
+- the draft prefill
+- the tx detail edit (`txLinkTabsEditable`)
+
+The payer chip reads "รับ" on income (`BillPeopleCard.payLabel`; a row with neither paid nor onPay shows no chip). An event income is always mine: no payer chip on the others, and switching the type to income clears the event payer. The wallet note says "ไม่เข้ากระเป๋า" / "เข้ากระเป๋า ฿x". The tx detail view says "รับโดย", "ฉันรับเอง", "ใครรับ" and "✓ รับครบแล้ว". Amount rule as on expense: amount = my share, paid_by.amount = what they received, the wallet gets the rest. Hub: a "BillPeopleCard — income (รับแทน)" demo.
+
+**H5.** The debt wallet card says "เลือกกระเป๋า" until something is picked, and "ไม่ระบุกระเป๋า" once none is picked on purpose (`DebtEntryController.noWalletPicked`). On the detail page, a saved tx with no wallet counts as none on purpose.
+
+**A7.** A future date shows HintLine "อีก N วัน | นับเข้ายอดเมื่อถึงวันนั้น" in quick create. The tx detail hero (view mode) shows an "อีก N วัน" chip (`dueLabel`, as in the tx list).
+
+**C2 / C1 / G1.**
+- Rows with no amount can't be confirmed (needs-amount snack); they can only be skipped or marked จ่ายแล้ว. The select bar gets "จ่ายแล้วที่เลือก".
+- Bulk runs through `RecurringRepository.settleMany` → POST /recurring/occurrences/bulk, in chunks of 100. The snack splits paid / left out / refused.
+- Removed: the old-BE occurrence paths (`calendar`, `editOccurrence`, `updateItem`, `setItemArchived`, recurring_item_actions.dart, the `!bySlot` branches) and tx_list_filters `canStepForward`. Tests were updated to match.
+
+**Goals.**
+- A2: saving amounts are plain (not red) in the recurring rows, the detail and the home.
+- A3: `sgPlanSectionDesc` = "ครบเมื่อไร และเริ่มจากเท่าไร", shown on create only (editing has just the due date).
+- A4: the ongoing-goal hero shows "ออมเดือนนี้ saved / plan" when the goal has a plan (same as a goal with a target).
+- F1 decision (goals page owner): **no month stepper**. The 2026-10-21 owner call stands (current month only; past months would be recomputed from today's rules). Owner, say so if you want it anyway.
+
+**Shared files touched:** app_th.arb / app_en.arb (keys appended, gen-l10n run), ui/domain/transactions/bill_people_card.dart, ui/molecules/amount_input.dart (AI-2's E1 ± button lives there too).
