@@ -39,3 +39,9 @@ DONE · prod BE image `a24bc82` (from `c17a3aa`), built on the dev PC, `docker s
 
 ## 2026-10-26 — I docs (0.4.1-0)
 DONE · now/STATUS.md rewritten · rules/decisions.md (0.4.0-4 saving kind, paid = linked or marked, 0.4.1-0 owner answers, the stale "no ออม type" and "future tx proposed" lines fixed, H8 done) · team/releases/0.4.0-4.md (after the fact) · ref/schema.md + ref/api-document.md (071–080, bulk, รับแทน, health, wording) · modules/04, 12, 13
+
+## 2026-10-26 16:19 — gate fix + deploy.sh on ppForge (owner's go)
+DONE · be `21fe2b2` on wip/0.4.1-0 (after the v0.4.1-0 tag) · appversion tests ok (165 / 2167 / 1169 → 426; 170 / 2170 / 1170 / 4171 → pass) · prod: deployed with the new deploy.sh (backup chubi_pocket-20261026-1555.dump.gz, no new migrations, healthy)
+- `appversion.PubspecBuild`: a build ≥ 1000 counts as build % 1000 (the split-per-ABI versionCode). The app side (send the pubspec build, `hasUpdateFor`) is AI-4's `2848aeb`.
+- deploy.sh builds on the dev PC and docker-loads onto ppForge (checks /health + /api/v1/health; keeps prev); deploy.sh and release.sh default to 143.14.147.249.
+- Gate: `.env.bak-20261026-1619-before-gate-172`, MIN = LATEST = 172 (APK 172 on Firebase): 170 / 2170 → 426, 172 / 2172 → pass.
