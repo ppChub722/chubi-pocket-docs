@@ -17,7 +17,7 @@ _Last updated: 2026-10-26 after the 0.4.1-0 close._
 
 ## Next (owner decides)
 1. Install build 172 from Firebase (firsttester) and try it against prod: the test list in `team/releases/0.4.1-0.md`.
-2. **0.4.1-1 "linked = synced"** (mostly BE: linked rows keep the same values, DB accepts 0 on synced rows, every user setting on the server; G4 quick create project mode goes here) — see `now/roadmap-1.0.md` and the owner answers in `now/briefs/0.4.1-0-plan.md`. Needs a plan + work split first.
+2. **0.4.1-1 "linked = synced"** (mostly BE: linked rows keep the same values, DB accepts 0 on synced rows, every user setting on the server; G4 quick create project mode goes here) — see `now/roadmap-1.0.md` and the owner answers in `now/briefs/0.4.1-0-plan.md`. Concept being discussed with the owner: `now/briefs/0.4.1-1-concept.md` (no code until the owner says go); then a plan + work split.
 
 ## Where things are
 - The map of every doc: the root `README.md` (old `ai/…` paths → new ones at its bottom).
