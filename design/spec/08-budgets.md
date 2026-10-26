@@ -1,6 +1,6 @@
 # 08 — Budgets
 
-> **0.3.1-10 — Budgets v2 (migration 059, owner mockup `design/mockups/budget-v2.html`, 2026-10-13).** Section 0 replaces everything below (kept for history: one category, fixed periods, user / project scope, `/budgets/overview` are gone). Shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`, tag **Budgets**.
+> **0.3.1-10 — Budgets v2 (migration 059, owner mockup `archive/design/mockups/budget-v2.html`, 2026-10-13).** Section 0 replaces everything below (kept for history: one category, fixed periods, user / project scope, `/budgets/overview` are gone). Shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`, tag **Budgets**.
 
 > **0.4.0-2 (updated 2026-10-20).** The scope is AND across categories / wallets / tags (§0.1). Sources: `upcoming` is now a computed recurring occurrence only, and the new `future_tx` is a future-dated expense, both expected (§0.2). Item rows carry `tag_refs`, `rule_id` and `slot`. The app pages are in §0.7. Fields: [`api-document.md` §08](../api/api-document.md#08--budgets).
 

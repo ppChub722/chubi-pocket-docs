@@ -2,7 +2,7 @@
 
 Engineering reference for the ChubiPocket Flutter client (Android + Flutter web). Stack, design tokens, navigation, state management patterns (Bloc + Repository), reusable widgets, platform differences.
 
-**Designer-facing screen specs and visual design** live in [`../../../product/ui-design/app/`](../../../product/ui-design/app/) — this folder is implementation-only.
+**The UI kit and its hub** (every UI piece, reviewed there first) are described in [`../../../engineering/app-hub.md`](../../../engineering/app-hub.md) — this folder is implementation-only.
 
 **Cross-frontend conventions** (API contract, auth flow, error envelope handling, pagination, dates) shared with future Phase 3 admin (Next.js) and power-user web (Nuxt 3) live in [`../overview.md`](../overview.md).
 

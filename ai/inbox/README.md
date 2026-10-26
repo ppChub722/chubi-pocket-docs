@@ -1,7 +1,8 @@
 # AI team inbox
 
 One file per session role, append-only, newest entry at the BOTTOM:
-`fe-event.md`, `fe-<area>.md`, `be.md`, `qa-fix.md`, `qa-lead.md`, `devops.md`
+`lead.md`, `be.md`, `qa.md`, `devops.md`, `fe-a.md` … `fe-e.md` (session names), `fe-<area>.md` (page owners: `fe-core`, `fe-debts`, `fe-events`, `fe-recurrent`).
+Inboxes of roles nobody uses any more move to `../../archive/ai/inbox/`.
 
 ## Rules
 - **Work done:** append the full report to YOUR file, then send Lead ONE line:

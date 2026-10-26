@@ -398,7 +398,7 @@ Owned by [`../spec/04-transactions.md`](../spec/04-transactions.md).
 
 ### `pending_transactions`
 
-Migration 046 (owner design 2026-10-08), kind `saving` added in 060. Drafts waiting to be confirmed — not transactions yet: they never touch balances or reports. Every draft field may be empty; the full transaction rules apply only on submit. Contract: [`../api/ux-overhaul-contract.md`](../api/ux-overhaul-contract.md) §14. No `*_by_user_id` audit columns.
+Migration 046 (owner design 2026-10-08), kind `saving` added in 060. Drafts waiting to be confirmed — not transactions yet: they never touch balances or reports. Every draft field may be empty; the full transaction rules apply only on submit. Contract: [`ux-overhaul-contract.md`](../../archive/design/api/ux-overhaul-contract.md) §14 (archived; current shapes in `openapi.yaml`). No `*_by_user_id` audit columns.
 
 | Column                  | Type          | Constraints                                         | Description |
 | ----------------------- | ------------- | --------------------------------------------------- | ----------- |

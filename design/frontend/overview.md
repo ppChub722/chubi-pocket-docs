@@ -13,7 +13,7 @@ This file covers what's identical across all clients. Per-client implementation 
 | **App** | [`app/`](app/) | 0–3 | Flutter (Android; web build = dev tool) | End users, mobile-first |
 | **Web** | `web/` *(Phase 3)* | 3+ | Next.js (one app) | Power users (bulk management, import/export, free editing) + internal admin via role-gated pages |
 
-Per-client design + UX specs (screens, layouts, interactions, brand) live in [`../../product/ui-design/<client>/`](../../product/ui-design/) — designer-facing, plain UX language. This folder holds engineering-only detail.
+The app's UI kit (tokens, atoms to templates) lives in the hub: [`../../engineering/app-hub.md`](../../engineering/app-hub.md). This folder holds engineering-only detail.
 
 ---
 
@@ -86,9 +86,7 @@ Each subfolder owns:
 
 It does NOT own:
 
-- Screen layouts (those live in [`../../product/ui-design/<client>/screens/`](../../product/ui-design/))
-- Design tokens (those live in [`../../product/ui-design/<client>/design-sheet.md`](../../product/ui-design/))
-- Brand identity (same)
+- Screen layouts, design tokens, brand (those live in the hub: [`../../engineering/app-hub.md`](../../engineering/app-hub.md))
 
 ---
 

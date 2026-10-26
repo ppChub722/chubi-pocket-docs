@@ -1,8 +1,8 @@
 # ChubiPocket Docs
 
-Single source of truth for ChubiPocket — product context, technical design, engineering how-tos. The other repos (`-app`, `-be`, `-web`) hold code; **this repo holds the *why* and the contracts they must agree on**.
+Single source of truth for ChubiPocket — product context, technical design, engineering how-tos, and the AI team's shared notes. The other repos (`-app`, `-be`) hold code; **this repo holds the *why* and the contracts they must agree on**.
 
-> **If you're starting work on any other ChubiPocket repo: read this README, then open the relevant doc(s) listed below before touching code.** This is the canonical context — don't infer from code alone.
+> **If you're starting work on any other ChubiPocket repo: read this README and [`ai/STATUS.md`](ai/STATUS.md), then open the relevant doc(s) listed below before touching code.** This is the canonical context — don't infer from code alone.
 
 ---
 
@@ -12,8 +12,8 @@ Single source of truth for ChubiPocket — product context, technical design, en
 chubi-pocket/
 ├── chubi-pocket-docs/   ← you are here
 ├── chubi-pocket-app/    Flutter mobile app (Bloc, go_router, dio)
-├── chubi-pocket-be/     Backend (Docker: postgres + backend)
-└── chubi-pocket-web/    Web client
+├── chubi-pocket-be/     Backend (Go; Docker: postgres + backend)
+└── chubi-pocket-web/    Web client (out of scope until 1.0, see the roadmap)
 ```
 
 All repos live side-by-side in the same parent folder so cross-repo references work via relative paths during local dev.
@@ -31,14 +31,18 @@ All repos live side-by-side in the same parent folder so cross-repo references w
 
 | Folder | Purpose | Audience |
 |---|---|---|
-| [`product/`](product/overview.md) | What we're building, for whom, in which phase. Start here. | Everyone |
+| [`ai/`](ai/STATUS.md) | The team's live record: status, owner decisions, backlog, briefs, inbox reports, releases, role skills | Every AI session, the owner |
+| [`product/`](product/overview.md) | What we're building, for whom, and the roadmap to 1.0 | Everyone |
 | [`design/`](design/overview.md) | How it's built — API contracts, DB schema, frontend implementation, per-module specs | BE + FE devs, AI |
-| [`engineering/`](engineering/) | Dev how-tos (e.g., APK testing on phone) | Devs |
+| [`engineering/`](engineering/) | How-tos: the UI hub, APK testing, ops runbook, logging | Devs |
+| [`archive/`](archive/README.md) | Finished plans, old phase docs, old mocks, closed inboxes. History only — not current | Look up only |
 
 ### Key entry points
+- **Where we are now:** [`ai/STATUS.md`](ai/STATUS.md) — current round, who does what
+- **Owner rules:** [`ai/decisions.md`](ai/decisions.md) · **not done yet:** [`ai/backlog.md`](ai/backlog.md)
+- **Roadmap:** [`product/roadmap-1.0.md`](product/roadmap-1.0.md) — **canonical** plan up to 1.0
+- **Every screen, sheet, picker:** [`ai/app-map.md`](ai/app-map.md)
 - **Product overview:** [`product/overview.md`](product/overview.md) — what & who
-- **Roadmap:** [`product/roadmap-1.0.md`](product/roadmap-1.0.md) — **canonical** plan up to 1.0 (the old [`product/phases.md`](product/phases.md) is cancelled, history only)
-- **Current phase detail:** [`product/phase0/overview.md`](product/phase0/overview.md)
 - **Design overview:** [`design/overview.md`](design/overview.md) — map of the technical docs
 
 ---
@@ -46,27 +50,22 @@ All repos live side-by-side in the same parent folder so cross-repo references w
 ## Working on each repo — what to read first
 
 ### Working on `chubi-pocket-be`
-1. [`design/api/api-document.md`](design/api/api-document.md) — endpoint contracts
+1. `chubi-pocket-be/internal/apidoc/openapi.yaml` — the API contract the code is tested against; [`design/api/api-v2-notes.md`](design/api/api-v2-notes.md) — the rules the yaml can't say
 2. [`design/database/schema.md`](design/database/schema.md) — DB schema
 3. [`design/spec/`](design/spec/overview.md) — module behavior, business rules
 4. Release scope: [`product/roadmap-1.0.md`](product/roadmap-1.0.md)
 
 ### Working on `chubi-pocket-app`
 1. [`design/frontend/app/overview.md`](design/frontend/app/overview.md) — architecture (Bloc / go_router / dio / Repository pattern)
-2. [`design/api/api-document.md`](design/api/api-document.md) — what the BE exposes
-3. [`product/ui-design/app/`](product/ui-design/app/overview.md) — screens, flows
+2. [`engineering/app-hub.md`](engineering/app-hub.md) — the UI kit and hub: every UI piece lives there first
+3. [`design/api/api-document.md`](design/api/api-document.md) — what the BE exposes
 4. [`design/spec/`](design/spec/overview.md) — feature mechanics
 5. [`engineering/android-apk-testing.md`](engineering/android-apk-testing.md) — local dev + sideload to phone
 
-### Working on `chubi-pocket-web`
-1. [`design/frontend/overview.md`](design/frontend/overview.md) — frontend conventions
-2. [`design/api/api-document.md`](design/api/api-document.md)
-3. [`product/ui-design/`](product/ui-design/) — design references
-
 ### Doing anything cross-repo
-- API change → update [`design/api/api-document.md`](design/api/api-document.md) **before** changing BE or clients. Treat it as the contract.
+- API change → update `openapi.yaml` (and [`design/api/api-document.md`](design/api/api-document.md)) **before** changing BE or clients. Treat it as the contract.
 - DB change → update [`design/database/schema.md`](design/database/schema.md) at the same time as the migration.
-- New feature → check [`product/phases.md`](product/phases.md) is in current phase scope.
+- New feature → check it is in [`product/roadmap-1.0.md`](product/roadmap-1.0.md) scope.
 
 ---
 
@@ -75,7 +74,13 @@ All repos live side-by-side in the same parent folder so cross-repo references w
 ### Editing
 - All docs are markdown. Use relative links between files.
 - Specs (`design/spec/NN-*.md`) are numbered for reading order; keep numbering stable.
-- When a doc says it's "canonical" for something (e.g., `phases.md`), changes there are the authoritative source — sync derived references when you change it.
+- When a doc says it's "canonical" for something (e.g., `roadmap-1.0.md`), changes there are the authoritative source — sync derived references when you change it.
+- `ai/` notes follow their own rules: `STATUS.md` is rewritten, `decisions.md` is edited in place, `inbox/*.md` is append-only (see [`ai/inbox/README.md`](ai/inbox/README.md)).
+
+### Archive
+- A doc that is finished or replaced moves to `archive/` **at the same relative path** (`product/phases.md` → `archive/product/phases.md`), so an old path in a log still finds it.
+- Add a line to [`archive/README.md`](archive/README.md) saying why, and fix the live links that pointed at it.
+- Never edit archived docs; their own relative links may be broken.
 
 ### Git
 - **Personal identity:** commits in this multi-repo use `ppChub722 <poompich.e@gmail.com>` (matches the GitHub account). The global git config on this machine uses a different (work) email — set local config explicitly:
@@ -89,4 +94,4 @@ All repos live side-by-side in the same parent folder so cross-repo references w
 
 ## Status
 
-Live on 0.3.1-10. Solo dev, AI-assisted. The plan runs to 1.0 only (owner 2026-10-15): see [`product/roadmap-1.0.md`](product/roadmap-1.0.md). Day-to-day state: [`ai/STATUS.md`](ai/STATUS.md).
+Solo dev, AI-assisted. The plan runs to 1.0 only (owner 2026-10-15): see [`product/roadmap-1.0.md`](product/roadmap-1.0.md). Day-to-day state: [`ai/STATUS.md`](ai/STATUS.md).

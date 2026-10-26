@@ -1,6 +1,6 @@
 # คู่มือขึ้น VPS ใหม่ — ได้เครื่องปุ๊ป deploy ได้เลย
 
-> เขียนโดย DevOps · 2026-10-12 · ใช้คู่กับ [vps-migration.md](vps-migration.md) (เหตุผล/แผนภาพรวม) และ repo `ppforge-infra` (`projects/ppforge-infra`)
+> เขียนโดย DevOps · 2026-10-12 · ใช้คู่กับ [vps-migration.md](../archive/engineering/vps-migration.md) (archived) (เหตุผล/แผนภาพรวม) และ repo `ppforge-infra` (`projects/ppforge-infra`)
 > **ข้อมูลทั้งหมดสำรองไว้แล้ว** ที่ `projects/chubi-pocket/backups/vps-happyhost-2026-10-13/` (ดู `INVENTORY.md` ในโฟลเดอร์นั้น) — มี secret ห้าม commit ห้ามวางเนื้อหาในแชต
 > **สูตร restore ในไกด์นี้ทดสอบแล้ว** กับ dump จริงบน Postgres 15 (ตารางครบ 23, migration 53); ส่วน `bootstrap.sh` **ยังไม่เคยรันบนเครื่องจริง** — ดูผลลัพธ์แต่ละบรรทัดตอนรัน
 

@@ -1,6 +1,6 @@
 # 09 — Saving Goals
 
-> **0.3.1-10 — Saving goals v2 (migration 060, owner mockup `design/mockups/goals-v2.html`, 2026-10-13).** Section 0 replaces everything below: the wallet link, the % allocation, ALLOCATION_EXCEEDED, free % and `/accounts/:id/saving-allocations` are gone. Shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`, tag **Saving goals**.
+> **0.3.1-10 — Saving goals v2 (migration 060, owner mockup `archive/design/mockups/goals-v2.html`, 2026-10-13).** Section 0 replaces everything below: the wallet link, the % allocation, ALLOCATION_EXCEEDED, free % and `/accounts/:id/saving-allocations` are gone. Shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`, tag **Saving goals**.
 
 > **0.4.0-2 (updated 2026-10-20).** A goal (and ยังไม่จัดสรร) has MANY auto-saves, each with its own wallet, amount and repeat rule (migration 067). `?month=` gives any month's `month_plan` / `month_saved` / `month_short`. The saving goals list hero is rebuilt with a month stepper. All in §0.9. The recurring "saving" type is retired (§0.4). Fields: [`api-document.md` §09](../api/api-document.md#09--saving-goals).
 

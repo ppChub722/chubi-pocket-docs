@@ -9,7 +9,7 @@ _Last updated: 2026-10-24 by Lead (chubi-pocket-99), joint commit of the one-ses
 - Lead full run (2026-10-22): flutter analyze clean · flutter test 1274 pass + 1 red (feature_visuals ratchet), which FE fixed (147/0 on re-run) · go vet clean · go test all packages pass, 0 skip.
 - Local BE was rebuilt from the wip tree on 2026-10-24: migration **073**, health 200; backup `chubi-pocket/backups/local-before-rebuild-073-2026-10-24.dump`. Test DB `chubi_test_043` is still at 070 (migrate it before go tests).
 - 2026-10-24 joint commit: all sessions' work on wip/0.4.0-3, with NO analyze or tests run since the 2026-10-22 full run (owner's word). Run both before closing the round.
-- Mocks (owner-approved): artifact https://claude.ai/artifact/Xi3uisai5ZGpT4jHmfCdsb ("Chubi 0.4.0-3 Mocks"). Local copies for sessions without the Artifact tool: `design/mocks/0.4.0-3/*.dc.html`.
+- Mocks (owner-approved): artifact https://claude.ai/artifact/Xi3uisai5ZGpT4jHmfCdsb ("Chubi 0.4.0-3 Mocks"). Local copies for sessions without the Artifact tool: `archive/design/mocks/0.4.0-3/*.dc.html`.
 
 ## How 0.4.0-3 was run (owner 2026-10-21)
 - Page by page: the owner and Lead settle one page, Lead briefs at once (ai/decisions.md → "Page-by-page rounds").
@@ -73,4 +73,4 @@ _Last updated: 2026-10-24 by Lead (chubi-pocket-99), joint commit of the one-ses
 - 2026-10-24: sessions still open are chubi-pocket-7d and event (ad); 28, 4c and 41 have closed. Migration 073 changes the personal_debts table (`unlinked_project_transaction_id`); tell the next debt-page session.
 - Earlier (2026-10-22): Lead = chubi-pocket-48 · FE = chubi-pocket-55 · BE = chubi-pocket-39.
 - Reports → ai/inbox/<role>.md + ONE-line ping; devs may talk directly. Lead runs the full suite once at the end.
-- Rules: ai/decisions.md · not started / discussed: ai/backlog.md · old log: CURRENT-WORK.md (frozen 2026-10-11).
+- Rules: ai/decisions.md · not started / discussed: ai/backlog.md · old log: archive/CURRENT-WORK.md (frozen 2026-10-11) · finished docs: archive/ (see archive/README.md).

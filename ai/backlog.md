@@ -4,8 +4,27 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
 
 Release scope comes from `product/roadmap-1.0.md` (owner 2026-10-15). Items here that the roadmap puts out of scope (Play Store, monetization, web / admin, receipt photos, multi-currency) are dropped.
 
+## 0.4.2: per-user navigation (owner 2026-10-26; not designed or briefed yet)
+- **Owner's words:** each user arranges the bottom bar and the More page freely: group, reorder, and hide by how they use the app. Hiding a module hides ALL of it (e.g. no debts at all → every debt entry point is gone).
+- **What it covers:**
+  - Bottom bar: which pages sit in the slots and in what order.
+  - More page: the user's own groups (create / rename / delete), cards moved between groups and reordered freely.
+  - Hide a module: its bottom-bar slot, More card, dashboard / home cards, settings rows, quick-create modes, the "ผูกกับ" tabs / rows and pickers that lead to it, me/counts badges and notification types. Hidden = gone from the UI; the data stays (unhide brings it back).
+- **What exists today:** only compile-time flags (`lib/ui/tokens/app/app_modules.dart`, all true) + `offModuleRedirect` in `lib/app/shell/tab_nav.dart`. The known gap from 0.3.1 still applies: a hidden module's cards / rows have to be hidden by each page (the redirect only blocks the route).
+- **Likely shape (to confirm with the owner):**
+  - The layout is saved per user on the BE (preferences), so it follows the user across devices; the app keeps a local copy for offline start.
+  - One runtime "modules + layout" source (replacing the const flags) that every entry point reads, plus a ratchet test that fails any entry point to a module that doesn't check it.
+  - An edit mode on the More page (drag to reorder / move between groups, add / rename a group, show / hide toggles) and a picker for the bottom-bar slots.
+- **Open questions:**
+  - Which pages can never be hidden or moved (home, transactions, settings, More itself)? How many bottom-bar slots, and is the centre + fixed?
+  - Modules that depend on each other: hiding contacts while debts / events stay on; hiding debts while event bills still create debts (book_debts) or splits exist.
+  - Existing data in a hidden module: does it still count in dashboard / reports / wallet balances? (Proposal: balances always count; module-specific cards and badges hide.)
+  - Shared things: a shared wallet / event from someone else when that module is hidden for me.
+  - Defaults for new users, and whether onboarding asks "which features do you use".
+- **Size (first guess):** M–L. The arrange / hide UI is moderate; the long tail is finding and gating every entry point to a module across the app (pickers, quick create, home, badges, notifications).
+
 ## 0.4.0-4 carried over from 0.4.0-3 (owner 2026-10-24: "ยกไปทำรอบ 0.4.0-4")
-- **Test diet: DONE 2026-10-24** (app wip/0.4.0-4 `9465e44`; plan in ai/reports/test-diet-2026-10-24.md; brief ai/briefs/test-diet-brief.md). 1,148 → 362 tests, 173 → 87 files, the full run takes 83 s (it was 40+ min), all green, analyze clean. UI is tested only by the hub smoke + 6 kit-usage ratchets; every logic gap was pulled out of its widget and tested, except swipe-back (accepted). The hub smoke found 3 kit overflows + 1 hub demo, all fixed. The red tests left from 0.4.0-3 are gone (deleted with their files, or fixed).
+- **Test diet: DONE 2026-10-24** (app wip/0.4.0-4 `9465e44`; plan in ai/reports/test-diet-2026-10-24.md; brief archive/ai/briefs/test-diet-brief.md). 1,148 → 362 tests, 173 → 87 files, the full run takes 83 s (it was 40+ min), all green, analyze clean. UI is tested only by the hub smoke + 6 kit-usage ratchets; every logic gap was pulled out of its widget and tested, except swipe-back (accepted). The hub smoke found 3 kit overflows + 1 hub demo, all fixed. The red tests left from 0.4.0-3 are gone (deleted with their files, or fixed).
   - Still untested (accepted): G7 the contact page's catch of a malformed body; G14 the user-currency extension (BuildContext; a pure `currencySymbolFor(AuthState)` would make it testable); the per-handler glue in notifications (snackbar / navigation); `_AppErrors.describe` (lib/ui/domain/l10n/app_ui_config.dart) lost its only test.
   - Found while doing it (not bugs today): SavingGoalDetail.copyWith drops deletePreview and every field not passed.
 - **Events** (handoff from the event session; log in inbox/fe-events.md rounds 1–4):
@@ -222,7 +241,7 @@ Release scope comes from `product/roadmap-1.0.md` (owner 2026-10-15). Items here
 ## Infra / process
 - Offsite backup copy runs in release.sh; the prod QA account was declined.
 - Migration squash + reset/seed scripts (deferred).
-- VPS migration plan exists (`engineering/vps-migration.md`); bring it up only when the owner asks.
+- VPS migration: done 2026-10-24 (ppForge box, `engineering/ops-runbook.md`); the old plan is `archive/engineering/vps-migration.md`.
 
 ## Dashboard: "แผนเดือนนี้" (owner 2026-10-13: a dashboard sub-feature, later)
 - Expected income (recurring) − recurring bills − goal contributions − category budgets = free to spend, plus a daily allowance. Built on Recurring.

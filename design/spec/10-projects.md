@@ -1,6 +1,6 @@
 # 10 — Projects
 
-> ⚠️ **REDESIGNED in Phase 2 (migration 27).** The behavior described below from "three ledgers, one shared view" through the Resolve / claim flow is the legacy design. The current model is **"project as a separate book"** — see [`../plans/project-as-separate-book.md`](../plans/project-as-separate-book.md) for the canonical description. Key changes:
+> ⚠️ **REDESIGNED in Phase 2 (migration 27).** The behavior described below from "three ledgers, one shared view" through the Resolve / claim flow is the legacy design. The current model is **"project as a separate book"** — see [`project-as-separate-book.md`](../../archive/engineering/project-as-separate-book.md) (archived plan) for the original description. Key changes:
 >
 > - Project ledger is **fully decoupled** from personal books — no auto-sync, no claim flow, no shared SQL view.
 > - **Splits live as child rows in `project_transactions`** (parent row + N children, linked by `parent_project_transaction_id`). The standalone `shared_expense_splits` table is no longer used by projects.
@@ -1181,7 +1181,7 @@ event page later reuses the same list-shaped add):
   with `transaction_ids` only. Same pull as §4.24 (auto members, auto-claimed
   board row).
 - **The splits MOVE onto the board** (owner 2026-10-10,
-  [`project-as-separate-book.md`](../../engineering/project-as-separate-book.md)
+  [`project-as-separate-book.md`](../../archive/engineering/project-as-separate-book.md)
   — no debt lives in both books): the bill's personal splits become the
   board row's member splits and leave the bill the usual way (a linked
   partner gets `split_changed` removed, or their pending `split_created` is
@@ -1225,7 +1225,7 @@ event page later reuses the same list-shaped add):
   A row fully split to others has no share: no auto copy, and "add to my
   book" is `400 NOTHING_TO_COPY`.
 - **A pending draft can carry an event** (2026-10-11): `draft.project_id` on
-  `POST/PUT /v1/pending-transactions` ([contract §14](../api/ux-overhaul-contract.md)).
+  `POST/PUT /v1/pending-transactions` ([contract §14](../../archive/design/api/ux-overhaul-contract.md), archived).
   Not checked at save; on confirm the draft takes the "new bill into an
   existing event" path of `POST /v1/projects/:id/bills` (same rules: active,
   non-viewer member of an active event; splits go onto the board) in the same

@@ -24,18 +24,11 @@ A personal finance application for tracking expenses, splitting bills, automatin
 
 ---
 
-## Phase summary
+## Release plan
 
-| Phase | Goal | Highlights | Currency | Platforms |
-|---|---|---|---|---|
-| **0** — Foundation | Scaffolding ready for feature work | Repo + CI, backend/frontend skeletons, auth, settings, UX state patterns, multiplatform verification | THB | Android, Web |
-| **1** — Feature completeness | Every feature works end-to-end | All modules in 3 sub-milestones (1a single-user core, 1b multi-user + dashboard + notifications, 1c planning) | THB | Android, Web |
-| **2** — UX polish | Pleasant to use | Dashboard + charts, multi-currency, push delivery, onboarding, receipt photos, export, performance | Multi-currency | Android, Web |
-| **3** — Production | Ready to sell / deploy | VPS + CI/CD, monitoring, backups, security, one Next.js web app (power editing + role-gated admin), monetization, legal | Multi-currency, global | Android, Web (Next.js) |
+The plan runs to 1.0 only: [`roadmap-1.0.md`](roadmap-1.0.md) (owner 2026-10-15, re-planned 2026-10-26). Phases 0 and 1 shipped; the old Phase 2 / Phase 3 plan is cancelled (history in [`../archive/product/phases.md`](../archive/product/phases.md)). Out of scope until 1.0: Play Store, monetization, the Next.js web / admin app, receipt photos, multi-currency conversion.
 
-iOS is **not planned** through Phase 3 (no dev device). Revisit post-launch.
-
-Per-phase scope, exit criteria, risks, and dependencies in [`phases.md`](phases.md).
+iOS is **not planned** (no dev device).
 
 ---
 
@@ -85,22 +78,12 @@ Cross-cutting user journeys. Each flow may touch multiple modules. Mechanics liv
 
 ```
 docs/
+├── ai/                               ← the team's live record (STATUS, decisions, backlog, briefs, inbox, releases)
 ├── product/                          ← what / when / who (this folder)
 │   ├── overview.md                    ← you are here
-│   ├── phases.md                      ← canonical development plan per phase
-│   ├── phase0/                        ← Phase 0 operational handoff plan (split per role + concern)
-│   │   ├── overview.md                 ← index, locked decisions, exit criteria
-│   │   ├── be.md                       ← Backend engineer checklist
-│   │   ├── fe.md                       ← Frontend engineer checklist
-│   │   ├── designer.md                 ← Designer refinement opportunities (placeholders ready)
-│   │   ├── db.md                       ← Database setup (Docker, migrations)
-│   │   └── ci-cd.md                    ← CI/CD (deferred from Phase 0)
-│   └── ui-design/                     ← designer + FE-dev shared screens (per client)
-│       └── app/                        ← Flutter app screens (Phase 0–3)
-│           ├── overview.md
-│           ├── design-sheet.md         ← brand + tokens + components (placeholders ready)
-│           ├── flows.md                ← user journeys
-│           └── screens/                ← per-screen specs
+│   └── roadmap-1.0.md                 ← canonical release plan up to 1.0
+├── engineering/                      ← how-tos: app hub (UI kit), APK testing, ops runbook, logging
+├── archive/                          ← finished / replaced docs (old phase plans, old ui-design, old mocks)
 │
 └── design/                           ← how it's built
     ├── overview.md                    ← design entry point + tech stack rationale + migration conventions
@@ -122,8 +105,10 @@ docs/
 | Question | Where |
 |---|---|
 | Why are we building this? | This file (vision, users, value) |
-| What ships in Phase X? | [`phases.md`](phases.md) |
-| What does this screen look like? | [`ui-design/app/screens/`](ui-design/app/screens/) |
+| What ships in which release? | [`roadmap-1.0.md`](roadmap-1.0.md) |
+| Where are we right now? | [`../ai/STATUS.md`](../ai/STATUS.md) |
+| What screens exist? | [`../ai/app-map.md`](../ai/app-map.md) |
+| What does a UI piece look like? | The hub: [`../engineering/app-hub.md`](../engineering/app-hub.md) |
 | What's the data model? | [`../design/database/schema.md`](../design/database/schema.md) |
 | How does feature X work end-to-end? | [`../design/spec/NN-*.md`](../design/spec/) per module |
 | What's the API for X? | Same module spec + [`../design/api/api-document.md`](../design/api/api-document.md) |
@@ -134,8 +119,8 @@ docs/
 
 ## Status
 
-- **Phase** — **Phase 1 complete** (1a + 1b + 1c shipped end-to-end), plus post-1c additions: shared wallets (spec 14), project planned_amount, quick-create events, income splits, closed-beta logging. Phase 2 (UX polish) up next; first VPS deploy in progress. See [`phases.md`](phases.md).
-- **Last updated** — 2026-09-16
+- **Where we are** — Phase 1 shipped; releases now follow [`roadmap-1.0.md`](roadmap-1.0.md). Current round: [`../ai/STATUS.md`](../ai/STATUS.md).
+- **Last updated** — 2026-10-26 (phase plans and ui-design moved to `archive/`)
 - **Version** — 0.7 (web direction: single Next.js app replaces Flutter-web-shell + Nuxt-3-power-web + separate admin; Flutter web demoted to dev tool)
 - **Version** — 0.6 (restructure: combined per-phase docs into single `phases.md`; moved `ui-design/` from design/ to product/; renamed design folders dropping numeric prefixes; reorganized `frontend/` to anticipate per-client subfolders for Phase 3 admin + power-user web)
 - **Version 0.5** — link rot fix; documented `/v1/` versioning
