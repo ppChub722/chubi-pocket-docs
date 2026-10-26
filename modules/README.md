@@ -1,80 +1,45 @@
-# 01 — Spec
+# Modules — how each feature works
 
-Backend behavior — what the system does and why, organized per feature module. Each numbered file documents one feature end-to-end: schema reference, API endpoints, flows, and design decisions.
+One file per feature module: schema reference, API behaviour, flows and design decisions. Start with [`product.md`](product.md) for what the app is and the user flows, then open the module you need.
 
-**Audience:** backend engineers (primary), AI tools consuming context for codegen, frontend devs cross-checking flows.
+**For one module, look in this order:**
+1. Its spec below (`NN-*.md`). A `§0` / "0.x" block at the top replaces older text further down.
+2. The owner's rules for it in [`../rules/decisions.md`](../rules/decisions.md) (search the rule names in the table). **The newest owner rule wins** over the spec.
+3. The exact contract: `chubi-pocket-be/internal/apidoc/openapi.yaml` + [`../ref/api-v2-notes.md`](../ref/api-v2-notes.md), the tables in [`../ref/schema.md`](../ref/schema.md), the screens in [`../ref/app-map.md`](../ref/app-map.md).
+4. What the team did last: the inbox in the last column.
 
-**Not in this folder:**
-- API request/response contracts → [`../api/api-document.md`](../api/api-document.md)
-- Column-level schema (types, constraints, indexes) → [`../database/schema.md`](../database/schema.md)
-- Frontend / Flutter design → [`../frontend/app/`](../frontend/app/)
-- Product context (what we're building, for whom) → [`../../product/overview.md`](../../product/overview.md)
+| File | Module | Owner rules (`rules/decisions.md`) | Team inbox |
+|---|---|---|---|
+| [01-auth.md](01-auth.md) | Authentication | — | `be` |
+| [02-users.md](02-users.md) | User profile + preferences | Profile settings page, Currency | `be` |
+| [03-accounts.md](03-accounts.md) | Wallets (accounts) | Wallet, Wallet "no balance" mode, Delete vs archive | `be` |
+| [04-transactions.md](04-transactions.md) | Transactions | Quick create, "ผูกกับ" section, Paid by someone else, Pending drafts, Splits | `fe-core`, `be` |
+| [05-categories-tags.md](05-categories-tags.md) | Categories + tags | Delete vs archive, Chips | `be` |
+| [06-shared-expenses.md](06-shared-expenses.md) | Split bills | Splits, Paid by someone else | `be` |
+| [07-contacts.md](07-contacts.md) | Contacts | Contacts vs debts, Contact page, Contact detail page, Contact picker, Person look, Person display name, Avatars | `be` |
+| [08-budgets.md](08-budgets.md) | Budgets | Budgets, Budgets v2 | `be` |
+| [09-saving-goals.md](09-saving-goals.md) | Saving goals | Saving goals, Saving goals v2 | `be` |
+| [10-projects.md](10-projects.md) | Events (was projects) | Events, Event tags, Deleting an event with bills, My book vs the event book | `fe-events`, `be` |
+| [11-scheduled-transactions.md](11-scheduled-transactions.md) | Recurring (replaced scheduled) | Recurring + upcoming, Recurring occurrences, Recurring list page, One-off upcoming is CUT | `fe-recurrent`, `be` |
+| [12-personal-debts.md](12-personal-debts.md) | Debts | Debt model, Debt direction words, Debt quick create, Debts people list, Wording, Ledger, not sync | `fe-debts`, `be` |
+| [13-notifications.md](13-notifications.md) | Notifications | — | `be` |
+| [14-shared-wallets.md](14-shared-wallets.md) | Shared wallets | Wallet | `be` |
+| [15-slip-import.md](15-slip-import.md) | Slip import → pending drafts | Pending drafts | `be` |
 
----
+Inboxes are in [`../team/inbox/`](../team/inbox/README.md). UI-wide rules (hub first, list pages, hero card, chips, edit mode…) are in the UI part of `rules/decisions.md`, and the kit itself in [`../build/app-hub.md`](../build/app-hub.md).
 
-## Cross-cutting documents
-
-These describe rules that span multiple modules:
+## Cross-cutting
 
 | File | Purpose |
 |---|---|
 | [data-model.md](data-model.md) | Cross-table inventory + ERD + key relationship notes |
 | [business-rules.md](business-rules.md) | Global invariants enforced across multiple modules |
 | [design-decisions.md](design-decisions.md) | Schema-wide architecture choices (UUID v7, JWT, archive-on-delete, FK naming rule, audit columns) |
-| [soft-delete-policy.md](soft-delete-policy.md) | Per-table delete behavior (hard-delete vs archive vs anonymize) |
-
----
-
-## Per-module specs
-
-Each `NN-*.md` file owns one feature module. File numbering matches `../database/schema.md` section numbering.
-
-| File | Module | Tables it owns |
-|---|---|---|
-| [01-auth.md](01-auth.md) | Authentication | `users`, `refresh_tokens`, `email_verification_tokens`, `password_reset_tokens`, `oauth_identities` |
-| [02-users.md](02-users.md) | User profile + preferences | `user_preferences`, `notification_preferences` (additions to `users`) |
-| [03-accounts.md](03-accounts.md) | Financial accounts | `accounts` |
-| [04-transactions.md](04-transactions.md) | Personal transactions | `transactions` |
-| [05-categories-tags.md](05-categories-tags.md) | Categories + tags | `categories`, `tags`, `transaction_tags` |
-| [06-shared-expenses.md](06-shared-expenses.md) | Split bills | `shared_expense_splits` |
-| [07-contacts.md](07-contacts.md) | Contact book + linking | `contacts`, `contact_invites` |
-| [08-budgets.md](08-budgets.md) | Budgets | `budgets` |
-| [09-saving-goals.md](09-saving-goals.md) | Saving goals | `saving_goals` |
-| [10-projects.md](10-projects.md) | Projects + project ledger | `projects`, `project_members`, `project_invites`, `project_transactions` |
-| [11-scheduled-transactions.md](11-scheduled-transactions.md) | Recurring + installments | `scheduled_transactions` |
-| [12-personal-debts.md](12-personal-debts.md) | Personal debt tracking | `personal_debts` |
-| [13-notifications.md](13-notifications.md) | Notifications + settings | `notifications`, `user_notification_settings` |
-| [14-shared-wallets.md](14-shared-wallets.md) | Shared wallets (multi-member accounts) | `account_members` (wallet rows live in ordinary `transactions`) |
-
----
+| [soft-delete-policy.md](soft-delete-policy.md) | Per-table delete behavior (hard delete vs archive vs anonymize) |
 
 ## Per-module file structure
 
-Each `NN-*.md` follows this shape:
+Each `NN-*.md` follows this shape: phase / version summary → schema (full definitions in [`../ref/schema.md`](../ref/schema.md)) → API with behaviour context → core concepts / flows → design decisions → open questions → status. File numbers match the section numbers in `ref/schema.md`.
 
-1. **Phase summary** — what's available in Phase 0/1, 2, 3
-2. **Schema** — short table inventory; full definitions in [`../database/schema.md`](../database/schema.md)
-3. **API** — endpoints with flow / behavior context (formal contracts in [`../api/api-document.md`](../api/api-document.md))
-4. **Core concepts / flows** — how the module behaves end-to-end
-5. **Design decisions** — module-specific rationale (cross-cutting decisions live in [design-decisions.md](design-decisions.md))
-6. **Open questions** — TBD items
-7. **Status** — phase, last updated, version
-
----
-
-## Where to start
-
-- **New to the system** → read modules in numeric order (`01-auth.md` first, then `02-users.md`, ...).
-- **Implementing one feature** → jump straight to that module.
-- **Need cross-cutting context** → start with [data-model.md](data-model.md) for the ERD, [business-rules.md](business-rules.md) for invariants, [design-decisions.md](design-decisions.md) for the "why".
-- **Calling the API from frontend** → go to [`../api/api-document.md`](../api/api-document.md). The spec files explain *why* an endpoint behaves a certain way; the API doc is the contract.
-- **Adding a new table** → check [design-decisions.md](design-decisions.md) for FK naming + audit-column rules first, then update [`../database/schema.md`](../database/schema.md) and the relevant module spec.
-
----
-
-## Status
-
-- **Phase** — Planning (pre–Phase 1)
-- **Last updated** — 2026-09-11
-- **Version** — 0.3 (added module 14 — shared wallets)
-- **Version 0.2** — restructured as pure entry point: API conventions moved to `../api/api-document.md`; cross-cutting content extracted to dedicated files in this folder
+- **New to the system** → read modules in numeric order.
+- **Adding a new table** → [design-decisions.md](design-decisions.md) for FK naming + audit columns, then update [`../ref/schema.md`](../ref/schema.md) and the module spec.

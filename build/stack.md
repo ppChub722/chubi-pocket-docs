@@ -1,32 +1,8 @@
-# Design
+# Stack & conventions
 
-Technical design documentation for ChubiPocket — how the app is built. Backend behavior, API contracts, database schema, and frontend client implementation.
+Why the app is built the way it is: the tech choices, their rationale, and the migration rules. For the Flutter architecture see [`app-architecture.md`](app-architecture.md); for client-wide API handling see [`client-conventions.md`](client-conventions.md); for the UI kit see [`app-hub.md`](app-hub.md).
 
 **Audience:** backend and frontend engineers; AI tools consuming context for codegen and questions.
-
-**Not in this folder:**
-- Product context (what we're building, for whom, which release) → [`../product/overview.md`](../product/overview.md) and [`../product/roadmap-1.0.md`](../product/roadmap-1.0.md)
-- UI pieces (tokens, kit, page templates) → the hub, see [`../engineering/app-hub.md`](../engineering/app-hub.md)
-
----
-
-## Folders in this design set
-
-| Folder | Purpose | Entry point | Audience |
-|---|---|---|---|
-| [spec/](spec/overview.md) | Backend behavior, business rules, design decisions, per-module flows | [spec/overview.md](spec/overview.md) | BE devs, AI |
-| [frontend/](frontend/overview.md) | Frontend implementation per client (currently `app/` Flutter; Phase 3 adds `web/` — one Next.js app incl. role-gated admin) | [frontend/overview.md](frontend/overview.md) | FE devs |
-| [database/](database/schema.md) | Single consolidated reference for every DB table | [database/schema.md](database/schema.md) | BE devs, AI |
-| [api/](api/api-document.md) | Single source of truth for every HTTP endpoint (contracts) | [api/api-document.md](api/api-document.md) | BE + FE devs, AI |
-
-### Why split into four folders
-
-- **spec — Backend behavior.** What the system does and why. Per-module narratives (flows, business rules, decisions). Cross-cutting docs for ERD, global conventions, soft-delete policy.
-- **frontend — Frontend engineering, per client.** Stack choices, state management, routing, widget API, build/deploy. One subfolder per client (`app/` for Flutter today; `admin/` and `web/` for Phase 3). The UI kit itself is documented in the hub (`engineering/app-hub.md`), not here.
-- **database — Schema source of truth.** Every table, column, constraint, index in one searchable file. Order matches `spec/` numbering.
-- **api — API contract source of truth.** Every endpoint, request/response shape, error codes in one file. Postman / OpenAPI exports are derived from it.
-
-Each folder owns one concern. No content duplicated between them — instead, files cross-reference.
 
 ---
 
@@ -64,7 +40,7 @@ Each folder owns one concern. No content duplicated between them — instead, fi
 - **Versioning** — `/v1/...` from day 1; full path `/api/v1/auth/login`
 - **Style** — REST; resource-oriented URLs; standard HTTP verbs and status codes
 - **Auth** — Bearer JWT in `Authorization` header
-- **Error envelope** — uniform `{ "error": { "code", "message", "details" } }` shape; details in [`spec/overview.md`](spec/overview.md)
+- **Error envelope** — uniform `{ "error": { "code", "message", "details" } }` shape; details in [`spec/overview.md`](../modules/README.md)
 
 Not used / explicitly rejected:
 - **Provider** (Flutter package) — superseded by Bloc + Repository pattern
@@ -75,7 +51,7 @@ Not used / explicitly rejected:
 
 ## Migration conventions
 
-Schema migrations are SQL files in the backend repo (`backend/migrations/NNNNNN_description.sql`), authored by engineers from the schema-as-target-state in [`database/schema.md`](database/schema.md). Conventions:
+Schema migrations are SQL files in the backend repo (`backend/migrations/NNNNNN_description.sql`), authored by engineers from the schema-as-target-state in [`database/schema.md`](../ref/schema.md). Conventions:
 
 - **Tool** — `golang-migrate` (sequential numbering, separate `up` and `down` files)
 - **Naming** — `NNNNNN_action_table.sql` (e.g., `000018_create_contacts_table.up.sql` + `.down.sql`)
@@ -87,21 +63,6 @@ The actual list of migrations for a given phase is **derived** from the schema d
 
 ---
 
-## Where to start
-
-- **Just looking around** → read this file, then click into the folder that matches your role.
-- **Backend dev implementing a feature** → [`spec/overview.md`](spec/overview.md) → relevant `NN-*.md` module → [`api/api-document.md`](api/api-document.md) for endpoint contract → [`database/schema.md`](database/schema.md) for table.
-- **Frontend dev building a screen** → [`../engineering/app-hub.md`](../engineering/app-hub.md) for the kit (hub first) → [`frontend/app/overview.md`](frontend/app/overview.md) for stack + state patterns → [`api/api-document.md`](api/api-document.md) for endpoints.
-- **Designing a new table** → [`spec/overview.md`](spec/overview.md) (FK naming, audit columns) → [`database/schema.md`](database/schema.md) → relevant module spec in `spec/`.
-- **Calling the API** → [`api/api-document.md`](api/api-document.md). It's self-contained.
-- **AI / agent reading for context** → start here, then drill into the specific entry-point file based on the question.
-
----
-
 ## Status
 
-- **Current release and round** — see [`../ai/STATUS.md`](../ai/STATUS.md)
-- **Last updated** — 2026-10-26 (links moved off the archived phase / ui-design docs)
-- **Version** — 0.5 (restructure: dropped numeric prefixes from folder names; `02-flutter` renamed to `frontend/` and reorganized into per-client subfolders for Phase 3 admin + power-user web; `05-ui-design` moved to `../product/ui-design/`; absorbed platforms-stack rationale from former `product/01-platforms-stack.md`; added migration conventions section)
-- **Version 0.4** — 4 folders with single entry points; `api/` added
-- **Audience** — backend + frontend engineers; AI assistants
+- **Last updated** — 2026-10-26 (was `design/overview.md`; the folder map moved to the root README)
