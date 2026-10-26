@@ -1,0 +1,264 @@
+# Backlog (discussed, not started)
+
+Lead keeps this list current. Delete an item once it's briefed, or move it into STATUS "In progress".
+
+Release scope comes from `now/roadmap-1.0.md` (owner 2026-10-15). Items here that the roadmap puts out of scope (Play Store, monetization, web / admin, receipt photos, multi-currency) are dropped.
+
+## 0.4.3: per-user navigation (owner 2026-10-26; not designed or briefed yet)
+- **Owner's words:** each user arranges the bottom bar and the More page freely: group, reorder, and hide by how they use the app. Hiding a module hides ALL of it (e.g. no debts at all → every debt entry point is gone).
+- **What it covers:**
+  - Bottom bar: which pages sit in the slots and in what order.
+  - More page: the user's own groups (create / rename / delete), cards moved between groups and reordered freely.
+  - Hide a module: its bottom-bar slot, More card, dashboard / home cards, settings rows, quick-create modes, the "ผูกกับ" tabs / rows and pickers that lead to it, me/counts badges and notification types. Hidden = gone from the UI; the data stays (unhide brings it back).
+- **What exists today:** only compile-time flags (`lib/ui/tokens/app/app_modules.dart`, all true) + `offModuleRedirect` in `lib/app/shell/tab_nav.dart`. The known gap from 0.3.1 still applies: a hidden module's cards / rows have to be hidden by each page (the redirect only blocks the route).
+- **Likely shape (to confirm with the owner):**
+  - The layout is saved per user on the BE (preferences), so it follows the user across devices; the app keeps a local copy for offline start.
+  - One runtime "modules + layout" source (replacing the const flags) that every entry point reads, plus a ratchet test that fails any entry point to a module that doesn't check it.
+  - An edit mode on the More page (drag to reorder / move between groups, add / rename a group, show / hide toggles) and a picker for the bottom-bar slots.
+- **Open questions:**
+  - Which pages can never be hidden or moved (home, transactions, settings, More itself)? How many bottom-bar slots, and is the centre + fixed?
+  - Modules that depend on each other: hiding contacts while debts / events stay on; hiding debts while event bills still create debts (book_debts) or splits exist.
+  - Existing data in a hidden module: does it still count in dashboard / reports / wallet balances? (Proposal: balances always count; module-specific cards and badges hide.)
+  - Shared things: a shared wallet / event from someone else when that module is hidden for me.
+  - Defaults for new users, and whether onboarding asks "which features do you use".
+- **Size (first guess):** M–L. The arrange / hide UI is moderate; the long tail is finding and gating every entry point to a module across the app (pickers, quick create, home, badges, notifications).
+
+## 0.4.0-4 carried over from 0.4.0-3 (owner 2026-10-24: "ยกไปทำรอบ 0.4.0-4")
+- **Test diet: DONE 2026-10-24** (app wip/0.4.0-4 `9465e44`; plan in team/reports/test-diet-2026-10-24.md; brief archive/ai/briefs/test-diet-brief.md). 1,148 → 362 tests, 173 → 87 files, the full run takes 83 s (it was 40+ min), all green, analyze clean. UI is tested only by the hub smoke + 6 kit-usage ratchets; every logic gap was pulled out of its widget and tested, except swipe-back (accepted). The hub smoke found 3 kit overflows + 1 hub demo, all fixed. The red tests left from 0.4.0-3 are gone (deleted with their files, or fixed).
+  - Still untested (accepted): G7 the contact page's catch of a malformed body; G14 the user-currency extension (BuildContext; a pure `currencySymbolFor(AuthState)` would make it testable); the per-handler glue in notifications (snackbar / navigation); `_AppErrors.describe` (lib/ui/domain/l10n/app_ui_config.dart) lost its only test.
+  - Found while doing it (not bugs today): SavingGoalDetail.copyWith drops deletePreview and every field not passed.
+- **Events** (handoff from the event session; log in inbox/fe-events.md rounds 1–4):
+  - Setting "แก้บิลที่ลงบัญชีแล้ว" (ask / always / never) + the prompt when a booked bill is edited. Today an edit never touches my linked tx / debt amounts: the sheet never sends also_update_link / apply_to_my_tx. The BE already has applyBillToTxTx for the tx; debts have no sync at all.
+  - BE tests for PUT /projects/:id/project-transactions/:pt_id/my-books:
+    - unlink tx / debt / repay
+    - relink finds the old rows; relink with nothing remembered → relinked = []
+    - the bill origin round-trip (linked_transaction_id ↔ unlinked_transaction_id)
+    - my_books flags on BoardRow
+  - Cleanup (owner's call): resolve_sheet.dart and quick create's project mode are unused; unused keys fpEventsBudgetUsed, fpEventsBudgetLeft, fpEventsTagsFilterLabel.
+  - Optional: an event-shaped first-load skeleton for event detail (today the generic DetailPageSkeleton; the owner seemed fine with it).
+- **Kit** (handoff from 7d; details in inbox/fe-core.md, top 2 entries):
+  - Buttons not yet on AppButton / AppIconButton:
+    - kit: AppMessage (tone-coloured TextButton; AppButton may need a colour option), ErrorView "ลองใหม่", AppListHeader ListHeaderAction.link, SplitRowAction ✕, ChatDial, the colour dialog in IconMakerSheet, AmountInput ±, HintLine, the fold buttons (AppHeroFoldButton / DueCard)
+    - other pages: DueMoreRow "ดูทั้ง N งวด ›" (recurring), CycleDivider "ดูรอบก่อน ▾" (debts)
+    - borderline: the wallet's "ยังไม่มีเลขบัญชี" tap (maybe AddTile), the top bar back + crumb link, boot_error_app (runs before the theme)
+  - Move pages to AppListHeader + AppListToolbar (hub /dev/ui/molecules/list-header; no page moved yet), then delete SectionHeader / DateGroupHeader / DueGroupHeader / ListToolbar.
+    - Owner rules: header title 14 w600 everywhere; categories / tags / contacts keep the search open.
+    - Recurring calendar: filter beside 🔍, search + sort under 🔍, the picked day as a "วันนี้ ✕" chip.
+  - Detail rows still on DetailRow / SplitRow instead of AppListRow (view mode only; edit keeps SplitRow): tx detail splits (_splitRow), wallet members (_MemberRow), IdentifierRow, the goal page's _autoLine, ShareRow, the contact page's linked-account row.
+  - Open for the owner: a % chip on the budget card (ProgressCard)?
+  - Cleanup (check with the owners first): EventCard, PositionRow, WalletCard, BreakdownRow, ProgressHeroFooter, ProgressSummary, HintLine; key fpWalletCardUsedLabel.
+- **Lead / quick create, open questions for the owner:**
+  - debt wallet card: "ยังไม่ได้เลือก" vs "ตั้งใจไม่ระบุกระเป๋า"
+  - the contact page's edit-mode name size
+  - should the events list page also get "เพิ่มบิล"?
+  - cleanup of unused debt pieces: DebtResultBox, debtSentence* keys, showSettleSheet, SavingMoveSheet (no callers)
+  - BE share message wording: personal_debts/message.go still says ฉันรอรับจาก / ฉันรอจ่ายให้ (app wording is now ลูกหนี้ / เจ้าหนี้)
+
+## 0.4.0-3 not yet discussed (2026-10-22)
+- **Income + ผูกกับ tabs**: today income keeps the old section (จ่ายแทน is expense-only). Option A: income gets [ส่วนตัว | แบ่ง | อีเวนต์]; option B: keep as is. Lead recommends A.
+- **Debt open bits**: the earlier-cycle "open count" (a debt in a cleared cycle without the paid label still counts as open; proposal: count only the current cycle); the person tx filter (counterparty_key) doesn't list split-source bills. Both proposals were asked; the owner didn't answer.
+- **B3 leftovers**: the preview shows person + wallet deltas, not event-board positions; editing a bill's payer / members from tx detail goes through the bill edit.
+- **Recurring ต้องจัดการ: bulk confirm / skip API (owner 2026-10-23: "เตรียมแก้ api แต่รอก่อน ขอดู ui ก่อน"; drafted by chubi-pocket-4c, NOT started).**
+  - UI now: ต้องจัดการ is two boxes (รอใส่ยอด with an amount field per row / รอยืนยัน with the amount + ✓); every row has a check; ยืนยันที่เลือก / ข้ามที่เลือก. The app calls `POST /recurring/{rule}/occurrences/{slot}/confirm|skip` once per row.
+  - Owner rule: confirming a row with no amount typed records it as 0 (after a warning) so the user fixes it later. The BE refuses that today: `ErrAmountRequired` in slot.go confirm (amount nil or <= 0). Until the BE allows it, those rows fail with an error snack.
+  - Proposed contract: `POST /recurring/occurrences/bulk`, body `{ "action": "confirm" | "skip" | "mark_paid", "items": [ { "rule_id", "slot", "amount"? } ] }`. One DB transaction. Response `{ "items": [...], "balances": [...], "left_out": [ { "rule_id", "slot", "reason" } ] }` (same shapes as settle-all).
+  - Open for the owner: is a 0-amount transaction allowed everywhere (tx validation, reports, budgets), or should it be a draft-like "recorded, amount pending" state?
+
+## 0.4.0-2 leftovers (2026-10-20, waiting on the owner's go)
+- **Tests (run 2026-10-20, see STATUS "Where it stands"):** all green except นายD's folders: 13 failures waiting for the owner's "fix" in his session (12 stale `saving_goals_pages_test` cases + `core/data/sync_coordinator_test`, likely pre-existing / flaky, since the sync code is unchanged this round).
+- **Cleanup pass: DONE 2026-10-20** (นายA, A18; details in `inbox/fe-a.md` "A18 cleanup pass DONE"). Left for later:
+  - TEST-ONLY code, to drop when its stale tests are fixed after the first run: `TxPeriod.canStepForward`, `RecurringRepository.calendar`.
+  - The old-BE fallback on the recurring detail (`_occurrenceMenu`, repo `editOccurrence` / `setItemArchived` / `updateItem`, `editRecurringItem`): drop it once the BE with C3 is deployed.
+  - Temporary claude.ai mock artifacts: only on the owner's word.
+- **BE:** budget item tag colors: DONE (C5 `tag_refs`).
+- **Found while documenting (2026-10-20, not verified by a run):**
+  - BE: future-dated EVENT bills counted as budget `used`. FIXED by นายC (they now count as expected until their day; test TestBudgetFutureEventBillIsExpected; spec 08 §0.2 updated). The local BE needs a restart to pick it up, on the owner's word.
+  - App: the spare pool (ยังไม่จัดสรร) page still edits ONE auto-save, while the BE takes many.
+  - App: the budgets list chip sums each budget's `used`, while the ring uses the BE `total_used`, which counts each row once. With overlapping budgets the two can differ. The owner chose "sum every budget" for the chip.
+  - Docs: stale history left in 04 (`is_recurring` / `scheduled_transaction_id`), 03 §3.11 and 09 §1–§4 (kept as history by the files' own headers).
+- **Docs debt:** `ref/api-document.md` was updated for this round by นายD (2026-10-20). Still open: spec 09 / 10 for the new list / detail layouts, if wanted.
+- **Cut one-off upcoming (decided 2026-10-20, not briefed; see decisions.md):**
+  - BE:
+    - future-dated tx stay in transactions
+    - balances, reports, dashboard and budget "used" cut at today
+    - migrate the existing one-off upcoming rows into transactions
+    - drop the one-off path and the move-out-of-transactions logic
+    - api-document + spec updates
+  - App:
+    - quick create: the future-date hint says it is a future transaction (no "goes to the recurring page")
+    - tx list / detail: dimmed rows with "อีก N วัน"
+    - the recurring page no longer lists one-offs
+  - Open: count future tx as รอจ่าย in budgets?
+- **Recurring redesign (list OK; detail drafted 2026-10-20; not coded):** mock https://claude.ai/artifact/96eCKWTzYmNHySepKXewaC.
+  - นายA surveyed the FE and BE. Both are L.
+  - 7 owner questions are open:
+    1. Wallet balance with future tx: subtract at read time, or a deferred apply + daily job.
+    2. Existing one-off rows: convert or delete.
+    3. No-end occurrences past the horizon: computed live, or an auto-rolling horizon.
+    4. Keep edited / skipped occurrences when a rule changes.
+    5. Batch select in the history tab.
+    6. Drop `RecurringItemPage`.
+    7. Occurrence names for the special frequencies.
+  - The BE tree has uncommitted work: `internal/shared/recurrence/`, migration 000067. Find out whose before touching it.
+- **Pending page, later (owner 2026-10-20, not this round):**
+  - Recurring is no longer in pending; due occurrences are handled on the recurring page.
+  - Add a link row "รายการประจำ: ค้าง N งวด ›" on the pending page.
+  - Old recurring pending drafts are left as they are.
+- **Hero / icon prep (decided 2026-10-20, not coded; see decisions.md → Module icons, Hero facts get icons, List hero heads):**
+  - Kit:
+    - `HeroFact(icon:)` + a hub demo. The icon mapping is in the R7CX mock note (ใช้ไป = receipt, รอจ่าย = clock, แผนถึงวันนี้ = trending up, ใช้ได้วันละ = calendar, รอบใหม่เริ่ม = repeat, ยังไม่จัดสรร = wallet, เป้าหมาย = flag / target, …).
+    - The module icon tile for list heroes. It goes on every list hero: budgets, goals, recurring, wallets (the net moves up beside it) and transactions (no mock yet).
+  - `AppIcons.budget` → a pie / donut. Check every use: Home / More tiles, menus, pickers, hub.
+  - Budgets list hero:
+    - Icon tile + summary chip (sum each budget's plan-to-date; reuse `bgStatusOnPlan` / `bgStatusAhead` / `bgStatusOverBy`).
+    - Drop `bgSummaryUsedCaption`.
+    - Values: `bgRingTotalLeft` → เหลือทั้งหมด, `bgFactUsedTotal` → ใช้ไปทั้งหมด.
+  - Goals list hero:
+    - Piggy tile + big เงินออมทั้งหมด + `StepperPill.month` for the plan ring.
+    - BE: the month plan for months other than the current one (today only the current month).
+- **Open question:** less air between the hero amount field's label and the number (`AppInputSize.hero`, geometry tests). Not decided.
+
+## 0.4.0-1 review leftovers (2026-10-18)
+- The other detail pages (budget, goal, wallet, category, …) still need the new edit rules (`rules/decisions.md` → Editable look): no ✏️ when the page can't be edited, long-press to edit, dashed = editable, no 🔒.
+- An `EditAccess` enum (editable / locked / hidden per field) was not created; the rules live in `EditModeMixin`'s doc for now.
+- Rows with mini (20) chips are not on the dashed rule yet.
+
+## 0.3.1-11: currency auto from the user setting (owner 2026-10-15; rules in decisions.md → Currency)
+- BE: fill every record's currency from the user's setting; allow changing the user currency (relabel, no conversion).
+- FE: remove hard-coded THB / ฿ (events create, budgets create, goals list, …) → the user's currency with its decimals; profile setting becomes editable with a warning.
+
+## Offline mode leftovers (FE-B handoff 2026-10-13; the core is done, the tree is green)
+- Page-specific submit buttons are not disabled while offline: quick create, auth, and pages with their own AppButtons.
+- The shell wiring has no tests. Nobody has run it against a stopped local BE yet (ask DevOps to stop the container).
+- The BE should spec `GET /health` in OpenAPI; it was added to the api_flows baseline.
+
+## Bugs reported by the owner (logged, not briefed)
+- **Bottom bar missing after a fast back** (2026-10-13, prod 0.3.1-9): pressing back quickly from an edit page that hides the bottom bar (via ShellChromeHider) to a main tab leaves the bottom bar hidden. Likely a race in the hide/show (the restore runs before the pop finishes, or the hide of the leaving page lands after the show). Owner: "ยังไม่แก้ รับเรื่องไว้ก่อน".
+- **Contact detail "doesn't open"** (2026-10-13, prod build 55). FE-D checked it: NOT a code bug. The VPS went offline again ~21:55, and the page sits on the skeleton for 10–25 s (connect 10 s + receive 15 s) before the error + retry shows. Fix proposal (Lead: do it in the template, all detail pages):
+  - any load failure, not only ApiException, → full-page error + retry (today a non-Api exception leaves the skeleton forever; contact_detail_page `_load` ~line 86)
+  - show the error / retry sooner (shorter detail-load timeout)
+- Seen in the same screenshot (not reported by the owner): on Profile settings, scrolled content shows through under the status bar at the top ("ชื่อที่แสดง" drawn behind the clock), and a filled email shows stacked (the one-row question is still open).
+
+## Note for the scheduled / recurrence round (owner 2026-10-12)
+- Places using DayOfMonthGrid (scheduled tx, wallet statement/due day…) may need CUSTOM recurrence: every N weeks, several days a month (e.g. the 3rd and 27th), etc.
+- Consider borrowing the Google Calendar recurrence model (iCal RRULE: FREQ / INTERVAL / BYDAY / BYMONTHDAY) and its "custom repeat" UI.
+
+## 0.3.1-10: debts rework (after the API cleanup, owner 2026-10-12)
+- Debts UI gets finished ONCE in 0.3.1-10, together with the model rework (owner 2026-10-13). No more debts UI tweaks in 0.3.1-9: today's state is the hub-adopted minimal one; cancel sits in การจัดการ until the model removes it.
+- API item C (`/personal-debts/people` + `/people/:key`, paged, live names) built together with the new debt model.
+- Bugs held for that round:
+  - scheduled detail "not found" (the scheduled round)
+
+## (done) App hub (design system), BOTH FEs, before any feature work (owner 2026-10-12: "design first, then features")
+- Phase 0 map is DONE: `team/inbox/fe-a.md` "App hub, Phase 0: THE MAP" (106 rows, missing atoms AppInput / AppCard / AppText…, 30 hub pages, FE-A/FE-B split, ~12–14 days). It has 8 owner questions, open.
+- Phase 1 (the bulk move, a half-day freeze) starts after the 0.3.1-8 APK is out.
+- **Architecture:**
+  - ppForge UI library (core, later) → app UI layer = the gate (`ui.dart`, app tokens, domain components, app hub) → features import only the gate
+  - no core yet: build the app hub now and extract the core from it later
+- **Discipline:**
+  - tag every piece `generic` / `domain`
+  - generic pieces never import features / app models / l10n strings / money colours
+  - tokens split into structure vs app values
+- **Phases:**
+  - 0. FE-A map (read-only): level, generic/domain, users, blockers, missing atoms (AppInput…), folder plan, hub URL map → owner review
+  - 1. move files into `lib/ui/{tokens,atoms,molecules,organisms,templates,domain}`, no behaviour change
+  - 2. the new English-only hub replaces /dev:
+    - every piece gets its own page with all variants + "used by"
+    - Templates: DetailPage / ListPage / FormSheet / TransactionDetail
+    - Debug: Logs, Imports lab, Theme switcher
+    - delete the old gallery + detail playground (D1)
+    - QA re-points its scripts
+  - 3. missing atoms, one at a time (hub first, then migrate)
+  - 4. the detail standard leftovers, decided on the DetailPage template:
+    - placeholder values: faint, tap → edit + add
+    - 🔒 next to the value
+    - every green section heading has a description right under it
+    - tinted hero background + a faint watermark icon for every entity
+    - wallet: "เลขอ้างอิง", one slip hint, a members description, the "ในรายงานของฉัน" duplicate
+- FE-A's earlier /dev tidy-up proposal (team/inbox/fe-a.md) is superseded by this plan.
+
+## Debts rework (after the UI round; model agreed in principle, confirm details before briefing)
+- **New model:**
+  - a debt is a record "who owes whom how much"
+  - "mark paid" is just a label; to stop counting a debt, delete it
+  - repayment transactions tie to the PERSON (contact / name), not to a debt
+  - net per person = debts − repayments (overpaid simply flips the side)
+- No notifications on pay/receive (only on creation + split edits).
+- **Quick create:** mode chips [รายการ] [จ่ายหนี้]. Debt mode = pick a person (PersonMark, only people with open debts) → amount → wallet; optional "mark these debts paid" (multi-select). From a debt page the centre + opens debt mode preset to that person; the + button colour follows the page.
+- **Debt pages:**
+  - list = people list like contacts (3-level PersonMark)
+  - person detail = hero (net) + tabs "รายการหนี้" (default: a timeline of debts + repayments; search/filter/sort shows debts only) and "ประวัติการจ่าย" (repayment txs, with search/filter/sort)
+- **BE work:** repayment tx linked to a counterparty instead of `source_personal_debt_id`; `settled_amount` semantics retired; person net endpoint; repayment history in the API. Debt PUT may change identity/amount only for manual debts (split debts are edited on the transaction).
+- **Bugs:**
+  - **B1–B7** (BE survey; most disappear with the new model)
+  - FE debt survey issues: overpaid edit blocked, mixed currencies summed, stale caches, the "ค้างอยู่" label on settled
+- **QA explore 2026-10-11** (`team/inbox/qa.md`; scripts `team/qa/`, `node run-debts.mjs`):
+  - FAIL: a deleted debt's URL shows a generic error, not "not found"
+  - notes:
+    - a cancelled debt still shows คงค้าง
+    - deleting a debt leaves its repayment txs
+    - English system category names "Debt Received/Paid"
+    - ติด wording differs between the More tile and the list
+    - the URL doesn't follow pushed pages
+    - no discard prompt on the new-debt form
+    - "ลบหนี้นี้" sits below the fold
+- **Docs:** spec 12 / 13 / schema are stale (BE drift report). Rewrite them with the new model.
+
+## Remaining pages (after the UI round; surveys done, discuss page by page with the owner)
+- **Events:**
+  - list shows only 20 (no paging)
+  - THB hard-coded on a new event
+  - type maxLength 50 vs BE 30
+  - planned-on-create double call
+  - the resolve sheet's category chip has no icon / colour (the model it gets has no getter; FE-D 2026-10-13)
+  - multi-select add from the event page
+  - member picker → PickerSheet
+  - "โปรเจกต์ → อีเวนต์" wording (~33 strings)
+- **Budgets:**
+  - spent doesn't refresh after tx changes
+  - THB on create
+  - cards/period picker on kit
+  - archived view
+  - past periods (needs BE)
+- **Scheduled:**
+  - paused/cancelled vanish (FE-only bug: status=active hard-coded)
+  - stale detail after cancel / last installment
+  - raw ISO dates
+  - status not shown in the list
+  - the form is still old-style (shared DraftForm)
+- **Saving goals:**
+  - ฿ hard-coded in the list
+  - no free-capacity hint on create
+  - progress not refreshing
+  - archived view
+  - BE archived-wallet snapshot conflicts with the hide rule
+
+## UI kit (pending owner decision)
+- Every chip on AppChip: one Material `ActionChip` is left (`lib/ui/organisms/app_date_range_picker.dart`). The sizes are decided (mini 20 / chip 28 / control 36).
+- Detail patterns: pick one design for 7 divergences (✏️ placement, status placement, scheduled _VariantPill / goal AppBadge, archive colour, meta line, empty note on event/wallet, PickerTile vs DetailRow ›).
+- Date picker is still Material (calendar): own picker later?
+
+## Infra / process
+- Offsite backup copy runs in release.sh; the prod QA account was declined.
+- Migration squash + reset/seed scripts (deferred).
+- VPS migration: done 2026-10-24 (ppForge box, `ops/ops-runbook.md`); the old plan is `archive/engineering/vps-migration.md`.
+
+## Dashboard: "แผนเดือนนี้" (owner 2026-10-13: a dashboard sub-feature, later)
+- Expected income (recurring) − recurring bills − goal contributions − category budgets = free to spend, plus a daily allowance. Built on Recurring.
+
+## Small open items (0.3.1-11)
+- Tapping a pending 🐷 saving draft confirms it directly; it should open an edit sheet first (fe-saving).
+
+## NEXT: 0.3.1-11 UI review round (owner 2026-10-13 04:30; 0.3.1-10 shipped as is)
+- Owner on the local build: "UI แปลกมาก น่าจะต้องปรับอีกเยอะ". Flow: owner sends screenshots per page → Lead discusses → fixes at the kit / template root (pixel tests) → release 0.3.1-11.
+
+## Recurring + subscriptions round (owner 2026-10-17; discussed, not briefed)
+- **Recurring picker (link a tx to a recurring):** tx detail and quick create get a "รายการประจำ" row in the section renamed "ผูกกับ" (owner 2026-10-17, was "แบ่งรายการ"; rows แบ่งกับคน · อีเวนต์ · รายการประจำ), right after the event row; the picker holds recurring + เตือนจ่าย, "likely" group first (category / amount match). Linking a เตือนจ่าย makes this tx the period's real amount. Mock: artifact "Chubi List Pages" → รายการ → Quick create. Tap → a recurring picker sheet (active rules, search; "+ create a new recurring from this tx" prefilled with amount / category / wallet / day). Linking makes the tx that period's occurrence (upcoming → in tx). Binds to the CURRENT period's occurrence (owner 2026-10-17): that occurrence is consumed (state → in tx with the tx id), so it leaves upcoming and no pending draft is made for it (an existing pending draft for it is removed). If the amount differs: ask once whether to update the rule; a mismatch is fine either way.
+- **Subscription flag:** a "เป็นค่าสมาชิก" switch on the recurring setup (owner picked the switch over category-based). The recurring list card shows ค่าสมาชิก / บิลอื่น ๆ tiles with per-month + per-year totals (tappable filters).
+- **Wanted:** 9 quarterly "review subscriptions" prompt (yearly totals, one-tap pause) · 10 free-trial end date + reminder 2 days before · 11 yearly renewal reminder 7 days before · 12 shared subscription (family plan): auto-create debts for the members each period · 15 installments "งวด 3/10 · ends …" · 16 move one occurrence's date / skip it · 17 calendar month view (interesting, later) · 18 reminder 1 day before due (needs push, 0.4).
+- **Decided:** 13 how-to-cancel = just the note field · 14 an occurrence's amount is always editable (no averaging).
+- **Also decided (owner 2026-10-17):** no "repeat" switch in quick create (the recurring picker covers it) · no templates · from slips → later, with the slip-scan work · duplicate: recurring page first (every record type later) · price change = the amount-mismatch question above.
+- **Not picked yet:** 2 auto-detect repeating txs → suggest.
+- **เตือนจ่าย (owner 2026-10-17):** bills / card payments are NOT recurring money. They become a recurring type "เตือนจ่าย": same setup (name, description, category, tags, wallet, rule; expense or transfer) but the amount is optional. On the day: a notification + a pending draft WITHOUT an amount ("ใส่ยอด"); the amount is entered in pending or on the recurring page; a draft without an amount can't be confirmed. Recurring types: ค่าสมาชิก / ผ่อนชำระ / รายรับ / เตือนจ่าย (no ออม: auto-saving lives on the goal; no บิล / โอน types).
+- **Recurring page = 3 swipeable tabs** (labels visible, under the summary card): รายการประจำ · เตือนจ่าย · ปฏิทิน. One summary card: "30 วันข้างหน้า ต้องจ่าย ฿X · รอใส่ยอด n รายการ".
+- **Page indicator on every swipe-tab page (owner 2026-10-17, noted, do later "all at once"):** the dots under swipeable tabs (active = a short teal pill, others = grey dots) on EVERY page with swipe tabs: wallet detail, event detail, recurring (3 tabs), saving-goal detail (2 tabs), plus any other TabbedListPageBody / AppTabBar page (fe-core to list them). One kit piece (name proposal `AppPageIndicator`), exported in ui.dart and demoed in the hub (hub convention); built into the swipe-tab template so pages get it for free. Placement (owner 2026-10-17): at the END of each tab's content, in the flow (not floating, not sticky, not under the tab bar). lib/ui is frozen → do it with the library UI round or as a kit exception.
