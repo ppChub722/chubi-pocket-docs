@@ -9,13 +9,14 @@ _Owner decision 2026-10-15. Replaces the phase plan in [`phases.md`](../archive/
 
 ## Releases (re-planned by the owner 2026-10-26)
 
-The 0.4.0-N rounds became the UI rounds (0.4.0 to 0.4.0-4, all shipped). What the old plan put in 0.3.1-11, 0.3.2, 0.3.3 and 0.4 and is still open moved into 0.4.1 / 0.4.2 below.
+The 0.4.0-N rounds became the UI rounds (0.4.0 to 0.4.0-4 shipped; the 0.4.0 round closes before 0.4.1-0 starts). What the old plan put in 0.3.1-11, 0.3.2, 0.3.3 and 0.4 and is still open moved into 0.4.1 – 0.4.3 below.
 
 | Version | Scope |
 |---|---|
 | **0.4.1-0** | Leftovers: everything still open from the earlier rounds (list below). |
-| **0.4.1-1** | LLM: free text → LLM → pending draft (JSON), then LLM drafts for every module (was 0.3.2 / 0.3.3). |
-| **0.4.2** | The old 0.4 features: dashboard incl. "แผนเดือนนี้", push notifications (FCM, no Play Store needed), auth refresh token, CSV export, onboarding, accessibility (dark mode is done), l10n sweep, **per-user navigation** (bottom bar and More page arranged by each user: group, reorder, hide; a hidden module disappears app-wide; details in `ai/backlog.md`). |
+| **0.4.1-1** | **Linked = synced** (owner 2026-10-26), mostly BE: anything linked keeps the same values — my tx ↔ event bill ↔ other members' copies (for members who turned sync on), debts ↔ their tx / bill, recurring occurrence ↔ its tx. Editing one side updates the others with a notification; unsync breaks the link; a share that drops to 0 stays linked at 0 (the DB accepts 0 amounts for synced rows); every user setting lives on the server. Details: `ai/briefs/0.4.1-0-plan.md` → Owner answers. |
+| **0.4.2** | **LLM focus:** free text → LLM → pending draft (JSON), then LLM drafts for every module (was 0.3.2 / 0.3.3). |
+| **0.4.3** | The old 0.4 features: dashboard incl. "แผนเดือนนี้", push notifications (FCM, no Play Store needed), auth refresh token, CSV export, onboarding, accessibility (dark mode is done), l10n sweep, **per-user navigation** (bottom bar and More page arranged by each user: group, reorder, hide; a hidden module disappears app-wide; details in `ai/backlog.md`). |
 | **0.5** | Hardening: migration squash + reset / seed scripts, monitoring (errors + uptime alerts), backup restore test, rate limiting, list performance (1000+ rows). |
 | **1.0** | Stable for the circle. Freeze. |
 

@@ -4,7 +4,7 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
 
 Release scope comes from `product/roadmap-1.0.md` (owner 2026-10-15). Items here that the roadmap puts out of scope (Play Store, monetization, web / admin, receipt photos, multi-currency) are dropped.
 
-## 0.4.2: per-user navigation (owner 2026-10-26; not designed or briefed yet)
+## 0.4.3: per-user navigation (owner 2026-10-26; not designed or briefed yet)
 - **Owner's words:** each user arranges the bottom bar and the More page freely: group, reorder, and hide by how they use the app. Hiding a module hides ALL of it (e.g. no debts at all → every debt entry point is gone).
 - **What it covers:**
   - Bottom bar: which pages sit in the slots and in what order.
