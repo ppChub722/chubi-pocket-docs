@@ -4,6 +4,11 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
 
 Release scope comes from `now/roadmap-1.0.md` (owner 2026-10-15). Items here that the roadmap puts out of scope (Play Store, monetization, web / admin, receipt photos, multi-currency) are dropped.
 
+## Forced update does nothing on real phones (found by AI-1, 2026-10-26; needs the owner's call)
+- `release-apk.sh` builds with `--split-per-abi`, so Android's versionCode is ABI × 1000 + build: arm64 build 170 = **2170** (Firebase shows "0.4.1-0 (2170)").
+- The app sends `PackageInfo.buildNumber` as `X-App-Build`, so a phone sends 2170. An old 0.4.0-4 phone sends 2167, which passes `MIN_APP_BUILD=170`; `hasUpdateFor` never prompts either. Nobody is locked out, but the gate is a no-op.
+- Fix (S): the app sends `buildNumber % 1000`, or the BE takes `build % 1000` when build ≥ 1000. Until then, set the gate knowing that real phones send 1xxx / 2xxx.
+
 ## 0.4.3: per-user navigation (owner 2026-10-26; not designed or briefed yet)
 - **Owner's words:** each user arranges the bottom bar and the More page freely: group, reorder, and hide by how they use the app. Hiding a module hides ALL of it (e.g. no debts at all → every debt entry point is gone).
 - **What it covers:**

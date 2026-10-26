@@ -56,7 +56,21 @@ sudo docker logs chubi_app | grep <request_id> # ตามรอย request เ�
 cd /srv/chubi && sudo docker compose restart app
 ```
 
-### Deploy ทั้งหมดด้วยคำสั่งเดียว (ใช้อันนี้) — เพิ่ม 2026-10-08
+### Deploy BE บน ppForge (ที่ใช้จริง 2026-10-26, 0.4.1-0)
+`deploy.sh` ยัง build image **บน VPS** และ default host ยังเป็นเครื่องเก่า → **อย่าใช้กับ ppForge (1 GB)** จนกว่าจะแก้ script · ทำแบบนี้แทน (Git Bash, เครื่อง dev):
+```bash
+cd chubi-pocket-be && ./scripts/local-deploy.sh                      # build image จาก tree ที่ commit แล้ว (ได้ chubi-pocket-be-app:latest)
+docker tag chubi-pocket-be-app:latest chubi-be:prod-new
+docker save chubi-be:prod-new | gzip -1 | ssh ppforge 'gunzip | sudo docker load'
+tar -czf - migrations | ssh ppforge 'rm -rf ~/upload && mkdir -p ~/upload && tar -xzf - -C ~/upload'
+ssh ppforge 'sudo bash /srv/backup/backup.sh'                        # backup ก่อน migrate
+ssh ppforge 'sudo cp -r ~/upload/migrations/. /srv/chubi/migrations/ && cd /srv/chubi && sudo docker compose --profile tools run -T --rm migrate </dev/null'
+ssh ppforge 'sudo docker tag chubi-be:prod chubi-be:prev && sudo docker tag chubi-be:prod-new chubi-be:prod && cd /srv/chubi && sudo docker compose up -d app'
+curl -s https://chubipocket-api.ppforge.dev/health; curl -s https://chubipocket-api.ppforge.dev/api/v1/health
+```
+ถอย: `ssh ppforge 'sudo docker tag chubi-be:prev chubi-be:prod && cd /srv/chubi && sudo docker compose up -d app'` · gate อัปเดตแอป: ดูหัวข้อ "บังคับอัปเดตแอป" (backup `.env` ก่อนแก้ทุกครั้ง; เลข build ที่มือถือส่งจริงคือ 2xxx — ดู now/backlog.md)
+
+### Deploy ทั้งหมดด้วยคำสั่งเดียว (เครื่องเก่า — build บน VPS) — เพิ่ม 2026-10-08
 รันจาก **Git Bash** บนเครื่อง dev (ไม่ต้องเปิด Docker ในเครื่อง — image build บน VPS):
 ```bash
 cd chubi-pocket-be

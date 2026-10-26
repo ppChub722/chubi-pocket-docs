@@ -15,7 +15,7 @@ Global conventions (base URL, error envelope, data types, HTTP verbs) are in [`o
 | Concern | Phase 1b | Phase 2 | Phase 3 |
 |---|---|---|---|
 | `notifications` table + in-app inbox | ✅ | ✅ | ✅ |
-| Triggers: `split_created`, `split_paid`, `split_received`, `project_tx_recorded_for_you`, `project_invite`, `project_tx_changed`, `personal_debt_cancelled` | ✅ | ✅ | ✅ |
+| Triggers: `split_created`, `split_changed`, `project_tx_recorded_for_you`, `project_invite`, `project_tx_changed` (`split_paid` / `split_received` / `personal_debt_cancelled`: gone, §2.2) | ✅ | ✅ | ✅ |
 | Per-user preferences (`auto_notify`, `auto_resolve`, `default_account_id`, etc.) | ✅ | ✅ | ✅ |
 | Mark-read / mark-actioned / dismiss | ✅ | ✅ | ✅ |
 | Push delivery (FCM / APNs) | — | ✅ | ✅ |
@@ -74,41 +74,9 @@ The full set of notification types in Phase 1b. Each entry: when it fires, recip
 
 **Suppressed when:** the splitter's `auto_notify_linked_split_contacts = false` and no manual "send notification" choice was made.
 
-### 2.2 `split_paid` — RETIRED in 0.3.1-10
+### 2.2 `split_paid` / `split_received` — retired (migration 054)
 
-> Retired (migration 054): nothing is sent on pay / receive (owner rule). Repayments are person-ledger entries (spec 12 §0); the rows were deleted and the type removed from the mute / auto switches. Kept below for history.
-
-**Fires when:** a personal `transactions` row of type `expense` is inserted with `source_split_id` set, AND the split's creditor resolves to a linked user.
-
-**Recipient:** the creditor user.
-
-**Payload:**
-
-```json
-{
-  "split_id": "...",
-  "payer_user_id": "...",
-  "payer_display_name": "Bob",
-  "amount": 1000.00,
-  "currency": "THB",
-  "payer_transaction_id": "0190e5-tx2",
-  "project_id": "..." // null if no project
-}
-```
-
-**Deep-link:** project view → split detail (project context) or personal split detail.
-
-### 2.3 `split_received`
-
-**Fires when:** a personal `transactions` row of type `income` is inserted with `source_split_id` set (creditor recorded receipt), AND the split's debtor resolves to a linked user.
-
-**Recipient:** the debtor user.
-
-**Payload:** mirror of `split_paid` (with `receiver_*` fields instead of `payer_*`).
-
-**Deep-link:** split detail.
-
-Closure signal — tells the debtor "the creditor confirmed they got it." Mostly informational; suppressible per-user in Phase 2+.
+Replaced by the person ledger (054; repayments are transactions since 069): nothing is sent on pay / receive; `split_paid` rows were deleted and both types left the mute / auto switches. Current model: [spec 12](12-personal-debts.md) §0–§1.
 
 ### 2.4 `project_tx_recorded_for_you`
 
@@ -197,29 +165,9 @@ Added people get the ordinary `split_created`. If the partner hasn't added the s
 
 **Deep-link:** invite accept screen.
 
-### 2.7 `personal_debt_cancelled`
+### 2.7 `personal_debt_cancelled` — never built
 
-**Fires when:** a `personal_debts` row is updated to `status = 'cancelled'`, AND the debt's `source_split_id` is set, AND the split's creditor resolves to a linked user.
-
-**Recipient:** the creditor user.
-
-**Payload:**
-
-```json
-{
-  "personal_debt_id": "...",
-  "split_id": "...",
-  "debtor_user_id": "...",
-  "debtor_display_name": "Bob",
-  "amount": 1000.00,
-  "currency": "THB",
-  "note": "(optional cancel reason)"
-}
-```
-
-**Deep-link:** split detail. Lets the creditor know "Bob cancelled his tracking of this debt."
-
-Phase 2+. (Phase 1b: the cancel happens silently on the debtor's side; the creditor finds out at next sync.)
+Migration 054 dropped debt cancel / `status` (stop counting = delete); a removed split sends `split_changed` "removed" (§2.8). Current model: [spec 12](12-personal-debts.md) §0–§1.
 
 ### 2.9 `recurring_due` (0.3.1-10, migration 057; updated 2026-10-20, 0.4.0-2, migration 068)
 
@@ -340,7 +288,7 @@ Update settings. Body accepts any subset of the columns in §1.2.
 
 ### 4.1 Notifications, not events
 
-Notifications are stored as rows the recipient can see, mark, dismiss. They are NOT a generic event bus or audit log. Internal cross-module signaling (e.g., "split was paid → bump personal_debt") happens in the same database transaction via direct table updates, not via the notifications table.
+Notifications are stored as rows the recipient can see, mark, dismiss. They are NOT a generic event bus or audit log. Internal cross-module signaling (e.g., "split edited → update the debt") happens in the same database transaction via direct table updates, not via the notifications table.
 
 This keeps notifications small (only user-visible signals) and avoids accidentally building a brittle event-driven architecture out of UI-facing state.
 
@@ -377,7 +325,6 @@ Every notification has an `actor_user_id` (nullable for pure system events). Let
 `user_notification_settings` row is inserted at user signup with all defaults. Defaults aim for least-noise:
 - Auto-notify on splits with linked contacts: ON (the splitter expects coordination)
 - Auto-add to debt on receiving a split notification: OFF (forces the receiver to consciously decide)
-- Auto-record received payment: OFF (forces the receiver to confirm)
 - Auto-resolve own project_transactions: OFF (gives the user explicit control of their personal book)
 
 Users tune these in settings as they get familiar with the workflows.
@@ -394,12 +341,11 @@ The data model is the same in both phases; Phase 2 just adds a separate dispatch
 
 - **Push delivery infrastructure** — FCM token table, APNs cert handling, opt-in flow — Phase 2+ scope.
 - **Notification grouping** — "5 splits created in Japan trip" instead of 5 separate notifications. Phase 2+ UX.
-- **Per-trigger mute** — "don't notify me on `split_received`" — Phase 2+ granular settings.
+- **Per-trigger mute** — "don't notify me on `split_changed`" — Phase 2+ granular settings.
 - **Email digest** — Daily/weekly summary email — Phase 3+.
 - **Notification expiry** — Auto-delete read notifications after X days? — Phase 2+ cleanup job.
 - **Locale-aware notification text** — Server-side rendered display strings vs. client-side i18n. Phase 1b: client-side, payload is data only.
 - **Cross-device read state sync** — `read_at` is server-side, so trivially synced across devices. Confirm.
-- **`split_received` may be noisy** — if Alice does 10 receives across a trip, Bob gets 10 notifications. Phase 2+ grouping helps.
 
 ---
 

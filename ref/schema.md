@@ -55,9 +55,9 @@ For module behavior, API endpoints, design rationale, and cross-table invariants
 | [06 — (Removed: shared_expense_splits)](#06--removed-shared_expense_splits) | _merged into §12_                                                                                   |
 | [07 — Contacts](#07--contacts)                                              | `contacts`                                                                                          |
 | [08 — Budgets](#08--budgets)                                                | `budgets`, `budget_categories`, `budget_wallets`, `budget_periods` (v2, migration 059)              |
-| [09 — Saving Goals](#09--saving-goals)                                      | `saving_goals`, `saving_entries`, `saving_auto` (v2, migrations 060 / 062 / 067)                    |
+| [09 — Saving Goals](#09--saving-goals)                                      | `saving_goals`, `saving_entries` (v2, migration 060; `saving_auto` dropped in 077)                  |
 | [10 — Projects](#10--projects)                                              | `projects`, `project_members`, `project_transactions`, `event_tags`, `project_transaction_tags`, `project_my_tags` |
-| [11 — Recurring](#11--recurring) _(replaces Scheduled Transactions, migration 057)_ | `recurring_rules`, `recurring_items` (`scheduled_transactions` dropped)                 |
+| [11 — Recurring](#11--recurring) _(replaces Scheduled Transactions, migration 057)_ | `recurring_rules`, `recurring_items`, `recurring_due_checks` (`scheduled_transactions` dropped) |
 | [12 — Personal Debts](#12--personal-debts-bidirectional)                    | `personal_debts`                                                                                    |
 | [13 — Notifications](#13--notifications)                                    | `notifications`, `user_notification_settings`                                                       |
 | [14 — Shared Wallets](#14--shared-wallets)                                  | `account_members` (wallet rows live in ordinary `transactions`; migrated in 039)                    |
@@ -231,7 +231,7 @@ One row per user, 1:1 with `users`. Preferences are stored as a JSONB blob so ne
 
 | Key        | Type   | Phase | Allowed values                      |
 | ---------- | ------ | ----- | ----------------------------------- |
-| `timezone` | string | 1     | IANA tz identifier                  |
+| `timezone` | string | 1     | IANA tz identifier. The API saves only names Postgres knows; queries use the stored value as is (no per-query `pg_timezone_names` check). Migration 074 reset any unknown / empty value to `Asia/Bangkok` once |
 | `theme`    | string | 2     | `"light"` \| `"dark"` \| `"system"` |
 | `language` | string | 2     | IETF tag                            |
 | `fee_category_id` | string or null | 0.3.1 | UUID of one of the user's **expense** categories — fee drafts from bank slips get it (the "ใช้เป็นหมวดค่าธรรมเนียม" switch). `null` clears. Validated on write; a deleted category is ignored on read. [spec 15 §7](../modules/15-slip-import.md) |
@@ -356,7 +356,8 @@ Owned by [`../spec/04-transactions.md`](../modules/04-transactions.md).
 | `source_project_transaction_id` | `UUID`          | FK → `project_transactions.id`, NULLABLE   | Set when this transaction was created via the actor's claim of a project_transaction                                                                                                                                                     |
 | `repay_contact_id`              | `UUID`          | FK → `contacts.id` ON DELETE SET NULL, NULLABLE | Migration 069 (0.4.0-3). A REPAYMENT's debt person when it is a contact (mirrors `personal_debts.counterparty_contact_id`) |
 | `repay_person_name`             | `VARCHAR(100)`  | NULLABLE                                   | Migration 069. Set on every REPAYMENT: the person's name snapshot (mirrors `counterparty_person_name`). A repayment = an expense (I pay back, Debt Paid, balance +) or income (they pay me back, Debt Received, balance −) tied to the PERSON; person key = `c:<repay_contact_id>` or `n:<lower(trim(repay_person_name))>` (spec 12 §1.4) |
-| `paid_by_amount`                | `DECIMAL(15,2)` | NULLABLE                                   | Migration 070 (0.4.0-3). The part of this EXPENSE someone else paid for me. `amount` stays the bill (reports / budgets / my_share); the wallet moves only `amount − paid_by_amount` (the balance delta, `shared.SignedTxSQL`, wallet month flow). Its debt is the `personal_debts` row with `paid_for_transaction_id` = this row (spec 04 §2.8, spec 12 §1.5a) |
+| `paid_by_amount`                | `DECIMAL(15,2)` | NULLABLE                                   | Migration 070 (0.4.0-3). The part of this EXPENSE someone else paid for me. `amount` stays the bill (reports / budgets / my_share); the wallet moves only `amount − paid_by_amount` (the balance delta, `shared.SignedTxSQL`, wallet month flow). Its debt is the `personal_debts` row with `paid_for_transaction_id` = this row (spec 04 §2.8, spec 12 §1.5a). Migration 080 (0.4.1-0, "รับแทน"): also on an INCOME — someone received part of my income for me; the income counts its whole `amount`, the wallet moves `amount − paid_by_amount`, and the debt is "they owe me" (a `paid` entry) |
+| `unlinked_project_transaction_id` | `UUID`        | FK → `project_transactions.id` ON DELETE SET NULL, NULLABLE | Migration 073 (0.4.0-3). Set while "ลงบัญชีของฉัน" is off on an event bill: the row lost its `source_project_transaction_id` / `project_id` but stays in my books, and this remembers the bill so turning it on again links the same row back |
 | `created_at`                    | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                  |                                                                                                                                                                                                                                          |
 | `created_by_user_id`            | `UUID`          | FK → `users.id`, NULLABLE                  | NULL = system                                                                                                                                                                                                                            |
 | `updated_at`                    | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                  | Trigger-updated                                                                                                                                                                                                                          |
@@ -368,7 +369,7 @@ Owned by [`../spec/04-transactions.md`](../modules/04-transactions.md).
 - `amount > 0`
 - At most one of `source_personal_debt_id` / `source_project_transaction_id` is set
 - `transactions_repay_person_check` (migration 069): both `repay_*` NULL, OR `repay_person_name` non-blank AND `type IN ('expense', 'income')` AND `source_personal_debt_id IS NULL` AND `transfer_group_id IS NULL` (a repayment is never a debt's linked tx or a transfer leg)
-- `transactions_paid_by_check` (migration 070): `paid_by_amount IS NULL` OR (`paid_by_amount > 0` AND `paid_by_amount <= amount` AND `type = 'expense'`)
+- `transactions_paid_by_check` (migration 080; 070 allowed only `expense`): `paid_by_amount IS NULL` OR (`paid_by_amount > 0` AND `paid_by_amount <= amount` AND `type IN ('expense', 'income')`)
 - `project_id IS NOT NULL` ⇒ at least one source is set (one-way implication: project_id can never appear without a source, but a source CAN exist with `project_id = NULL` — the personal-context debt settle case where the debt has no project)
 
 **API-layer cross-field rules:**
@@ -389,6 +390,7 @@ Owned by [`../spec/04-transactions.md`](../modules/04-transactions.md).
 - `INDEX idx_transactions_transfer_group ON transactions(transfer_group_id) WHERE transfer_group_id IS NOT NULL`
 - `UNIQUE INDEX idx_transactions_source_personal_debt ON transactions(source_personal_debt_id) WHERE source_personal_debt_id IS NOT NULL` — one wallet transaction per debt entry (unique since migration 054)
 - `INDEX idx_transactions_source_pt ON transactions(source_project_transaction_id) WHERE source_project_transaction_id IS NOT NULL` — claim lookup
+- `INDEX idx_transactions_unlinked_pt ON transactions(unlinked_project_transaction_id) WHERE unlinked_project_transaction_id IS NOT NULL` — relink lookup (migration 073)
 - `INDEX idx_transactions_repay_contact ON transactions(user_id, repay_contact_id) WHERE repay_contact_id IS NOT NULL` and `INDEX idx_transactions_repay_name ON transactions(user_id, LOWER(TRIM(repay_person_name))) WHERE repay_person_name IS NOT NULL AND repay_contact_id IS NULL` — a person's repayments (migration 069)
 - `INDEX idx_transactions_user_updated ON transactions(user_id, updated_at)`, `INDEX idx_transactions_account_updated ON transactions(account_id, updated_at)` — sync fingerprints (`POST /sync`, `X-Sync-Versions`: max(updated_at) + count per user), migration 066
 
@@ -404,7 +406,7 @@ Migration 046 (owner design 2026-10-08), kind `saving` added in 060. Drafts wait
 | ----------------------- | ------------- | --------------------------------------------------- | ----------- |
 | `id`                    | `UUID`        | PK (v7)                                             | |
 | `user_id`               | `UUID`        | FK → `users.id`, NOT NULL, ON DELETE CASCADE        | Owner |
-| `source`                | `VARCHAR(32)` | NOT NULL, DEFAULT `'manual'`                        | Where the draft came from — free text so new sources need no migration: `manual`, `split_paid`, `project_copy`, `project_update`, `ocr`, `chat`, `auto_save` (saving auto-saves, §09). `recurring` / `upcoming` are legacy: since migration 068 recurring makes no drafts |
+| `source`                | `VARCHAR(32)` | NOT NULL, DEFAULT `'manual'`                        | Where the draft came from — free text so new sources need no migration: `manual`, `split_paid`, `project_copy`, `project_update`, `ocr`, `chat`. `auto_save` (goal auto-saves) is legacy: `saving_auto` was dropped in 077, the drafts it had made stay. `recurring` / `upcoming` are legacy: since migration 068 recurring makes no drafts |
 | `kind`                  | `VARCHAR(16)` | NOT NULL, DEFAULT `'create'`, CHECK                 | What submitting does: `create` (a new transaction) \| `settle_debt` (a new debt entry for `target_debt_id`'s person) \| `update_tx` (edits `target_transaction_id`) \| `saving` (a saving entry, migration 060) |
 | `draft`                 | `JSONB`       | NOT NULL, DEFAULT `'{}'`                            | The `POST /transactions` body (plus `tag_ids`), every key optional |
 | `target_debt_id`        | `UUID`        | FK → `personal_debts.id`, NULLABLE, ON DELETE CASCADE | `settle_debt` only |
@@ -650,6 +652,7 @@ Periods that have started, each with its own amount and note (migration 059). A 
 | `start_date` | `DATE`          | NOT NULL                                       | |
 | `end_date`   | `DATE`          | NULLABLE                                       | NULL = open (one range until ปิดงบ) |
 | `amount`     | `NUMERIC(15,2)` | NOT NULL, CHECK > 0                            | This period's amount |
+| `base_amount` | `NUMERIC(15,2)` | NOT NULL, CHECK > 0 (`budget_periods_base_amount_check`) | Migration 078 (0.4.0-4, "แก้เฉพาะรอบนี้"). What the period would be without its own amount: the budget's amount for that period. "ใช้งบปกติ" puts `amount` back to it, so a past period never takes today's budget amount. Backfill: `budgets.amount` for overridden periods, else the period's `amount` |
 | `overridden` | `BOOLEAN`       | NOT NULL, DEFAULT `FALSE`                      | TRUE = set for this period only ("เฉพาะรอบนี้"); kept when the budget's amount changes |
 | `note`       | `TEXT`          | NULLABLE                                       | |
 | `created_at` | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                      | |
@@ -677,6 +680,10 @@ Owned by [`../spec/09-saving-goals.md`](../modules/09-saving-goals.md).
 | `icon_code`          | `JSONB`         | NULLABLE                            | Icon Maker code                                         |
 | `status`             | `VARCHAR(20)`   | NOT NULL, DEFAULT `'active'`, CHECK | `'active'` \| `'completed'` (ปิดเป้าหมาย) \| `'archived'` (migration 060 added `completed`) |
 | `closed_at`          | `TIMESTAMPTZ`   | NULLABLE                            | When the goal was closed (ปิดเป้าหมาย, migration 060)    |
+| `period_amount`      | `NUMERIC(15,2)` | NULLABLE, CHECK > 0                 | Migration 079 (0.4.0-5, "เป้าต่อรอบ"). The target per period; NULL = no period target. A period's target never goes past what the goal still needs; a short period is not carried into the next one |
+| `period_freq`        | `TEXT`          | NULLABLE, CHECK                     | Migration 079. `'daily'` \| `'weekly'` \| `'monthly'` \| `'yearly'` |
+| `period_interval`    | `INT`           | NOT NULL, DEFAULT `1`, CHECK 1–99   | Migration 079. Every n `period_freq` |
+| `period_anchor`      | `DATE`          | NULLABLE                            | Migration 079. The first period starts here; the rest follow every `period_interval` `period_freq` (API default: the 1st of this month, monthly) |
 | `description`        | `TEXT`          | NULLABLE                            | ≤ 200 chars (API). Migration 051 |
 | `note`               | `TEXT`          | NULLABLE                            |                                                         |
 | `created_at`         | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`           |                                                         |
@@ -690,6 +697,7 @@ Owned by [`../spec/09-saving-goals.md`](../modules/09-saving-goals.md).
 
 - `target_amount > 0` (NULL passes)
 - `status IN ('active', 'completed', 'archived')`
+- `period_amount > 0`, `period_freq IN ('daily', 'weekly', 'monthly', 'yearly')`, `period_interval BETWEEN 1 AND 99` (migration 079; NULLs pass)
 
 **No stored progress.** Saved = the sum of the goal's `saving_entries`; progress, pace, ETA and the month numbers are computed at read time.
 
@@ -716,7 +724,7 @@ Migration 060. One row moves an amount of ONE wallet between buckets: the wallet
 | `amount`       | `NUMERIC(15,2)` | NOT NULL, CHECK > 0                             | |
 | `date`         | `DATE`          | NOT NULL                                        | |
 | `note`         | `TEXT`          | NULLABLE                                        | |
-| `source`       | `VARCHAR(10)`   | NOT NULL, DEFAULT `'manual'`, CHECK             | `'manual'` \| `'recurring'` (from a draft of a recurring ออม setting — legacy, those settings left recurring in 062) \| `'pending'` (any other pending saving draft, e.g. an auto-save) |
+| `source`       | `VARCHAR(10)`   | NOT NULL, DEFAULT `'manual'`, CHECK             | `'manual'` \| `'recurring'` (a confirmed occurrence of a recurring saving setting — again since migration 077; before that, legacy drafts of the pre-062 ออม settings) \| `'pending'` (any other pending saving draft, e.g. a legacy auto-save draft) |
 | `created_at`   | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                       | |
 | `updated_at`   | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                       | Trigger-updated |
 
@@ -728,27 +736,9 @@ Migration 060. One row moves an amount of ONE wallet between buckets: the wallet
 
 **Indexes:** `(user_id, date DESC, created_at DESC)`, `(account_id)`, `(from_goal_id) WHERE from_goal_id IS NOT NULL`, `(to_goal_id) WHERE to_goal_id IS NOT NULL`, `idx_saving_entries_user_updated (user_id, updated_at)` (sync fingerprints, migration 066).
 
-### `saving_auto`
+### Removed: `saving_auto`
 
-Auto-saving lives on the goal (migration 062, 0.4.0 M1) — and on the spare / unallocated bucket (`goal_id` NULL), not in recurring (062 moved the old recurring ออม settings here). **Since migration 067 (2026-10-20, 0.4.0-2) a goal or the spare bucket can have MANY auto-saves** (API max 20, `PUT /saving-goals/:id/auto-saves` replaces the set), each with its own wallet, amount and a full recurrence rule. For each occurrence from `start_date` to today, inside the end and after `last_produced` (newest 12 per auto-save per run), the BE makes one pending saving draft (`pending_transactions`, `source = 'auto_save'`, `kind = 'saving'`, `source_ref.auto_save_id`); confirming it writes a saving entry. The goal must be active; the spare bucket is always on. No `*_by_user_id` audit columns.
-
-| Column          | Type            | Constraints                                       | Description |
-| --------------- | --------------- | ------------------------------------------------- | ----------- |
-| `id`            | `UUID`          | PK (v7)                                           | |
-| `user_id`       | `UUID`          | FK → `users.id`, NOT NULL, ON DELETE CASCADE      | Owner |
-| `goal_id`       | `UUID`          | FK → `saving_goals.id`, NULLABLE, ON DELETE CASCADE | The goal; NULL = the spare / unallocated bucket |
-| `amount`        | `NUMERIC(15,2)` | NOT NULL, CHECK > 0                               | Per occurrence |
-| `account_id`    | `UUID`          | FK → `accounts.id`, NULLABLE, ON DELETE SET NULL  | Source wallet; NULL = none (the saving is made outside any wallet) |
-| `rule`          | `JSONB`         | NOT NULL                                          | Migration 067. The recurrence rule in the `/recurring` API shape: `{freq, interval, weekdays, monthly {mode, day, nth, weekday}, dates}` |
-| `start_date`    | `DATE`          | NOT NULL                                          | Migration 067. First possible occurrence |
-| `end_rule`      | `JSONB`         | NOT NULL, DEFAULT `'{"kind":"none","date":null,"count":null}'` | Migration 067. The end in the `/recurring` API shape: `{kind none \| date \| count, date, count}` |
-| `last_produced` | `DATE`          | NULLABLE                                          | Migration 067. The latest occurrence a draft was made for (the producer resumes after it) |
-| `created_at`    | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                         | |
-| `updated_at`    | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                         | Trigger-updated |
-
-**Migration 067 (2026-10-20):** dropped `day` (INT 1–31, 31 = last day) and `last_month` (first day of the month a draft was last made for) and the UNIQUE `(user_id, goal_id) NULLS NOT DISTINCT` index (one setting per goal). Backfill: every existing row became monthly, interval 1, on its old day; `start_date = created_at::date`; `last_produced` = the old day inside `last_month`'s month (clamped to the month's end). Down keeps the oldest row of each goal and restores `day` / `last_month` / the unique index.
-
-**Indexes:** `INDEX idx_saving_auto_goal ON saving_auto(user_id, goal_id)` (not unique since migration 067).
+**Dropped in migration 077 (0.4.0-4).** Goal auto-saves (062, many per goal since 067) are recurring saving settings again: `recurring_rules` with `type = kind = 'saving'` and `goal_id` (NULL = the unallocated pot), §11. Data: every `saving_auto` row with a known `rule.freq` became a rule with the same `id` (name `ออม <goal>` or `ออมเงิน`, its amount / wallet / rule / start / end, `tracked_from = last_produced + 1` else `start_date`, paused when the goal was not active); the table, its trigger and `idx_saving_auto_goal` are gone. Pending saving drafts it had already made (`source = 'auto_save'`) stay. Down rebuilds `saving_auto` (067 shape) from the saving rules with an amount and deletes those rules.
 
 ---
 
@@ -836,7 +826,7 @@ The canonical project ledger. Every transaction recorded in a project context go
 | `parent_project_transaction_id` | `UUID`          | FK → `project_transactions.id`, NULLABLE, ON DELETE CASCADE | NULL on parent rows; set on split-child rows                                                                                                                           |
 | `transaction_member_id`         | `UUID`          | FK → `project_members.id`, NOT NULL                         | On parent: the actor whose money moved. On a child: the debtor (the one who owes the parent's actor for this share).                                                   |
 | `record_user_id`                | `UUID`          | FK → `users.id`, NOT NULL                                   | The linked user who recorded this row. All members may edit any row (Phase 2 grants full edit rights project-wide).                                                    |
-| `type`                          | `VARCHAR(20)`   | NOT NULL, CHECK                                             | `'expense'` \| `'income'`. Transfers excluded — no accounts on either end.                                                                                             |
+| `type`                          | `VARCHAR(20)`   | NOT NULL, CHECK                                             | `'expense'` \| `'income'` \| `'payback'` (migration 072, 0.4.0-3: "A paid B" back is a row of its own — parent `transaction_member_id` = who paid back, ONE child = who got it, same amount). Transfers excluded — no accounts on either end. |
 | `amount`                        | `NUMERIC(18,4)` | NOT NULL, CHECK > 0                                         | On a child, this is the share amount (not the parent total)                                                                                                            |
 | `currency`                      | `VARCHAR(3)`    | NOT NULL                                                    | ISO 4217                                                                                                                                                               |
 | `date`                          | `DATE`          | NOT NULL                                                    |                                                                                                                                                                        |
@@ -844,6 +834,7 @@ The canonical project ledger. Every transaction recorded in a project context go
 | `marks`                         | `UUID[]`        | NOT NULL, DEFAULT `'{}'`                                    | Set of `project_member.id` values that have marked this row "resolved on the board". Independent of personal-book actions — toggling does NOT create personal entries. |
 | `description`                   | `TEXT`          | NULLABLE                                                    | Optional user-supplied label for the transaction; editable                                                                                                             |
 | `linked_transaction_id`         | `UUID`          | FK → `transactions.id`, NULLABLE, ON DELETE SET NULL, UNIQUE (partial) | Migration 056. The personal transaction a bill was made FROM (explicit link; amounts may differ, the money is linked by prompt). A deleted transaction just breaks it |
+| `unlinked_transaction_id`       | `UUID`          | FK → `transactions.id`, NULLABLE, ON DELETE SET NULL        | Migration 073 (0.4.0-3). The bill's `linked_transaction_id` while "ลงบัญชีของฉัน" is off (the tx is unlinked but kept); turning it on again puts it back. Pairs with `transactions.unlinked_project_transaction_id` / `personal_debts.unlinked_project_transaction_id` |
 | `created_at`                    | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                                   |                                                                                                                                                                        |
 | `created_by_user_id`            | `UUID`          | FK → `users.id`, NULLABLE                                   | NULL = system                                                                                                                                                          |
 | `updated_at`                    | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                                   | Trigger-updated                                                                                                                                                        |
@@ -851,7 +842,7 @@ The canonical project ledger. Every transaction recorded in a project context go
 
 **Constraints:**
 
-- `type IN ('expense', 'income')`
+- `type IN ('expense', 'income', 'payback')` (`payback` added in migration 072)
 - `amount > 0`
 - `transaction_member_id` must belong to the same `project_id` (API-validated; cross-project mismatch rejected)
 - A parent row's `parent_project_transaction_id` must be NULL (max 1 level deep — service-layer enforced)
@@ -939,14 +930,14 @@ The setting: a Google-Calendar-style rule plus the values its occurrences record
 | `description`        | `TEXT`          | NULLABLE                                          | |
 | `note`               | `TEXT`          | NULLABLE                                          | Copied to the transactions it records |
 | `icon_code`          | `JSONB`         | NULLABLE                                          | Icon Maker code |
-| `kind`               | `VARCHAR(12)`   | NOT NULL, DEFAULT `'subscription'`, CHECK         | Migration 064. What the user picks: `'subscription'` \| `'installment'` (a count of payments) \| `'income'` \| `'reminder'` (เตือนจ่าย: the amount may be unknown) |
-| `type`               | `VARCHAR(10)`   | NOT NULL, CHECK                                   | Money direction: `'expense'` \| `'income'` \| `'transfer'` (060 added `'saving'`, 064 removed it: auto-saving lives in `saving_auto`, §09) |
+| `kind`               | `VARCHAR(12)`   | NOT NULL, DEFAULT `'subscription'`, CHECK         | Migration 064. What the user picks: `'subscription'` \| `'installment'` (a count of payments) \| `'income'` \| `'reminder'` (เตือนจ่าย: the amount may be unknown) \| `'saving'` (ออมเงิน, migration 077) |
+| `type`               | `VARCHAR(10)`   | NOT NULL, CHECK                                   | Money direction: `'expense'` \| `'income'` \| `'transfer'` \| `'saving'` (060 added `'saving'`, 064 removed it, 077 brought it back: money from a wallet into a goal / the unallocated pot; a confirmed occurrence writes a `saving_entries` row, never a transaction) |
 | `amount`             | `NUMERIC(15,2)` | NOT NULL, CHECK ≥ 0 (migration 064; was > 0)      | Per occurrence. 0 = unknown (a reminder) |
 | `account_id`         | `UUID`          | FK → `accounts.id`, NULLABLE, ON DELETE SET NULL  | Wallet. NULL = none (a deleted wallet leaves the setting running wallet-less) |
 | `to_account_id`      | `UUID`          | FK → `accounts.id`, NULLABLE, ON DELETE SET NULL  | Transfer target |
 | `category_id`        | `UUID`          | FK → `categories.id`, NULLABLE, ON DELETE SET NULL | |
 | `tag_ids`            | `UUID[]`        | NOT NULL, DEFAULT `'{}'`                          | Personal tag ids (no FK) |
-| `goal_id`            | `UUID`          | FK → `saving_goals.id`, NULLABLE, ON DELETE SET NULL | Migration 060, for the old `saving` type; unused since 062 / 064 |
+| `goal_id`            | `UUID`          | FK → `saving_goals.id` (`recurring_rules_goal_id_fkey`), NULLABLE, ON DELETE CASCADE (migration 077; was SET NULL) | Type `saving`: the target goal; NULL = the unallocated pot ("ยังไม่จัดสรร"). Deleting the goal deletes its saving settings (the service does it too) |
 | `freq`               | `VARCHAR(10)`   | NOT NULL, CHECK                                   | `'daily'` \| `'weekly'` \| `'monthly'` \| `'yearly'` \| `'dates'` (an explicit list) |
 | `interval_n`         | `INT`           | NOT NULL, DEFAULT `1`, CHECK ≥ 1                  | Every n days / weeks / months / years |
 | `weekdays`           | `INT[]`         | NOT NULL, DEFAULT `'{}'`                          | Weekly: ISO weekdays (Monday = 1 … Sunday = 7); empty = the start's weekday |
@@ -972,9 +963,11 @@ The setting: a Google-Calendar-style rule plus the values its occurrences record
 | `created_at`         | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                         | |
 | `updated_at`         | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                         | Trigger-updated |
 
-**Check constraints:** `kind IN ('subscription', 'installment', 'income', 'reminder')`, `type IN ('expense', 'income', 'transfer')`, `amount >= 0`, `freq IN ('daily', 'weekly', 'monthly', 'yearly', 'dates')`, `interval_n >= 1`, `monthly_mode IS NULL OR monthly_mode IN ('day', 'weekday')`, `end_kind IN ('none', 'date', 'count')`, `status IN ('active', 'paused', 'archived')`.
+**Check constraints:** `kind IN ('subscription', 'installment', 'income', 'reminder', 'saving')`, `type IN ('expense', 'income', 'transfer', 'saving')` (both gained `saving` in migration 077), `amount >= 0`, `freq IN ('daily', 'weekly', 'monthly', 'yearly', 'dates')`, `interval_n >= 1`, `monthly_mode IS NULL OR monthly_mode IN ('day', 'weekday')`, `end_kind IN ('none', 'date', 'count')`, `status IN ('active', 'paused', 'archived')`.
 
-**Indexes:** `PRIMARY KEY (id)`, `INDEX idx_recurring_rules_user ON recurring_rules(user_id, status)`.
+**Indexes:** `PRIMARY KEY (id)`, `INDEX idx_recurring_rules_user ON recurring_rules(user_id, status)`, `INDEX idx_recurring_rules_goal ON recurring_rules(goal_id) WHERE goal_id IS NOT NULL` (migration 077).
+
+**Migration 077 (0.4.0-4):** every `saving_auto` row became a `type = kind = 'saving'` rule (see §09 "Removed: `saving_auto`").
 
 **Migration 068 backfill:** `tracked_from` = the earlier of `created_at::date` and the rule's oldest stored `slot` (counting only the rows that survived the delete below); `due_notified_until` = the migration day (nothing already due is notified again); `paused_from` = `updated_at::date` for paused / archived rules; `auto_create` FALSE.
 
@@ -997,7 +990,7 @@ The stored occurrences (068: only recorded / cleared / skipped / edited ones, ma
 | `produced_at`     | `TIMESTAMPTZ` | NULLABLE                                            | 057: when the item's pending draft was made. Since 068: set when a transaction is recorded or linked |
 | `pending_id`      | `UUID`        | FK → `pending_transactions.id`, NULLABLE, ON DELETE SET NULL | Legacy (pre-068): the pending draft made for it. The draft is deleted when the occurrence is confirmed, or skipped without `delete_tx` |
 | `transaction_id`  | `UUID`        | FK → `transactions.id`, NULLABLE, ON DELETE SET NULL | The transaction that records it (status `done`). Deleting that transaction releases the occurrence: back to due / upcoming (paid if it was cleared first), or skipped with `?skip_occurrence=true` |
-| `saving_entry_id` | `UUID`        | FK → `saving_entries.id`, NULLABLE, ON DELETE SET NULL | Migration 060, legacy recurring ออม |
+| `saving_entry_id` | `UUID`        | FK → `saving_entries.id`, NULLABLE, ON DELETE SET NULL | Migration 060. The saving entry that records a `saving` rule's occurrence (status `done`; in use again since 077) |
 | `cleared_at`      | `TIMESTAMPTZ` | NULLABLE                                            | Migration 068. Paid WITHOUT a transaction ("จ่ายแล้ว", e.g. "แม่จ่ายให้"): status `paid` |
 | `auto_created_at` | `TIMESTAMPTZ` | NULLABLE                                            | Migration 068. The transaction was recorded by auto-create (item `auto_created: true`). If that transaction is deleted, the occurrence goes back to due and is not re-created |
 | `created_at`      | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()`                           | |
@@ -1020,6 +1013,16 @@ The stored occurrences (068: only recorded / cleared / skipped / edited ones, ma
 - `INDEX idx_recurring_items_user_updated ON recurring_items(user_id, updated_at)` — sync fingerprints (migration 066)
 
 Migration 068 adds no index.
+
+### `recurring_due_checks`
+
+Migration 075 (0.4.0-4). The due check (auto-create, the due / ending notices, pausing settings whose wallet was archived) no longer runs on every read: it runs once per user-local day from `POST /sync`, and after a recurring write. This row remembers the last run. No `*_by_user_id` audit columns.
+
+| Column       | Type          | Constraints                                   | Description |
+| ------------ | ------------- | --------------------------------------------- | ----------- |
+| `user_id`    | `UUID`        | PK, FK → `users.id`, ON DELETE CASCADE        | One row per user (upserted) |
+| `checked_on` | `DATE`        | NOT NULL                                      | The user-local day the last check ran for; `POST /sync` skips the check while it is ≥ today (unless an active rule points at an archived wallet) |
+| `checked_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()`                     | When it ran |
 
 ### Migration 068 — data steps (2026-10-20)
 
@@ -1079,10 +1082,13 @@ not converted and keep counting as debts.
 | `project_id`                    | `UUID`          | FK → `projects.id`, NULLABLE, ON DELETE SET NULL             | 1b.2: contextual project                                                                                                                      |
 | `source_kind`                   | `VARCHAR(20)`   | NULLABLE, CHECK                                              | Migration 054. Where a split-made entry came from: `'transaction'` (a split on my bill) \| `'partner'` (another user's split on me, the mirror) \| `'event'` (reserved). NULL = manual entry |
 | `counterpart_debt_id`           | `UUID`          | FK → `personal_debts.id`, NULLABLE, ON DELETE SET NULL       | Migration 045. The mirror entry in the other user's book (a split pair), so a change on one side can notify the other                        |
-| `paid_for_transaction_id`       | `UUID`          | FK → `transactions.id`, NULLABLE, UNIQUE, ON DELETE CASCADE  | Migration 070 (0.4.0-3). The EXPENSE this debt is the "someone paid for me" part of: my own paid_by (`source_kind paid_by`, one record with the expense: deleting the expense deletes it) or a partner's split mirrored into my book (`source_kind partner`, my expense of my share; deleting the expense first unlinks it). Not `source_transaction_id`, so it never lowers my_share (spec 12 §1.5a) |
+| `unlinked_project_transaction_id` | `UUID`        | FK → `project_transactions.id`, NULLABLE, ON DELETE SET NULL | Migration 073 (0.4.0-3). Set while "ลงบัญชีของฉัน" is off on the event bill this debt was made from: the debt lost its bill link but stays in my books; turning it on again links the same row back |
+| `linked_transaction_id`         | `UUID`          | FK → `transactions.id`, NULLABLE, ON DELETE SET NULL, UNIQUE (partial) | Migration 076 (0.4.0-4, "บันทึกในรายการ"). One of my EXISTING transactions this entry points at — a soft link, unlike the entry's own transaction (`transactions.source_personal_debt_id`): the transaction keeps its category and still counts in reports; unlinking keeps it; deleting it only clears the link. One transaction links at most one entry |
+| `paid_for_transaction_id`       | `UUID`          | FK → `transactions.id`, NULLABLE, UNIQUE, ON DELETE CASCADE  | Migration 070 (0.4.0-3). The EXPENSE (or, since migration 080, the INCOME someone received for me — "รับแทน", a `paid` entry: they owe me) this debt is the "someone paid for me" part of: my own paid_by (`source_kind paid_by`, one record with the expense: deleting the expense deletes it) or a partner's split mirrored into my book (`source_kind partner`, my expense of my share; deleting the expense first unlinks it). Not `source_transaction_id`, so it never lowers my_share (spec 12 §1.5a) |
 | `amount`                        | `DECIMAL(15,2)` | NOT NULL, CHECK > 0 (migration 054)                          | The entry amount                                                                                                                              |
 | `currency`                      | `VARCHAR(3)`    | NOT NULL                                                     |                                                                                                                                               |
 | `date`                          | `DATE`          | NOT NULL (migration 054)                                     | Entry date (backfill: the source transaction's date, else `created_at` in Asia/Bangkok)                                                      |
+| `due_date`                      | `DATE`          | NULLABLE                                                     | Migration 071 (0.4.0-3, "กำหนดจ่าย"). Optional due date of a DEBT entry (never on a repayment); never before `date` (API). Feeds the person's `next_due_date` |
 | `paid`                          | `BOOLEAN`       | NOT NULL, DEFAULT `FALSE` (migration 054)                    | The "paid" label (was `status = 'settled'`); never changes a number                                                                           |
 | `description`                   | `TEXT`          | NULLABLE                                                     | What it was for (≤ 200 chars, API). Split entries take the bill's description. Migration 051 |
 | `note`                          | `TEXT`          | NULLABLE                                                     |                                                                                                                                               |
@@ -1109,6 +1115,8 @@ not converted and keep counting as debts.
 - `INDEX idx_personal_debts_project ON personal_debts(project_id) WHERE project_id IS NOT NULL`
 - `INDEX idx_personal_debts_user_updated ON personal_debts(user_id, updated_at)` — sync fingerprints (migration 066)
 - `UNIQUE INDEX idx_personal_debts_paid_for_tx ON personal_debts(paid_for_transaction_id) WHERE paid_for_transaction_id IS NOT NULL` — one paid-by debt per expense (migration 070)
+- `INDEX idx_personal_debts_unlinked_pt ON personal_debts(unlinked_project_transaction_id) WHERE unlinked_project_transaction_id IS NOT NULL` — relink lookup (migration 073)
+- `UNIQUE INDEX personal_debts_linked_transaction_uniq ON personal_debts(linked_transaction_id) WHERE linked_transaction_id IS NOT NULL` — one entry per linked transaction (migration 076)
 
 **Reports — "my share" computation:**
 For a transaction whose splits live in `personal_debts`
@@ -1260,7 +1268,8 @@ user's email etc. come from a join on `users`.
 
 ## Status
 
-- **Last updated** — 2026-10-21
+- **Last updated** — 2026-10-26 (migration head: **080**)
+- **Version** — 0.16 (2026-10-26 — synced against migrations 071–080. **080** `transactions_paid_by_check` allows `income` ("รับแทน"). **079** `saving_goals.period_amount` / `period_freq` / `period_interval` / `period_anchor`. **078** `budget_periods.base_amount`. **077** recurring `type` / `kind` gain `saving`, `recurring_rules.goal_id` FK → ON DELETE CASCADE + `idx_recurring_rules_goal`, `saving_auto` migrated into recurring and dropped. **076** `personal_debts.linked_transaction_id` + unique index. **075** `recurring_due_checks`. **074** `user_preferences.timezone` cleanup. **073** `transactions` / `personal_debts.unlinked_project_transaction_id`, `project_transactions.unlinked_transaction_id`. **072** `project_transactions.type` gains `payback`. **071** `personal_debts.due_date`.)
 - **Version** — 0.15 (2026-10-21 — **070** paid by someone else: `transactions.paid_by_amount` + `transactions_paid_by_check`, `personal_debts.paid_for_transaction_id` + unique index, `source_kind` gains `paid_by`. **069** repayment transactions: `transactions.repay_contact_id` / `repay_person_name`.)
 - **Version** — 0.14 (2026-10-20 — synced against migrations 039–068; the file had stopped at 051 (plus 043 / 047 / 048 / 052 notes). **068** recurring on computed occurrences: one-off items + their drafts deleted, `recurring_items.rule_id` NOT NULL, unrecorded untouched rows deleted, `recurring_rules.tracked_from` / `due_notified_until` / `auto_create` / `auto_created_until` / `paused_from`, `recurring_items.cleared_at` / `auto_created_at`, `recurring_auto_created` notification type, `recurring_due` → `/recurring?focus=due`. **067** many auto-saves per goal: `saving_auto` `rule` / `start_date` / `end_rule` / `last_produced`, `day` / `last_month` / the unique index dropped. Backfilled: 039 `account_members` as built (nullable `joined_at`, live-unique index; §14 no longer "planned"), 040 `projects.planned_amount` (no longer planned), 041 / 052 / 057 notification types, 042 nullable `transactions.account_id`, 044 `account_members.sort_order`, 045 `muted_types` / `auto_types` + `personal_debts.counterpart_debt_id`, 046 + 060 `pending_transactions` (new section), 053 contact `nickname` / `show_nickname`, 054 person ledger (`personal_debts` direction paid / received, `date`, `paid`, `source_kind`; `settled_amount` / `status` gone), 055 `event_tags` / `project_transaction_tags` / `project_my_tags` (`projects.type`, `project_transactions.tags` gone), 056 `project_transactions.linked_transaction_id`, 057 `recurring_rules` / `recurring_items` (§11 rewritten, `scheduled_transactions` + `transactions.scheduled_transaction_id` gone), 058 `accounts.track_balance`, 059 budgets v2 (+ `budget_categories` / `budget_wallets` / `budget_periods`), 060 goals v2 (+ `saving_entries`), 061 `categories.status` gone, `accounts` closed → archived, nullable `saving_entries.account_id`, 062 `saving_auto`, 063 event deep links, 064 recurring `kind` / `trial_until` / amount ≥ 0, 065 nullable `saving_goals.target_amount`, 066 sync-fingerprint indexes. TOC gains §15.)
 - **Version** — 0.13 (Migration 051: name / description / note standard — `description` on transactions, tags, contacts, personal_debts, saving_goals, scheduled_transactions; `note` on tags, projects; `contacts.notes` → `note`; `budgets.name` added, old `budgets.description` labels moved into it.)
