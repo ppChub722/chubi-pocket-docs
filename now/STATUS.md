@@ -1,13 +1,13 @@
 # STATUS — read this first (rewritten, not appended)
 
-_Last updated: 2026-10-26 by AI-1 (chubi-pocket-85, BE + docs) during the 0.4.1-0 close._
+_Last updated: 2026-10-26 after the 0.4.1-0 close._
 
-## Where we are: 0.4.1-0 — coded, green, BE live on prod, not tagged yet
-- Branch **wip/0.4.1-0** in app and be (owner 2026-10-26). App `275355b` = version **0.4.1-0+170** (feature commit `7bce00a`). BE `c17a3aa` (+ `277f21b` docs paths). Not pushed, not tagged.
-- Full run (AI-3, 2026-10-26 15:17): flutter analyze clean · flutter test **371 passed** · go vet clean · go test ./... with TEST_DATABASE_URL all ok, **0 skip**. AI-1 ran go test again with the test DB at 080: all ok, 0 skip.
-- **Prod:** BE 0.4.1-0 live on the ppForge VPS (image `a24bc82` from `c17a3aa`, migrations 079 + 080, backup `chubi_pocket-20261026-1532.dump.gz`, previous image kept as `chubi-be:prev`). Then the gate fix: BE `21fe2b2` (live, deployed with the reworked `deploy.sh`) reads a split-per-ABI versionCode (2172) as the build (172); app `2848aeb` sends the pubspec build. **APK 172** is on Firebase and the gate is **MIN = LATEST = 172** (`.env` backed up as `.env.bak-20261026-1619-before-gate-172`): 170 / 2170 → 426, 172 / 2172 → pass. These commits came after the `v0.4.1-0` tag.
-- **Local:** BE rebuilt from wip/0.4.1-0 (migration 080, health 200). Test DB `chubi_pocket_test` at 080.
-- Plan and owner answers: `now/briefs/0.4.1-0-plan.md`. Release notes: `team/releases/` (0.4.0-4 written after the fact; 0.4.1-0 comes with the tag).
+## Where we are: 0.4.1-0 — closed (tagged, merged, live)
+- Tag **`v0.4.1-0`** in app `2848aeb` (version **0.4.1-0+172**) · be `21fe2b2` · docs `a2512c1`; `origin/main` = the tag in app and be. Release note: `team/releases/0.4.1-0.md`.
+- Full run (AI-3, 2026-10-26 15:17): flutter analyze clean · flutter test **371 passed** · go vet clean · go test ./... with TEST_DATABASE_URL all ok, **0 skip**.
+- **Prod:** BE `21fe2b2` live on the ppForge VPS (migrations 079 + 080, backup `chubi_pocket-20261026-1532.dump.gz`, previous image kept as `chubi-be:prev`). **APK 172** is on Firebase and the gate is **MIN = LATEST = 172** (`.env.bak-20261026-1619-before-gate-172`): the app sends the pubspec build, the BE also reads a split-per-ABI versionCode (2172 = 172); 170 / 2170 → 426.
+- **Local:** BE at 080, health 200. Test DB `chubi_pocket_test` at 080.
+- Plan and owner answers: `now/briefs/0.4.1-0-plan.md`.
 
 ## Done in 0.4.1-0 (details in team/inbox/ai-2.md, ai-3.md, be.md and the commits)
 - **AI-1 (BE + docs):** C1 `POST /recurring/occurrences/bulk` (confirm / skip / mark_paid, a savepoint per occurrence, `left_out` reasons) · H1 paid_by on an income ("รับแทน", migration 080; the debt is "they owe me") · A6 `GET /api/v1/health` · H3 the person tx filter also lists split bills, paid_by bills and debt-linked tx · H8 share text "{name} เป็นลูกหนี้ / เจ้าหนี้" · A7 BE cleanup (recurring RuleID non-null) · D2 my-books tests · I docs (this file, decisions, schema, API, specs 04 / 12 / 13) · the docs restructure (now / rules / modules / ref / build / ops / team).
@@ -16,9 +16,8 @@ _Last updated: 2026-10-26 by AI-1 (chubi-pocket-85, BE + docs) during the 0.4.1-
 - **AI-4 (entry flows + recurring + goals):** A1 currency leaks, H1 app (income gets every ผูกกับ tab incl. "รับแทน"), H5 wallet wording, A7 app (future-date hint), C2 rows with no amount + C1 wiring, G1, goals bundle A2–A4 / F1.
 
 ## Next (owner decides)
-1. Install build 170 from Firebase (firsttester) and try it against prod; device checks (plan section J).
-2. Close the round: merge wip/0.4.1-0 → main in app / be / docs, tag `v0.4.1-0`, push, release note `team/releases/0.4.1-0.md`.
-3. Then **0.4.1-1 "linked = synced"** (mostly BE: DB accepts 0 on synced rows, every user setting on the server) — see `now/roadmap-1.0.md`.
+1. Install build 172 from Firebase (firsttester) and try it against prod: the test list in `team/releases/0.4.1-0.md`.
+2. **0.4.1-1 "linked = synced"** (mostly BE: linked rows keep the same values, DB accepts 0 on synced rows, every user setting on the server; G4 quick create project mode goes here) — see `now/roadmap-1.0.md` and the owner answers in `now/briefs/0.4.1-0-plan.md`. Needs a plan + work split first.
 
 ## Where things are
 - The map of every doc: the root `README.md` (old `ai/…` paths → new ones at its bottom).
@@ -26,7 +25,7 @@ _Last updated: 2026-10-26 by AI-1 (chubi-pocket-85, BE + docs) during the 0.4.1-
 - Ops: `ops/ops-runbook.md` (prod = `ssh ppforge`, build images on the dev PC, never on the 1 GB box).
 
 ## New machine checklist
-- Clone / pull app, be, docs; `git switch wip/0.4.1-0` in app and be.
+- Clone / pull app, be, docs (`main`).
 - Flutter via fvm 3.47.3 (`.fvm/flutter_sdk`); the PATH flutter fails pub resolution.
 - Docker Desktop, then `chubi-pocket-be/scripts/local-deploy.sh` (migrates the local DB). The local DB data does NOT move with git: start empty, or copy `chubi-pocket/backups/` (secrets + dumps, never committed) and restore.
 - Go DB tests: a throwaway DB (e.g. `chubi_pocket_test`) migrated to the head, `TEST_DATABASE_URL=postgres://chubadmin:admin1234@localhost:5433/chubi_pocket_test?sslmode=disable`.
