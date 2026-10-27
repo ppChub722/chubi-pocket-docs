@@ -17,7 +17,7 @@ _Last updated: 2026-10-27, 0.4.1-1 started._
 
 ## Next (owner decides)
 1. Install build 172 from Firebase (firsttester) and try it against prod: the test list in `team/releases/0.4.1-0.md`.
-2. **0.4.1-1 "linked = synced" — IN PROGRESS (go 2026-10-27).** Plan + briefs: `now/briefs/0.4.1-1-plan.md` (wins over the concept `now/briefs/0.4.1-1-concept.md`). Scope: base (0 amounts written by the system only, one call = one DB tx + effects), person book (repayment rows, 4 debt categories), recurring (slot reads its tx, 3-overdue limit, installments shift, auto-create never fails), event bugs + one "book bill" call. Shared bills (split + event copies, auto-sync switches, `private_note`), the events revamp and the "หนี้" recurring kind → 0.4.1-2.
+2. **0.4.1-1 "linked = synced" — DONE + committed locally 2026-10-27, not tagged / pushed / built** (be `15f028a`, app `b049fd3`; full run: flutter analyze clean, flutter test 385 pass; go vet clean, go test 25 packages ok, 0 skip, on a fresh `chubi_test_0411` at 091). Next on the owner's order: local build, then the release flow (version bump, tags, deploy). Plan + briefs: `now/briefs/0.4.1-1-plan.md` (wins over the concept `now/briefs/0.4.1-1-concept.md`). Scope: base (0 amounts written by the system only, one call = one DB tx + effects), person book (repayment rows, 4 debt categories), recurring (slot reads its tx, 3-overdue limit, installments shift, auto-create never fails), event bugs + one "book bill" call. Shared bills (split + event copies, auto-sync switches, `private_note`), the events revamp and the "หนี้" recurring kind → 0.4.1-2.
 
 ## Where things are
 - The map of every doc: the root `README.md` (old `ai/…` paths → new ones at its bottom).
