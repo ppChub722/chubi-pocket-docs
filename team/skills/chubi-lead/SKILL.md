@@ -92,4 +92,4 @@ At start:
   - pull-to-refresh everywhere (detail view mode, not edit)
   - load failures → error + retry fast
   - offline mode: global banner, saves disabled, typed input kept
-- **Ledger, not sync:** never auto-change another user's book. ลบ = hard delete, เก็บถาวร = soft.
+- **My book, my switch:** another user's edit reaches my book automatically only when I turned auto sync on; otherwise a notification asks (0.4.1-1 plan, owner 2026-10-27). ลบ = hard delete, เก็บถาวร = soft.

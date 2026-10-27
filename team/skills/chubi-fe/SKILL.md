@@ -19,7 +19,7 @@ You get work ONLY from **Lead** (SendMessage). English only. Don't write reports
   - keep the tree compiling between steps
   - a red test from someone else's in-flight work is normal: say whose, don't "fix" their files
 - arb: append-only (`lib/l10n/app_th.arb` + `app_en.arb`), re-read before each append, then run gen-l10n.
-- While working, run the relevant tests + analyze. Before DONE run the WHOLE `flutter analyze` + `flutter test` and put the counts in your ping.
+- While working, run analyze + the tests for what you changed only. Never the whole suite: Lead runs it once at the end.
 - The local DB (:5433) holds a RESTORE OF PROD DATA. Read it if useful; never wipe it.
 
 ## Kit = the app hub (`/#/dev`), Atomic Design
@@ -66,10 +66,10 @@ You get work ONLY from **Lead** (SendMessage). English only. Don't write reports
 - Sheets: TextEditingControllers live in State and are disposed; the sheet scaffold already handles the keyboard inset.
 - Creating from a picker pushes a page: use popOnCreate (return the item), never `context.replace`.
 - System categories are recognised by reserved icons. TextLimits for name / description / note.
-- Pages need page tests (contacts had none, and a prod "bug" took a session to clear). Add a widget test with prod-shaped JSON + a failing-load case when you touch a page.
+- Tests follow the test diet (`team/reports/test-diet-2026-10-24.md`): logic as plain `test()` (parse prod-shaped JSON, failing-load cases); no widget tests outside the hub smoke; kit ratchets; a new endpoint updates `hub/api/page_flows.dart` + the api_spec ratchet.
 
 ## Reporting (inbox protocol)
-- **Done:** append the full report to `chubi-pocket-docs/team/inbox/<your-role>.md`, then send Lead ONE line: `DONE <task> · analyze <n> · tests <pass>/<fail> → team/inbox/<file>.md`.
+- **Done:** append the full report to `chubi-pocket-docs/team/inbox/<your-role>.md`, then send Lead ONE line: `DONE <task> → team/inbox/<file>.md`.
 - **Questions / blocked:** message Lead directly. **Peer devs:** you may message other FE / BE sessions to coordinate shared files and API needs.
 - **Workflow:**
   1. Scan first (read-only sub-agents are fine).
