@@ -1,6 +1,6 @@
 # STATUS — read this first (rewritten, not appended)
 
-_Last updated: 2026-10-26 after the 0.4.1-0 close._
+_Last updated: 2026-10-27, 0.4.1-1 started._
 
 ## Where we are: 0.4.1-0 — closed (tagged, merged, live)
 - Tag **`v0.4.1-0`** in app `2848aeb` (version **0.4.1-0+172**) · be `21fe2b2` · docs `a2512c1`; `origin/main` = the tag in app and be. Release note: `team/releases/0.4.1-0.md`.
@@ -17,7 +17,7 @@ _Last updated: 2026-10-26 after the 0.4.1-0 close._
 
 ## Next (owner decides)
 1. Install build 172 from Firebase (firsttester) and try it against prod: the test list in `team/releases/0.4.1-0.md`.
-2. **0.4.1-1 "linked = synced"** (mostly BE: linked rows keep the same values, DB accepts 0 on synced rows, every user setting on the server; G4 quick create project mode goes here) — see `now/roadmap-1.0.md` and the owner answers in `now/briefs/0.4.1-0-plan.md`. Concept being discussed with the owner: `now/briefs/0.4.1-1-concept.md` (no code until the owner says go); then a plan + work split.
+2. **0.4.1-1 "linked = synced" — IN PROGRESS (go 2026-10-27).** Plan + briefs: `now/briefs/0.4.1-1-plan.md` (wins over the concept `now/briefs/0.4.1-1-concept.md`). Scope: base (0 amounts written by the system only, one call = one DB tx + effects), person book (repayment rows, 4 debt categories), recurring (slot reads its tx, 3-overdue limit, installments shift, auto-create never fails), event bugs + one "book bill" call. Shared bills (split + event copies, auto-sync switches, `private_note`), the events revamp and the "หนี้" recurring kind → 0.4.1-2.
 
 ## Where things are
 - The map of every doc: the root `README.md` (old `ai/…` paths → new ones at its bottom).
@@ -32,7 +32,7 @@ _Last updated: 2026-10-26 after the 0.4.1-0 close._
 - Role skills: `team/skills/chubi-*`.
 
 ## Team (session names change on restart; check ListAgents + roll call)
-- 0.4.1-0 (owner 2026-10-26): 4 AIs, equal shares. AI-1 = chubi-pocket-85 (BE + docs) · AI-2 = chubi-pocket-ce (kit + offline) · AI-3 = chubi-pocket-02 (lists + cleanup + close) · AI-4 = chubi-pocket-59 (entry flows + recurring + goals; also the app commits). ce and 02 have closed.
-- Questions go to the owner directly. Reports → `team/inbox/<role>.md` + a one-line ping.
+- 0.4.1-1 (2026-10-27): Lead = chubi-pocket-b9 · BE-1 = chubi-pocket-b3 (base + person book) · BE-2 = chubi-pocket-21 (recurring + events BE) · App-1 = chubi-pocket-ca (debts + quick create + bill sheet) · App-2 = chubi-pocket-9c (recurring + shared pieces). Lead commits; devs don't.
+- Questions for the owner go to Lead. Reports → `team/inbox/<role>.md` + a one-line ping to Lead.
 - Shared files, tell the others before editing: app_th/en.arb (append keys, then gen-l10n), hub_registry.dart, ui.dart, app_router.dart, BE internal/apidoc/openapi.yaml, cmd/api/main.go.
 - Rules: `rules/decisions.md` · not started / discussed: `now/backlog.md` · history: `archive/` (see archive/README.md).
