@@ -1,5 +1,15 @@
 # 10 — Projects
 
+> **§0 — 0.4.1-1 (owner 2026-10-27): the bill sheet saves in ONE call.** `POST /event-bills` (`project_id` or `new_event`) / `PUT /event-bills/:pt_id` write the bill (or payback), the payback rows of the people marked "คืนแล้ว", and every part of my book in one DB transaction. `?preview=true` gives the before → after of each person and wallet. Rules inside:
+> - **I paid:** my tx = the whole bill from my wallet (the bill's origin); each other member's share = they owe me. "คืนแล้ว" on them = a payback row (them → me) + the debt + an immediate repayment into my wallet (their balance stays 0).
+> - **Someone else paid, I didn't pay back:** my tx = my share with NO wallet ("จ่ายโดย X") + the debt "ฉันติด X". Never a wallet and a debt both.
+> - **Someone else paid, I paid back on the spot:** my tx = my share from my wallet, no debt, a payback row (me → X).
+> - **A payback with me in it:** the debt it clears (default: only when this event's own debt with that person doesn't already cover it) + the repayment from / into my wallet.
+> - **The payer who books later** gets the bill's origin (the whole bill), not a copy of a share.
+> - **Editing a bill updates its split rows in place**: a copy pointing at a split row stays linked; a member who left the bill has their copy unlinked first.
+> - **"คืนแล้ว" follows the tick:** a payback row made for a bill remembers it (`paid_back_for_id`, migration 091) and the board shows the tick. Un-ticking it on an edit removes that payback row and my repayment of it, in the same DB transaction. A changed share remakes them at the new amount (my debt for that person follows the bill only from 0.4.1-2).
+> Contract: `ref/api-document.md` §10, openapi `bookEventBill` / `rebookEventBill`.
+
 > ⚠️ **REDESIGNED in Phase 2 (migration 27).** The behavior described below from "three ledgers, one shared view" through the Resolve / claim flow is the legacy design. The current model is **"project as a separate book"** — see [`project-as-separate-book.md`](../archive/engineering/project-as-separate-book.md) (archived plan) for the original description. Key changes:
 >
 > - Project ledger is **fully decoupled** from personal books — no auto-sync, no claim flow, no shared SQL view.

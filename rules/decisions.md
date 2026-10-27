@@ -54,7 +54,19 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - **Hub first (owner 2026-10-19, repeated):** use what is in the hub; a new piece goes into `lib/ui` + a hub demo + `hub_registry` covers before any page uses it.
 
 ## Product
-- **Ledger, not sync:** never auto-change another user's book. Notifications are prompts with one-tap actions.
+- **My book, my switch (owner 2026-10-27, replaces "Ledger, not sync"):** another user's edit reaches my book automatically only when I turned auto sync on; otherwise a notification asks ("อัปเดตตาม"), and "no" leaves my copy "ไม่ตรง", still connected. Full sync rules: `now/briefs/0.4.1-1-plan.md` → "Sync rules a–f"; shared bills (0.4.1-2): `now/briefs/0.4.1-2-plan.md`.
+- **0.4.1-1 owner answers (2026-10-27; full list in `now/briefs/0.4.1-1-plan.md`):**
+  - connect = knows where it came from; sync = same values. Links live only in recurring, debts and events; budgets, wallets and savings read the real txs.
+  - Every write that touches a connected side is ONE BE call in ONE DB transaction and answers with `effects` (what changed elsewhere).
+  - Only the system writes 0 amounts (sync, auto-create); a typed amount stays > 0; a 0 row can be saved if its amount wasn't touched.
+  - Debt ⇄ my own tx: amount, date, description, note are one value. Fields only one side has stay that side's.
+  - Recurring: a tx FILLS a slot; deleting the tx skips the slot (last values kept; un-skip = due with them); a skipped slot can be filled directly; skip a filled slot = disconnect first; "จ่ายแล้ว" without a tx needs an amount and counts only in recurring totals (and a "หนี้" kind's person balance); rule edits touch only empty slots.
+  - Overdue limit: 3 waiting → the rule pauses ("ค้าง 3 งวด", in ต้องจัดการ); the user turns it on; the next slot = the current period; installments (count end) shift, a date end keeps its date; rules over the limit paused at release.
+  - Auto-create never waits and never fails: amount 0 is created; a missing category / wallet → none; no overdue limit; the form warns on amount 0 / a varying amount.
+  - Repayments are person-book entries with an optional tx (old no-wallet ones lost their tx); 4 debt system categories (ให้กู้ยืม / กู้ยืม / ชำระหนี้ / รับชำระหนี้), old debt txs moved to them; every system category locks rename + "นับในรายงาน" (icon editable).
+  - Debt description is free text; empty = the category name. "ปิดหนี้" on pay back = one switch that labels every open debt with that person paid; just a label, even if the payment is partial.
+  - Cross-user debts: each side can disconnect its own copy; the other side is notified; no reconnect.
+  - Tx-detail disconnect never changes the bill. Known and kept until 0.4.1-2: switching ผูกกับ off อีเวนต์ / moving event A → B in the tx edit still changes the bill.
 - Notify on debt creation (`split_created`) and split edits (`split_changed` / "อัปเดตตาม"). Nothing on pay/receive.
 - **Delete vs archive:** ลบ = hard delete; เก็บถาวร = soft (hidden, not counted, restorable). Categories, tags, transactions and debts are delete-only. Plan (done, archived): `archive/engineering/v0.3.3-delete-archive-plan.md`.
 - Reports, dashboard, budgets and list totals count `my_share`; wallet balances stay cash.
@@ -66,7 +78,7 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
   - The person tx filter includes split-source bills, paid_by bills and linked tx.
   - Debt wallet wording: nothing picked = "เลือกกระเป๋า", deliberately none = "ไม่ระบุกระเป๋า".
   - No "เพิ่มบิล" on the events list. Home and More section heads stay as they are (not AppListHeader). The dashboard is "coming soon" until 0.4.3.
-  - **"linked = synced"** (replaces the ask / always / never idea) is its own round, 0.4.1-1: linked rows keep the same values (my tx ↔ event bill ↔ members who turned sync on; debts ↔ their tx / bill; occurrence ↔ its tx); editing one side updates the others and notifies; unsync = break the link; a synced share can reach 0 (the DB will accept 0 there); every user setting lives on the server. It replaces "Ledger, not sync" above for linked rows once built.
+  - **"linked = synced"** (replaces the ask / always / never idea) is its own round, 0.4.1-1: linked rows keep the same values (my tx ↔ event bill ↔ members who turned sync on; debts ↔ their tx / bill; occurrence ↔ its tx); editing one side updates the others and notifies; unsync = break the link; a synced share can reach 0 (the DB will accept 0 there); every user setting lives on the server. Refined 2026-10-27: see the 0.4.1-1 answers above (the "every user setting on the server" part moved to 0.4.1-2).
 - **Splits:**
   - a "ฉัน" row (create/edit) with an "อัตโนมัติ" chip (default on; typing turns it off)
   - save only when balanced; equal split includes me (remainder on ฉัน)
