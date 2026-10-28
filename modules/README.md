@@ -25,6 +25,7 @@ One file per feature module: schema reference, API behaviour, flows and design d
 | [13-notifications.md](13-notifications.md) | Notifications | — | `be` |
 | [14-shared-wallets.md](14-shared-wallets.md) | Shared wallets | Wallet | `be` |
 | [15-slip-import.md](15-slip-import.md) | Slip import → pending drafts | Pending drafts | `be` |
+| [16-telegram.md](16-telegram.md) | Telegram bot (0.4.2) | Shape in `now/briefs/0.4.2-plan.md` | `be` |
 
 Inboxes are in [`../team/inbox/`](../team/inbox/README.md). UI-wide rules (hub first, list pages, hero card, chips, edit mode…) are in the UI part of `rules/decisions.md`, and the kit itself in [`../build/app-hub.md`](../build/app-hub.md).
 

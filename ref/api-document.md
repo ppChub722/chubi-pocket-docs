@@ -64,6 +64,7 @@ Authorization: Bearer <access_token>
 - `POST /v1/auth/google` *(Phase 3+)*
 - `POST /v1/projects/accept-invite` *(invite codes are URL-shareable)*
 - `GET /v1/health` (`getHealth`, 0.4.1-0) → `200 {status: "ok"}` — the app's online check; also served at `/health` (no `/api/v1`) for the uptime check. Outside the app build check (see below)
+- `POST /v1/telegram/webhook` (`telegramWebhook`, 0.4.2 1a, **internal**: Telegram calls it, never the app) — registered only when `TELEGRAM_BOT_TOKEN` is set. Auth = header `X-Telegram-Bot-Api-Secret-Token` equal to `TELEGRAM_WEBHOOK_SECRET` (constant-time check; missing / wrong → `401 UNAUTHORIZED`). Otherwise always `200` with an empty body, even for a body that isn't an update (Telegram retries non-200). No JWT, no build check, no sync middleware; the request log never holds its body. Behaviour: [`../modules/16-telegram.md`](../modules/16-telegram.md)
 - Contact-invite acceptance endpoints (TBD per [07](#07--contacts))
 
 **Token strategy by phase:** Phase 0/1 uses a single 30-day JWT; Phase 2+ uses 15-min access + 7-day refresh; Phase 3+ adds an access-token blocklist for instant revocation. See [01-auth.md §3.6](../modules/01-auth.md#36-phased-token-strategy).
@@ -1236,7 +1237,8 @@ Error codes specific to shared wallets:
 
 ## Status
 
-- **Last updated** — 2026-10-26
+- **Last updated** — 2026-10-28
+- **Version** — 0.10 (0.4.2 1a, migration 120: `POST /v1/telegram/webhook`, internal, in Conventions → public endpoints; spec [`../modules/16-telegram.md`](../modules/16-telegram.md) — 2026-10-28)
 - **Version** — 0.9 (0.4.0-3 … 0.4.1-0, migrations 071–080: `GET /v1/health` (Conventions); paid_by on an income + wider `counterparty_key` (§04); `BudgetPeriod.base_amount` (§08); goal auto-saves removed → recurring kind `saving`, period targets (§09); `POST /recurring/occurrences/bulk`, due check once a day (§11); debt `due_date`, link / unlink an existing transaction, share wording (§12) — 2026-10-26)
 - **Version** — 0.8 (0.4.0-2: computed recurring occurrences + by-slot writes + auto-create + occurrence names + due / auto-created notices (§11, §13); future-dated transactions are plain (§04); goals `?month=` (§09); budget `tag_refs` + `future_tx` / `upcoming` sources (§08); card `month_in` (§03); me / dashboard counts (§11) — 2026-10-20)
 - **Version** — 0.7 (Pointers: editable splits, overpaid debts, deletable repayment rows, split_changed — 2026-10-10)

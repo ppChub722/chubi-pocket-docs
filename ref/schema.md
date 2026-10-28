@@ -62,6 +62,7 @@ For module behavior, API endpoints, design rationale, and cross-table invariants
 | [13 — Notifications](#13--notifications)                                    | `notifications`, `user_notification_settings`                                                       |
 | [14 — Shared Wallets](#14--shared-wallets)                                  | `account_members` (wallet rows live in ordinary `transactions`; migrated in 039)                    |
 | [15 — Slip Import](#15--slip-import)                                        | `payment_providers`, `import_logs`                                                                  |
+| [16 — Telegram](#16--telegram)                                              | `telegram_messages`                                                                                 |
 
 ---
 
@@ -1365,9 +1366,36 @@ user's email etc. come from a join on `users`.
 
 ---
 
+## 16 — Telegram
+
+0.4.2, migration 120. Spec: [`../modules/16-telegram.md`](../modules/16-telegram.md).
+
+### `telegram_messages`
+
+Every text an ALLOWED private chat sends the bot, once per Telegram
+`update_id` (Telegram may resend). The real-sentence set for the LLM eval
+(0.4.2 1b; owner OK 2026-10-28). No user link yet (1c adds linking).
+Not-allowed chats, `/start` and non-text messages are not kept.
+Pre-release data, wipe-able. Exempt from the audit columns (written by the
+system only).
+
+| Column          | Type          | Constraints                         | Description |
+| --------------- | ------------- | ----------------------------------- | ----------- |
+| `id`            | `UUID`        | PK, DEFAULT `gen_random_uuid()`     | |
+| `update_id`     | `BIGINT`      | NOT NULL, UNIQUE                    | Telegram's update id: the dedupe key |
+| `chat_id`       | `BIGINT`      | NOT NULL                            | Telegram chat id (private chat = the user's Telegram id) |
+| `from_username` | `TEXT`        | NULLABLE                            | Telegram @username without the @; NULL = none |
+| `text`          | `TEXT`        | NOT NULL                            | The message text as sent |
+| `received_at`   | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()`           | The message's Telegram `date` |
+
+**Indexes:** `(chat_id, received_at DESC)`.
+
+---
+
 ## Status
 
-- **Last updated** — 2026-10-26 (migration head: **080**)
+- **Last updated** — 2026-10-28 (migration head: **120**)
+- **Version** — 0.18 (2026-10-28 — 0.4.2 1a: **120** `telegram_messages` (new §16). The 0.4.2 range is 120–129.)
 - **Version** — 0.17 (2026-10-27 — 0.4.1-1 BE-1, migrations 081–084. **084** `transactions.amount` / `personal_debts.amount` `>= 0` (system-written 0, B1), `personal_debts.disconnected_at`, notification type `debt_disconnected`. **083** one debt link: `transactions.debt_connected` + `debt_prev_category_id`, 076's `personal_debts.linked_transaction_id` folded in and dropped. **082** system categories `LOAN_GIVEN` / `LOAN_TAKEN` seeded, debt transactions moved to them. **081** `personal_debts.kind` (debt | repayment); 069's repayment transactions became rows, wallet-less ones lost their transaction; `transactions.repay_contact_id` / `repay_person_name` + check + indexes dropped. BE-2: **091** `project_transactions.paid_back_for_id` (a "คืนแล้ว" payback row knows its bill; un-ticking removes it). **090** `recurring_rules.pause_reason` (manual / overdue_limit / goal_inactive) + `gaps` (resume / installment shift); `recurring_due_checks` emptied so rules over the limit pause at their first check. 085–089 unused.)
 - **Version** — 0.16 (2026-10-26 — synced against migrations 071–080. **080** `transactions_paid_by_check` allows `income` ("รับแทน"). **079** `saving_goals.period_amount` / `period_freq` / `period_interval` / `period_anchor`. **078** `budget_periods.base_amount`. **077** recurring `type` / `kind` gain `saving`, `recurring_rules.goal_id` FK → ON DELETE CASCADE + `idx_recurring_rules_goal`, `saving_auto` migrated into recurring and dropped. **076** `personal_debts.linked_transaction_id` + unique index. **075** `recurring_due_checks`. **074** `user_preferences.timezone` cleanup. **073** `transactions` / `personal_debts.unlinked_project_transaction_id`, `project_transactions.unlinked_transaction_id`. **072** `project_transactions.type` gains `payback`. **071** `personal_debts.due_date`.)
 - **Version** — 0.15 (2026-10-21 — **070** paid by someone else: `transactions.paid_by_amount` + `transactions_paid_by_check`, `personal_debts.paid_for_transaction_id` + unique index, `source_kind` gains `paid_by`. **069** repayment transactions: `transactions.repay_contact_id` / `repay_person_name`.)

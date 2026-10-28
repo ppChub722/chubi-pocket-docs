@@ -20,6 +20,7 @@ The schema has **31 migrated tables** (as of migration 068, 2026-10-20) plus 5 p
 | **Personal debts** | 12 — Personal Debts | `personal_debts` |
 | **Notifications** | 13 — Notifications | `notifications`, `user_notification_settings` |
 | **Slip import** | 15 — Slip Import | `payment_providers`, `import_logs` |
+| **Telegram** | 16 — Telegram | `telegram_messages` |
 
 ---
 
@@ -197,6 +198,7 @@ These are infrastructure tables — covered in their owning module's spec but ra
 | `notifications` | 13 | One row per (recipient, event) |
 | `user_notification_settings` | 13 | One row per user; lazy-created |
 | `payment_providers`, `import_logs` | 15-slip-import | Bank code list; unhandled-slip log |
+| `telegram_messages` | 16-telegram | Texts the bot received (eval set) |
 
 `contact_invites` and `project_invites` were never migrated (invites ride notifications).
 

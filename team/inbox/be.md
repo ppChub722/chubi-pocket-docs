@@ -1442,3 +1442,53 @@ DONE (Lead brief, owner "ต่อเลย ให้จบทุกงาน").
 
 **Breaking for the current app:** the `summary_message.text` wording only. Everything else is additive.
 
+
+## 2026-10-28 12:19 — 0.4.2 1a: Telegram hello (BE session)
+DONE · base be `7b1f6bc`, nothing committed · go vet + go test (telegram, logger, apidoc; config has no tests) ok, **0 skip**, on a fresh `chubi_test_042` (every `migrations/*.up.sql`, head 120).
+
+**Files (be):**
+- NEW `internal/modules/telegram/`:
+  - `types.go`: Update / Message / Chat / User / WebhookInfo.
+  - `client.go`: Bot API over net/http (SendMessage with reply_parameters, SetWebhook with allowed_updates=["message"], GetWebhookInfo, GetMe). Errors drop the *url.Error URL and mask the token.
+  - `handler.go`: HandleUpdate, the reply table, dedupe (last 1000 ids in memory + the table's unique key), one log line per update with no text.
+  - `webhook.go`: Serve (constant-time secret → 401, else always 200 with an empty body), `New` (nil = off), `Start` (getMe → setWebhook → getWebhookInfo in a goroutine), ParseChatIDs.
+  - `store.go`: Save, `ON CONFLICT (update_id) DO NOTHING`.
+  - tests: client_test, handler_test, webhook_test (incl. the store test on the DB).
+- NEW `migrations/000120_telegram_messages.{up,down}.sql`: id, update_id UNIQUE, chat_id, from_username NULL, text, received_at (= Telegram's message date), index (chat_id, received_at DESC).
+- `internal/platform/config/config.go`: `TelegramConfig` + the 4 keys (gofmt also re-aligned JWTConfig / OCRConfig).
+- `cmd/api/main.go`: `telegram.New` after the other services; `api.POST("/telegram/webhook", …)` sits right after `/health`, BEFORE `api.Use(version middleware)`, so it gets no build check, JWT or sync. `Start()` runs after the server goroutine.
+- `internal/platform/logger/gin_logger.go`: `GinLoggerMiddleware(log, logBodies, noBodyPaths...)`, called with `telegram.Path`. This was needed: prod runs `LOG_BODIES=true` (runbook §6), and without the opt-out the request log printed the webhook body, i.e. the message text. A scratch test confirmed the leak; the webhook test now checks for it.
+- `internal/apidoc/openapi.yaml`: `telegramWebhook` (tag `Internal`, `x-internal: true`, `security: []`, header param, 200 empty / 401) + schemas `TelegramUpdate`, `TelegramMessage` + tag `Internal`.
+- `.env.example`, `.env.prod.example`, `docker-compose.deploy.yml`: the 4 keys (`${…:-}`).
+- **app** `test/hub/api_unused_baseline.txt`: + `POST /telegram/webhook`. The app's API ratchet fails on a spec endpoint no page flow lists, and the app never calls this one. `flutter test test/hub/api_spec_ratchet_test.dart` passes.
+
+**Env keys:** `TELEGRAM_BOT_TOKEN` (empty = off), `TELEGRAM_WEBHOOK_SECRET` (1–256 `A-Za-z0-9_-`; anything else = bot off + an error log), `TELEGRAM_WEBHOOK_URL` (setWebhook on start; empty = skipped with a warning), `TELEGRAM_ALLOWED_CHAT_IDS` (comma list; bad entries skipped with a warning; empty = nobody).
+
+**Replies:** the plan's table. My own choices:
+- The `/start` hello is "สวัสดีครับ ส่งข้อความมาได้เลย".
+- Not-allowed is "ยังไม่เปิดให้ใช้ (chat id: N)", sent for any private message from that chat (including /start).
+- Only allowed text is kept; /start and not-allowed chats are not.
+- A failed save still replies.
+
+**Tests (15):**
+- client: paths and bodies, reply_parameters only with replyTo, token absent from the API error / transport error (closed server) / non-JSON answer.
+- handler table: 10 rows (allowed text / photo / not allowed / /start ×2 / /start not allowed / group / channel / edited / empty).
+- dedupe: memory, then a "restart" caught by the store key.
+- store or send failure; the log has no text plus the expected keys; seenSet eviction; ParseChatIDs.
+- webhook: missing / wrong / prefix secret → 401 with no reply; good → 200 with an empty body and one reply, no text in the request log with bodies on, a resend gets no second reply; bad JSON / empty / `[]` → 200 with no reply.
+- `New` off without a token or with a bad secret, token never logged; `Start` calls getMe → setWebhook → getWebhookInfo; `Store.Save` on the DB (insert, conflict, row values).
+
+**Docs:** NEW `modules/16-telegram.md` (+ modules/README row), `ref/api-document.md` (public-endpoints line + status 0.10), `ref/schema.md` (§16 + TOC + status 0.18, head 120), `modules/data-model.md` (2 rows), `ops/ops-runbook.md` (§3 "Telegram bot": keys, restart, log lines, a query on the kept texts; §6 flag row).
+
+**On the VPS (Lead):**
+1. Migration 120 runs with the deploy (additive, not breaking: no app change, no MIN_APP_BUILD bump).
+2. The ppForge compose (`ppforge-infra/apps/chubi/docker-compose.yml`) uses `env_file: .env`, so it needs no edit; just add the 4 keys to `/srv/chubi/.env`:
+   - the owner pastes the token
+   - Lead makes the secret (`openssl rand -hex 32`)
+   - `TELEGRAM_WEBHOOK_URL=https://chubipocket-api.ppforge.dev/api/v1/telegram/webhook`
+   - `TELEGRAM_ALLOWED_CHAT_IDS` empty at first
+3. `docker compose up -d app`, then `docker logs … | grep telegram` should show "telegram: on" @bot and "telegram: webhook" url=… pending=0.
+4. The owner messages the bot, gets "ยังไม่เปิดให้ใช้ (chat id: N)". Put N in `TELEGRAM_ALLOWED_CHAT_IDS`, `up -d app`, then a message gets "ได้รับข้อความแล้ว ✓".
+5. Check that Caddy passes `/api/v1/telegram/webhook` and the `X-Telegram-Bot-Api-Secret-Token` header through (Caddy keeps headers by default).
+
+**Breaking for the app:** none.
