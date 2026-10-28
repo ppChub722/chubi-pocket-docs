@@ -406,3 +406,11 @@ Per global convention ([`overview.md §3`](README.md)). All `PUT /v1/users/me` f
 ## 0.4.0 profile additions
 
 `GET|PUT /users/me` also carry `default_account` (ref | null; set with `default_account_id`: an active wallet you are a member of, `null` clears, absent leaves it) and `auto_copy_own_event_bills` (a bill I record in an event also lands in my own book). Both are stored in `user_notification_settings`. `GET /me/counts` has `counts.archived` and `GET /me/archived` is the archived hub (`total` + wallets / budgets / goals / events / contacts / recurring, each `{count, items[{id, name, icon_code, archived_at}]}`).
+
+## 0.4.1-2 settings on the server (BE-3; migration 110)
+- One answer for the central settings page: `GET /users/me` carries every preference, the main wallet `default_account`, `fee_category` (CategoryRef), the two switches `auto_sync_events` / `auto_sync_debts` and `notification_summary {on, total}`. `auto_copy_own_event_bills` is gone (folded into `auto_sync_events`).
+- Preference keys: `timezone`, `theme_mode` (light|dark|system; replaces `theme`), `theme_id`, `language` (th|en), `font_th`, `font_en` (≤ 50 chars), `fee_category_id`, `money_style`, `money_decimals`, `page_prefs`. Unknown keys and bad values → 400. A missing key = null: the app fills it from the device once after login; afterwards the server wins (the app keeps a boot cache only).
+- `page_prefs` (P6): the last sort / filter / collapsed choice per page, one object per page id (wallets, budgets, goals, recurring, events, categories, tags, contacts, debts, pending). A page's object replaces its entry, `null` resets that page, `page_prefs: null` resets every page; inner keys belong to the app; ≤ 2 KB per page.
+- Migration 110 dropped the registration defaults `theme` / `language` no app ever sent (P2).
+- Sync dataset `profile` (P4) = this answer, so a change on another device reaches the open app.
+- The main wallet (`default_account`) is the quick-create default (X10); one value (the "กระเป๋าที่รับเงิน" row of the mock is dropped, Lead 2026-10-27).

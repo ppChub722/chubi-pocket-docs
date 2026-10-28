@@ -56,9 +56,9 @@ For module behavior, API endpoints, design rationale, and cross-table invariants
 | [07 — Contacts](#07--contacts)                                              | `contacts`                                                                                          |
 | [08 — Budgets](#08--budgets)                                                | `budgets`, `budget_categories`, `budget_wallets`, `budget_periods` (v2, migration 059)              |
 | [09 — Saving Goals](#09--saving-goals)                                      | `saving_goals`, `saving_entries` (v2, migration 060; `saving_auto` dropped in 077)                  |
-| [10 — Projects](#10--projects)                                              | `projects`, `project_members`, `project_transactions`, `event_tags`, `project_transaction_tags`, `project_my_tags` |
+| [10 — Projects](#10--projects)                                              | `projects`, `project_members`, `project_transactions`, `project_transaction_payers` (105), `event_settle_bookings` (103), `shared_bill_opt_outs` (093), `event_tags`, `project_transaction_tags`, `project_my_tags` |
 | [11 — Recurring](#11--recurring) _(replaces Scheduled Transactions, migration 057)_ | `recurring_rules`, `recurring_items`, `recurring_due_checks` (`scheduled_transactions` dropped) |
-| [12 — Personal Debts](#12--personal-debts-bidirectional)                    | `personal_debts`                                                                                    |
+| [12 — Personal Debts](#12--personal-debts-bidirectional)                    | `personal_debts`, `personal_debt_bills` (100)                                                       |
 | [13 — Notifications](#13--notifications)                                    | `notifications`, `user_notification_settings`                                                       |
 | [14 — Shared Wallets](#14--shared-wallets)                                  | `account_members` (wallet rows live in ordinary `transactions`; migrated in 039)                    |
 | [15 — Slip Import](#15--slip-import)                                        | `payment_providers`, `import_logs`                                                                  |
@@ -227,16 +227,23 @@ One row per user, 1:1 with `users`. Preferences are stored as a JSONB blob so ne
 { "timezone": "Asia/Bangkok", "theme": "system", "language": "th" }
 ```
 
+Migration 110 (0.4.1-2 P2) removed the never-sent `theme` / `language` keys from every existing row (`preferences - 'theme' - 'language'`); `theme` is replaced by `theme_mode`, a missing `language` is filled by the app from the device after login. Registration no longer writes them (fixed 2026-10-28, `auth/store.go` `InsertPreferencesTx`). Current keys: the table below.
+
 **Known JSONB keys** (typed at app layer):
 
 | Key        | Type   | Phase | Allowed values                      |
 | ---------- | ------ | ----- | ----------------------------------- |
 | `timezone` | string | 1     | IANA tz identifier. The API saves only names Postgres knows; queries use the stored value as is (no per-query `pg_timezone_names` check). Migration 074 reset any unknown / empty value to `Asia/Bangkok` once |
-| `theme`    | string | 2     | `"light"` \| `"dark"` \| `"system"` |
-| `language` | string | 2     | IETF tag                            |
+| `theme_mode` | string | 0.4.1-2 | `"light"` \| `"dark"` \| `"system"` (replaces `theme`, removed by migration 110) |
+| `theme_id` | string | 0.4.1-2 | the app's theme id (e.g. `mint`), 1–50 chars |
+| `language` | string | 0.4.1-2 | `"th"` \| `"en"` (checked since 0.4.1-2) |
+| `font_th` / `font_en` | string | 0.4.1-2 | the font id per language, 1–50 chars |
+| `page_prefs` | object | 0.4.1-2 | last sort / filter per page: keys `wallets`, `budgets`, `goals`, `recurring`, `events`, `categories`, `tags`, `contacts`, `debts`, `pending`; each an app-owned object ≤ 2 KB; merged per page |
+| `money_style` | string | 0.3.1 | `plus_minus` \| `plus_minus_plain` \| `parentheses` \| `parentheses_plain` \| `color_only` |
+| `money_decimals` | string | 0.3.1 | `always` \| `never` \| `auto` |
 | `fee_category_id` | string or null | 0.3.1 | UUID of one of the user's **expense** categories — fee drafts from bank slips get it (the "ใช้เป็นหมวดค่าธรรมเนียม" switch). `null` clears. Validated on write; a deleted category is ignored on read. [spec 15 §7](../modules/15-slip-import.md) |
 
-Unknown keys are ignored on read, rejected on write.
+Registration writes `{"timezone": "Asia/Bangkok", "money_style": "color_only"}` (0.4.1-2 P2: no `theme` / `language`; the app sends the device's values once after login). Unknown keys are ignored on read, rejected on write (400).
 
 **Indexes:** `PRIMARY KEY (user_id)`.
 
@@ -358,6 +365,7 @@ Owned by [`../spec/04-transactions.md`](../modules/04-transactions.md).
 | `debt_prev_category_id`         | `UUID`          | FK → `categories.id` ON DELETE SET NULL, NULLABLE | Migration 083. A connected transaction's category from before it took the kind category; restored on a disconnect. (069's `repay_contact_id` / `repay_person_name` were dropped in 081: repayments are `personal_debts` rows.) |
 | `paid_by_amount`                | `DECIMAL(15,2)` | NULLABLE                                   | Migration 070 (0.4.0-3). The part of this EXPENSE someone else paid for me. `amount` stays the bill (reports / budgets / my_share); the wallet moves only `amount − paid_by_amount` (the balance delta, `shared.SignedTxSQL`, wallet month flow). Its debt is the `personal_debts` row with `paid_for_transaction_id` = this row (spec 04 §2.8, spec 12 §1.5a). Migration 080 (0.4.1-0, "รับแทน"): also on an INCOME — someone received part of my income for me; the income counts its whole `amount`, the wallet moves `amount − paid_by_amount`, and the debt is "they owe me" (a `paid` entry) |
 | `unlinked_project_transaction_id` | `UUID`        | FK → `project_transactions.id` ON DELETE SET NULL, NULLABLE | Migration 073 (0.4.0-3). Set while "ลงบัญชีของฉัน" is off on an event bill: the row lost its `source_project_transaction_id` / `project_id` but stays in my books, and this remembers the bill so turning it on again links the same row back |
+| `private_note`                  | `TEXT`          | NULLABLE                                   | Migration 093 (0.4.1-2 S11). My private note on a copy of a shared bill (event or split); never synced, never notified. API: ≤ 500 chars, only on shared rows (400 `PRIVATE_NOTE_NOT_SHARED`) |
 | `created_at`                    | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                  |                                                                                                                                                                                                                                          |
 | `created_by_user_id`            | `UUID`          | FK → `users.id`, NULLABLE                  | NULL = system                                                                                                                                                                                                                            |
 | `updated_at`                    | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                  | Trigger-updated                                                                                                                                                                                                                          |
@@ -761,6 +769,8 @@ Thin container for a project.
 | `status`             | `VARCHAR(20)`  | NOT NULL, DEFAULT `'active'`, CHECK | `'active'` \| `'completed'` \| `'cancelled'` \| `'archived'`                        |
 | `icon_code`          | `JSONB`        | NULLABLE                            | Icon Maker code                                                                     |
 | `planned_amount`     | `DECIMAL(15,2)`| NULLABLE, CHECK (`planned_amount > 0`) (migration 040) | Planned total spend for the project (UI: "ตั้งงบไว้"). NULL = not set (plan UI hidden). Freely editable via project update. See `10-projects` §4.23 |
+| `kind`               | `VARCHAR(10)`  | NOT NULL, DEFAULT `'event'`, CHECK (`projects_kind_check`: `event`, `split`) | Migration 093 (0.4.1-2 S1). `split` = the hidden one-bill "event" of a split bill (a bill with no event): never shown as an event (lists, numbers, settle, pickers filter `kind = 'event'`); its people are its members (linked users active at once, no invite) |
+| `completed_at`       | `TIMESTAMPTZ`  | NULLABLE                            | Migration 101 (0.4.1-2 V2). Set by `POST /projects/{id}/complete` = locked for good (never back to active / cancelled, no delete; archive keeps it, restore returns it to `completed`). Backfill: completed events got `updated_at`. Trigger `project_transactions_locked` (BEFORE INSERT / UPDATE OF the bill's own values) refuses bill writes on such an event (`EVENT_COMPLETED`) |
 | `created_at`         | `TIMESTAMPTZ`  | NOT NULL, DEFAULT `NOW()`           |                                                                                     |
 | `created_by_user_id` | `UUID`         | FK → `users.id`, NULLABLE           | NULL = system                                                                       |
 | `updated_at`         | `TIMESTAMPTZ`  | NOT NULL, DEFAULT `NOW()`           | Trigger-updated                                                                     |
@@ -769,7 +779,7 @@ Thin container for a project.
 **Indexes:**
 
 - `PRIMARY KEY (id)`
-- `INDEX idx_projects_owner ON projects(owner_user_id, status)` — owner's projects list
+- `INDEX idx_projects_owner ON projects(owner_user_id, kind, status)` — owner's projects list (migration 093 added `kind`; was `(owner_user_id, status)`)
 - `INDEX idx_projects_status ON projects(status, updated_at DESC)` — member queries
 
 **`planned_amount` is one nullable number** — no separate table, no period. Named `planned_amount` (not "budget") to stay unambiguous vs the `budgets` table. Spent is computed from `project_transactions` parents (expenses − income); never cached. Decided 2026-09-11, resolving the former "budget_goal" open question.
@@ -792,6 +802,7 @@ Member identity within a project. **Two kinds** of member share this table post-
 | `invited_at`         | `TIMESTAMPTZ`  | NULLABLE                                        | Set when invite was generated                |
 | `joined_at`          | `TIMESTAMPTZ`  | NULLABLE                                        | Set when user_id populated via invite accept |
 | `left_at`            | `TIMESTAMPTZ`  | NULLABLE                                        | Set on leave (soft-remove)                   |
+| `removed_at`         | `TIMESTAMPTZ`  | NULLABLE                                        | Migration 101 (0.4.1-2 V15). Set when the OWNER removed them (left_at alone = they left). Their spots on bills stay = empty persons "( ) ____" to assign; the event can't be completed while one is left |
 | `created_at`         | `TIMESTAMPTZ`  | NOT NULL, DEFAULT `NOW()`                       |                                              |
 | `created_by_user_id` | `UUID`         | FK → `users.id`, NULLABLE                       | NULL = system                                |
 | `updated_at`         | `TIMESTAMPTZ`  | NOT NULL, DEFAULT `NOW()`                       | Trigger-updated                              |
@@ -834,7 +845,8 @@ The canonical project ledger. Every transaction recorded in a project context go
 | `description`                   | `TEXT`          | NULLABLE                                                    | Optional user-supplied label for the transaction; editable                                                                                                             |
 | `linked_transaction_id`         | `UUID`          | FK → `transactions.id`, NULLABLE, ON DELETE SET NULL, UNIQUE (partial) | Migration 056. The personal transaction a bill was made FROM (explicit link; amounts may differ, the money is linked by prompt). A deleted transaction just breaks it |
 | `unlinked_transaction_id`       | `UUID`          | FK → `transactions.id`, NULLABLE, ON DELETE SET NULL        | Migration 073 (0.4.0-3). The bill's `linked_transaction_id` while "ลงบัญชีของฉัน" is off (the tx is unlinked but kept); turning it on again puts it back. Pairs with `transactions.unlinked_project_transaction_id` / `personal_debts.unlinked_project_transaction_id` |
-| `paid_back_for_id`              | `UUID`          | FK → `project_transactions.id`, NULLABLE, ON DELETE SET NULL; partial index `idx_project_transactions_paid_back_for` | Migration 091 (0.4.1-1 E8). On a payback row made for a bill member ticked "คืนแล้ว": that bill. Un-ticking it on a bill edit removes the row (and the editor's repayment of it); the board shows the tick (`BoardSplit.paid_back`). NULL on paybacks entered on their own; deleting the bill leaves them as plain paybacks |
+| `paid_back_for_id`              | `UUID`          | FK → `project_transactions.id`, NULLABLE, ON DELETE SET NULL; partial index `idx_project_transactions_paid_back_for` | Migration 091 (0.4.1-1 E8). On a payback row made for a bill member ticked "คืนแล้ว": that bill. Un-ticking it on a bill edit removes the row (and the editor's repayment of it); the board shows the tick (`BoardSplit.paid_back`). NULL on paybacks entered on their own; deleting the bill leaves them as plain paybacks (0.4.1-2 V13: deleting an event bill deletes them) |
+| `payback_kind`                  | `VARCHAR(10)`   | NULLABLE, CHECK (`payback`, `loan`)                         | Migration 102 (0.4.1-2 V11). On a payback parent: `payback` (NULL reads the same) or `loan` (lending during the event). Same settle math; a claim books a payback as a repayment row, a loan as a debt row |
 | `created_at`                    | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                                   |                                                                                                                                                                        |
 | `created_by_user_id`            | `UUID`          | FK → `users.id`, NULLABLE                                   | NULL = system                                                                                                                                                          |
 | `updated_at`                    | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                                   | Trigger-updated                                                                                                                                                        |
@@ -848,6 +860,7 @@ The canonical project ledger. Every transaction recorded in a project context go
 - A parent row's `parent_project_transaction_id` must be NULL (max 1 level deep — service-layer enforced)
 - Self-split forbidden: a child's `transaction_member_id` must differ from its parent's `transaction_member_id` (service-layer enforced)
 - Sum of children's `amount` ≤ parent's `amount` (service-layer enforced)
+- Trigger `project_transactions_locked` (migration 101, function `project_transactions_locked_check`): BEFORE INSERT, or UPDATE OF `project_id`, `parent_project_transaction_id`, `transaction_member_id`, `type`, `amount`, `date`, `description`, `note`, `marks` — raises `EVENT_COMPLETED` (P0001) when the event's `completed_at` is set (reads the event row FOR SHARE, so it waits for a complete in flight). Link columns (`linked_transaction_id` …) still change. A race backstop: the API checks first (409 `EVENT_COMPLETED`)
 
 **No `account_id`** — project_transactions never hit a personal account. Personal entries are created client-side via the regular `POST /transactions` (with `source_project_transaction_id` set for traceback) or `POST /personal-debts`.
 
@@ -862,6 +875,45 @@ The canonical project ledger. Every transaction recorded in a project context go
 - `INDEX project_transactions_parent_idx ON project_transactions(parent_project_transaction_id) WHERE parent_project_transaction_id IS NOT NULL` — child lookup by parent
 - `UNIQUE INDEX idx_project_transactions_linked_tx ON project_transactions(linked_transaction_id) WHERE linked_transaction_id IS NOT NULL` — one bill per personal transaction (migration 056)
 - `INDEX idx_project_transactions_project_updated ON project_transactions(project_id, updated_at)` — sync fingerprints (migration 066)
+
+### `project_transaction_payers`
+
+Migration 105 (0.4.1-2 multi-payer, owner 2026-10-28). A bill's payers ("คนจ่าย") with what each paid, ONLY when there are 2+; none = the bill's `transaction_member_id` paid it all. `transaction_member_id` is always the main (biggest) payer, so the shares stay "child rows + the main payer's rest". PK `(project_transaction_id, member_id)` (FK CASCADE both), `amount > 0`; Σ = the bill (API). Trigger `project_transaction_payers_locked` refuses changes on a completed event.
+
+| Column                   | Type            | Constraints                                                 | Description |
+| ------------------------ | --------------- | ----------------------------------------------------------- | ----------- |
+| `project_transaction_id` | `UUID`          | PK, FK → `project_transactions.id`, NOT NULL, ON DELETE CASCADE | The bill (parent row) |
+| `member_id`              | `UUID`          | PK, FK → `project_members.id`, NOT NULL, ON DELETE CASCADE  | One payer |
+| `amount`                 | `DECIMAL(15,2)` | NOT NULL, CHECK `> 0`                                       | What this payer paid |
+
+No audit columns. **Indexes:** `PRIMARY KEY (project_transaction_id, member_id)`, `INDEX idx_project_transaction_payers_member ON project_transaction_payers(member_id)`. **Trigger:** `project_transaction_payers_locked` (function `project_transaction_payers_locked_check`, BEFORE INSERT OR UPDATE) raises `EVENT_COMPLETED` (P0001) when the bill's event has `completed_at` set (locks the event row FOR SHARE). DELETE is not covered by the trigger (the API checks).
+
+**View `project_bill_pairs(pt_id, project_id, type, debtor, creditor, amount)`** — every bill's real pairs: each share is split over the payers by what they paid (member m owes payer p = share_m × paid_p / bill, 2 dp); income flipped (the one who received owes); a payback = the receiver owes the giver. Settle, claims, `Event.my_net` read it.
+
+### `event_settle_bookings`
+
+Migration 103 (0.4.1-2 V12). One row per member who booked a completed event's fewest-transfers settle into their book ("ลงในสมุดฉัน", once). PK `(project_id, user_id)`, both FK CASCADE; `lines` JSONB `[{member_id, amount, pay, transaction_id}]`; `booked_at`. Once booked, that member's real pairs count as claimed.
+
+| Column       | Type          | Constraints                                     | Description |
+| ------------ | ------------- | ----------------------------------------------- | ----------- |
+| `project_id` | `UUID`        | PK, FK → `projects.id`, NOT NULL, ON DELETE CASCADE | The event |
+| `user_id`    | `UUID`        | PK, FK → `users.id`, NOT NULL, ON DELETE CASCADE    | The member who booked |
+| `lines`      | `JSONB`       | NOT NULL, DEFAULT `'[]'::jsonb`                 | The simplified lines booked: `[{member_id, amount, pay, transaction_id}]` (a plain transaction per line with me) |
+| `booked_at`  | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()`                       | |
+
+No audit columns, no extra index.
+
+### `shared_bill_opt_outs`
+
+Migration 093 (0.4.1-2 rule a / f). "I disconnected my copy of this bill" (tx-detail disconnect, `POST /event-bills/{pt_id}/disconnect`, or deleting my copy). The bill no longer reaches that user (no copy, no notices) until they connect again (row deleted).
+
+| Column                   | Type          | Constraints                                                     | Description |
+| ------------------------ | ------------- | --------------------------------------------------------------- | ----------- |
+| `project_transaction_id` | `UUID`        | PK, FK → `project_transactions.id`, NOT NULL, ON DELETE CASCADE | The bill |
+| `user_id`                | `UUID`        | PK, FK → `users.id`, NOT NULL, ON DELETE CASCADE                | The member who disconnected |
+| `created_at`             | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()`                                       | |
+
+No audit columns. **Indexes:** `PRIMARY KEY (project_transaction_id, user_id)`.
 
 ### `event_tags`
 
@@ -912,6 +964,8 @@ Primary key: `(project_id, tag_id)`. `INDEX idx_project_my_tags_user ON project_
 
 Owned by [`../spec/11-scheduled-transactions.md`](../modules/11-scheduled-transactions.md) (the file keeps its old name).
 
+**The "หนี้" kind (migrations 111–112, 0.4.1-2 K).** `recurring_rules`: `type` / `kind` CHECKs add `debt`; `pause_reason` adds `no_balance`; new `contact_id` (FK contacts, SET NULL), `person_name` VARCHAR(100), `debt_kind` (debt | repayment), `debt_direction` (paid | received), `zero_rounds` INT 0–3; `recurring_rules_debt_fields_check`: type debt ⇔ person_name + debt_kind + debt_direction set, contact_id only on debt. `recurring_items.debt_entry_id` (FK personal_debts, SET NULL, UNIQUE): the entry that fills the slot. Trigger `personal_debts_recurring_skip` (112, BEFORE DELETE on personal_debts): the slot of a deleted entry is skipped with its amount.
+
 **Removed: `scheduled_transactions`.** Migration 057 (0.3.1-10, 2026-10-13) dropped the table (its rows were not migrated; the installment / loan extras went with it) and `transactions.scheduled_transaction_id`, and created `recurring_rules` (the setting) + `recurring_items`.
 
 **The computed-occurrences model (migration 068, 2026-10-20, 0.4.0-2 C1 + C3 + C8).** A rule's occurrences are NOT stored: the BE computes them from the rule whenever they are asked for. A `recurring_items` row exists only for an occurrence that is recorded (a transaction), cleared (paid without a transaction), skipped or edited — plus manual extra occurrences and legacy rows that still hold a pending draft. A computed occurrence is addressed by `rule_id + slot` (its original date); a stored row keeps that slot. Recurring no longer produces pending drafts: "due" is a state (date ≤ today and not recorded). One-off upcoming items are gone: a future-dated transaction is a plain transaction (§04).
@@ -930,8 +984,8 @@ The setting: a Google-Calendar-style rule plus the values its occurrences record
 | `description`        | `TEXT`          | NULLABLE                                          | |
 | `note`               | `TEXT`          | NULLABLE                                          | Copied to the transactions it records |
 | `icon_code`          | `JSONB`         | NULLABLE                                          | Icon Maker code |
-| `kind`               | `VARCHAR(12)`   | NOT NULL, DEFAULT `'subscription'`, CHECK         | Migration 064. What the user picks: `'subscription'` \| `'installment'` (a count of payments) \| `'income'` \| `'reminder'` (เตือนจ่าย: the amount may be unknown) \| `'saving'` (ออมเงิน, migration 077) |
-| `type`               | `VARCHAR(10)`   | NOT NULL, CHECK                                   | Money direction: `'expense'` \| `'income'` \| `'transfer'` \| `'saving'` (060 added `'saving'`, 064 removed it, 077 brought it back: money from a wallet into a goal / the unallocated pot; a confirmed occurrence writes a `saving_entries` row, never a transaction) |
+| `kind`               | `VARCHAR(12)`   | NOT NULL, DEFAULT `'subscription'`, CHECK         | Migration 064. What the user picks: `'subscription'` \| `'installment'` (a count of payments) \| `'income'` \| `'reminder'` (เตือนจ่าย: the amount may be unknown) \| `'saving'` (ออมเงิน, migration 077) \| `'debt'` (หนี้, migration 111: books person-book entries) |
+| `type`               | `VARCHAR(10)`   | NOT NULL, CHECK                                   | Money direction: `'expense'` \| `'income'` \| `'transfer'` \| `'saving'` (060 added `'saving'`, 064 removed it, 077 brought it back: money from a wallet into a goal / the unallocated pot; a confirmed occurrence writes a `saving_entries` row, never a transaction) \| `'debt'` (migration 111, with kind `debt` only: a confirmed occurrence writes a `personal_debts` row, + its transaction when the setting has a wallet) |
 | `amount`             | `NUMERIC(15,2)` | NOT NULL, CHECK ≥ 0 (migration 064; was > 0)      | Per occurrence. 0 = unknown (a reminder) |
 | `account_id`         | `UUID`          | FK → `accounts.id`, NULLABLE, ON DELETE SET NULL  | Wallet. NULL = none (a deleted wallet leaves the setting running wallet-less) |
 | `to_account_id`      | `UUID`          | FK → `accounts.id`, NULLABLE, ON DELETE SET NULL  | Transfer target |
@@ -960,14 +1014,19 @@ The setting: a Google-Calendar-style rule plus the values its occurrences record
 | `auto_create`        | `BOOLEAN`       | NOT NULL, DEFAULT `FALSE`                         | Migration 068 (C8, "บันทึกอัตโนมัติเมื่อถึงวัน"). Record the transaction by itself when an occurrence comes due — on the first due check of the day (app open), no clock job. 0.4.1-1 R12: any amount (0 is recorded as 0) and any wallet; a wallet / category that is gone or archived is left off the transaction (before: needed a fixed amount and a wallet, API 400 `AUTO_CREATE_NEEDS_AMOUNT` / `AUTO_CREATE_NEEDS_WALLET`, gone)) |
 | `auto_created_until` | `DATE`          | NULLABLE                                          | Migration 068. Auto-create has handled the occurrences up to this day. Switching auto-create on sets it to yesterday (today's due occurrence counts, older due ones stay due); off / on again and resume reset it |
 | `paused_from`        | `DATE`          | NULLABLE                                          | Migration 068. The day the rule was paused (or archived while active; for `overdue_limit` the date of the 4th due occurrence). 0.4.1-1: on resume the span [paused_from, the current period's occurrence) becomes a `gaps` entry (nothing stored); what was due before the pause stays due. An archived wallet no longer pauses a rule |
-| `pause_reason`       | `TEXT`          | NULLABLE, CHECK `IN ('manual', 'overdue_limit', 'goal_inactive')` | Migration 090 (0.4.1-1 R7). Why it is paused: the user, "ค้าง 3 งวด" (a 4th occurrence came due while 3 waited; the 3 are stored and stay due), or a saving setting whose goal closed. Cleared on resume. 090 set `manual` (or `goal_inactive`) on the rules paused before it and emptied `recurring_due_checks` so every rule over the limit pauses at its first check |
+| `pause_reason`       | `TEXT`          | NULLABLE, CHECK `IN ('manual', 'overdue_limit', 'goal_inactive', 'no_balance')` (`no_balance` migration 111) | Migration 090 (0.4.1-1 R7). Why it is paused: the user, "ค้าง 3 งวด" (a 4th occurrence came due while 3 waited; the 3 are stored and stay due), a saving setting whose goal closed, or (111, 0.4.1-2 K5) a จ่ายหนี้ setting whose person owed nothing for 3 rounds in a row (resumes by itself on a new debt). Cleared on resume. 090 set `manual` (or `goal_inactive`) on the rules paused before it and emptied `recurring_due_checks` so every rule over the limit pauses at its first check |
 | `gaps`               | `JSONB`         | NOT NULL, DEFAULT `'[]'`                          | Migration 090 (0.4.1-1 R8 / R9). `[{from, to}]` (YYYY-MM-DD): occurrences with from <= slot < to are never made (a resume after a pause). A count end counts past them (installments shift); a date end keeps its date |
+| `contact_id`         | `UUID`          | FK → `contacts.id`, NULLABLE, ON DELETE SET NULL  | Migration 111 (0.4.1-2 K). Kind `debt`: the person as a contact; NULL on other kinds (CHECK) |
+| `person_name`        | `VARCHAR(100)`  | NULLABLE                                          | Migration 111. Kind `debt`: the person's name (always set on a debt setting; stays when the contact goes) |
+| `debt_kind`          | `VARCHAR(20)`   | NULLABLE, CHECK (`debt`, `repayment`)             | Migration 111. Kind `debt`: `debt` = จดหนี้, `repayment` = จ่ายหนี้; each occurrence books a `personal_debts` row of this kind |
+| `debt_direction`     | `VARCHAR(20)`   | NULLABLE, CHECK (`paid`, `received`)              | Migration 111. Kind `debt`: the entry direction (as the debts API) |
+| `zero_rounds`        | `INT`           | NOT NULL, DEFAULT `0`, CHECK `BETWEEN 0 AND 3`    | Migration 111 (K5). จ่ายหนี้: rounds in a row with nothing owed; at 3 the setting pauses with `no_balance` |
 | `created_at`         | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                         | |
 | `updated_at`         | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                         | Trigger-updated |
 
-**Check constraints:** `kind IN ('subscription', 'installment', 'income', 'reminder', 'saving')`, `type IN ('expense', 'income', 'transfer', 'saving')` (both gained `saving` in migration 077), `amount >= 0`, `freq IN ('daily', 'weekly', 'monthly', 'yearly', 'dates')`, `interval_n >= 1`, `monthly_mode IS NULL OR monthly_mode IN ('day', 'weekday')`, `end_kind IN ('none', 'date', 'count')`, `status IN ('active', 'paused', 'archived')`.
+**Check constraints:** `recurring_rules_kind_check`: `kind IN ('subscription', 'installment', 'income', 'reminder', 'saving', 'debt')`, `recurring_rules_type_check`: `type IN ('expense', 'income', 'transfer', 'saving', 'debt')` (both gained `saving` in migration 077, `debt` in 111), `recurring_rules_pause_reason_check` (090; `no_balance` in 111), `recurring_rules_debt_fields_check` (111): `(type = 'debt') = (person_name IS NOT NULL AND debt_kind IS NOT NULL AND debt_direction IS NOT NULL) AND (type = 'debt' OR contact_id IS NULL)`, `debt_kind IN ('debt', 'repayment')`, `debt_direction IN ('paid', 'received')`, `zero_rounds BETWEEN 0 AND 3`, `amount >= 0`, `freq IN ('daily', 'weekly', 'monthly', 'yearly', 'dates')`, `interval_n >= 1`, `monthly_mode IS NULL OR monthly_mode IN ('day', 'weekday')`, `end_kind IN ('none', 'date', 'count')`, `status IN ('active', 'paused', 'archived')`.
 
-**Indexes:** `PRIMARY KEY (id)`, `INDEX idx_recurring_rules_user ON recurring_rules(user_id, status)`, `INDEX idx_recurring_rules_goal ON recurring_rules(goal_id) WHERE goal_id IS NOT NULL` (migration 077).
+**Indexes:** `PRIMARY KEY (id)`, `INDEX idx_recurring_rules_user ON recurring_rules(user_id, status)`, `INDEX idx_recurring_rules_goal ON recurring_rules(goal_id) WHERE goal_id IS NOT NULL` (migration 077), `INDEX idx_recurring_rules_contact ON recurring_rules(contact_id) WHERE contact_id IS NOT NULL` (migration 111).
 
 **Migration 077 (0.4.0-4):** every `saving_auto` row became a `type = kind = 'saving'` rule (see §09 "Removed: `saving_auto`").
 
@@ -995,12 +1054,13 @@ The stored occurrences (068: only recorded / cleared / skipped / edited ones, ma
 | `saving_entry_id` | `UUID`        | FK → `saving_entries.id`, NULLABLE, ON DELETE SET NULL | Migration 060. The saving entry that records a `saving` rule's occurrence (status `done`; in use again since 077) |
 | `cleared_at`      | `TIMESTAMPTZ` | NULLABLE                                            | Migration 068. Paid WITHOUT a transaction ("จ่ายแล้ว", e.g. "แม่จ่ายให้"): status `paid` |
 | `auto_created_at` | `TIMESTAMPTZ` | NULLABLE                                            | Migration 068. The transaction was recorded by auto-create (item `auto_created: true`). If that transaction is deleted, the occurrence goes back to due and is not re-created |
+| `debt_entry_id`   | `UUID`        | FK → `personal_debts.id`, NULLABLE, ON DELETE SET NULL | Migration 111 (0.4.1-2 K). The person-book entry that fills a kind `debt` occurrence (status `done`). Deleting the entry SKIPS the slot with its last amount (trigger `personal_debts_recurring_skip`, migration 112: `archived`, `edited` TRUE, `draft.amount` = the entry's amount, `produced_at` / `auto_created_at` / `cleared_at` NULL) instead of making it due again |
 | `created_at`      | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()`                           | |
 | `updated_at`      | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()`                           | Trigger-updated |
 
 **Status is derived, never stored** (068):
 
-- Stored row, first match wins: `done` (`transaction_id` or `saving_entry_id` set) → `skipped` (`archived`) → `paid` (`cleared_at` set) → `pending` (`pending_id` set, legacy) → `due` (`date` ≤ today, user's timezone) → `upcoming`.
+- Stored row, first match wins: `done` (`transaction_id`, `saving_entry_id` or, since 111, `debt_entry_id` set) → `skipped` (`archived`) → `paid` (`cleared_at` set) → `pending` (`pending_id` set, legacy) → `due` (`date` ≤ today, user's timezone) → `upcoming`.
 - Computed occurrence (no row): `paid` if `slot` < the rule's `tracked_from`; `due` if `slot` ≤ today; else `upcoming`.
 
 **Indexes:**
@@ -1012,6 +1072,7 @@ The stored occurrences (068: only recorded / cleared / skipped / edited ones, ma
 - `UNIQUE INDEX idx_recurring_items_pending ON recurring_items(pending_id) WHERE pending_id IS NOT NULL`
 - `UNIQUE INDEX idx_recurring_items_tx ON recurring_items(transaction_id) WHERE transaction_id IS NOT NULL` — a transaction records at most one occurrence
 - `UNIQUE INDEX idx_recurring_items_saving ON recurring_items(saving_entry_id) WHERE saving_entry_id IS NOT NULL` (migration 060)
+- `UNIQUE INDEX idx_recurring_items_debt_entry ON recurring_items(debt_entry_id) WHERE debt_entry_id IS NOT NULL` (migration 111) — an entry fills at most one occurrence
 - `INDEX idx_recurring_items_user_updated ON recurring_items(user_id, updated_at)` — sync fingerprints (migration 066)
 
 Migration 068 adds no index.
@@ -1087,7 +1148,7 @@ not converted and keep counting as debts.
 | `source_transaction_id`         | `UUID`          | FK → `transactions.id`, NULLABLE, ON DELETE SET NULL         | The bill a split entry came from (in the row owner's book). NULL for manual entries and partner-side mirror rows                             |
 | `source_project_transaction_id` | `UUID`          | FK → `project_transactions.id`, NULLABLE, ON DELETE SET NULL | 1b.2: project-context origin                                                                                                                  |
 | `project_id`                    | `UUID`          | FK → `projects.id`, NULLABLE, ON DELETE SET NULL             | 1b.2: contextual project                                                                                                                      |
-| `source_kind`                   | `VARCHAR(20)`   | NULLABLE, CHECK                                              | Migration 054. Where a split-made entry came from: `'transaction'` (a split on my bill) \| `'partner'` (another user's split on me, the mirror) \| `'event'` (reserved). NULL = manual entry |
+| `source_kind`                   | `VARCHAR(20)`   | NULLABLE, CHECK                                              | Migration 054. Where a split-made entry came from: `'transaction'` (a split on my bill) \| `'partner'` (another user's split on me, the mirror; wiped in 094, no longer written) \| `'event'` (an event debt; 0.4.0-4's per-settle-line `{event_id}` debts were retired in 104) \| `'paid_by'` (070). NULL = manual entry |
 | `counterpart_debt_id`           | `UUID`          | FK → `personal_debts.id`, NULLABLE, ON DELETE SET NULL       | Migration 045. The mirror entry in the other user's book (a split pair), so a change on one side can notify the other                        |
 | `unlinked_project_transaction_id` | `UUID`        | FK → `project_transactions.id`, NULLABLE, ON DELETE SET NULL | Migration 073 (0.4.0-3). Set while "ลงบัญชีของฉัน" is off on the event bill this debt was made from: the debt lost its bill link but stays in my books; turning it on again links the same row back |
 | `kind`                          | `VARCHAR(20)`   | NOT NULL, DEFAULT 'debt', CHECK (`debt`, `repayment`) | Migration 081 (0.4.1-1 D3). A DEBT (ให้ยืม / ยืม, a split, a paid-by, an event debt) or a REPAYMENT (จ่ายคืน = `paid`, รับคืน = `received`). Both count in the balance; a repayment has no paid label / due date. (076's `linked_transaction_id` was folded into `transactions.source_personal_debt_id` + `debt_connected` and dropped in 083.) |
@@ -1100,10 +1161,17 @@ not converted and keep counting as debts.
 | `paid`                          | `BOOLEAN`       | NOT NULL, DEFAULT `FALSE` (migration 054)                    | The "paid" label (was `status = 'settled'`); never changes a number                                                                           |
 | `description`                   | `TEXT`          | NULLABLE                                                     | What it was for (≤ 200 chars, API). Split entries take the bill's description. Migration 051 |
 | `note`                          | `TEXT`          | NULLABLE                                                     |                                                                                                                                               |
+| `private_note`                  | `TEXT`          | NULLABLE                                                     | Migration 093 (0.4.1-2 S11). My private note on a debt of a shared bill; never synced, never notified. API: ≤ 500 chars, only on shared rows (400 `PRIVATE_NOTE_NOT_SHARED`) |
 | `created_at`                    | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                                    |                                                                                                                                               |
 | `created_by_user_id`            | `UUID`          | FK → `users.id`, NULLABLE                                    | NULL = system                                                                                                                                 |
 | `updated_at`                    | `TIMESTAMPTZ`   | NOT NULL, DEFAULT `NOW()`                                    | Trigger-updated                                                                                                                               |
 | `updated_by_user_id`            | `UUID`          | FK → `users.id`, NULLABLE                                    | NULL = system                                                                                                                                 |
+
+**Wiped in migration 094 (0.4.1-2 S15, the one-way split mirror retired in S16):** the splitter rows of mirrored pairs (`source_kind` transaction / paid_by with a `counterpart_debt_id`), every `partner` mirror and its wallet-less expense (`paid_for_transaction_id`), and the `split_created` / `split_changed` notices. Plain splits / paid-by debts with typed names or unlinked contacts and already-disconnected pairs stay. `source_kind` `partner` and `counterpart_debt_id` are no longer written (a split with a linked contact is a shared bill, BE-1).
+
+**Retired in migration 104 (0.4.1-2 V8, Q-E4 wipe):** the 0.4.0-4 per-settle-line `{event_id}` debts (`kind = 'debt'`, `source_kind = 'event'`, `project_id` set, no `source_project_transaction_id`, no `personal_debt_bills` part). Deleted when they have no transaction of their own; with their own wallet transaction they stay as plain debts (`source_kind`, `project_id` → NULL; no wallet moves). Claims (`personal_debt_bills`) and the settle booking (`event_settle_bookings`) replace them.
+
+**Trigger `personal_debts_recurring_skip`** (migration 112, BEFORE DELETE, function `recurring_skip_on_debt_delete`): a deleted row that fills a "หนี้" recurring occurrence (`recurring_items.debt_entry_id`) skips that occurrence with its last amount (§11), on every delete path.
 
 **Dropped in migration 054:** `settled_amount`, `status` (`open` / `settled` / `cancelled`) and their CHECKs. Data: each repayment transaction became its own entry (same person, the transaction as its wallet side); cancelled rows and amount-0 rows (migration 052's overpaid leftovers) were deleted. Migration 052 had briefly allowed `amount >= 0` and `settled_amount > amount` (editable splits); 054 restored `amount > 0`.
 
@@ -1133,6 +1201,25 @@ entries' `amount` from the transaction's amount — giving the user's
 effective share. This keeps the account ledger cash-basis (full ฿4000 out)
 and the spending report share-basis (฿2000 = my share of dinner).
 
+### `personal_debt_bills`
+
+Migration 100 (0.4.1-2 V5 / S10). The copy ⇄ debt link: which shared bills (event or split) a debt books. A debt covering one bill = a per-bill debt ("a lump of one"); several = a lump ("claim ก้อน", one direction only). `personal_debts.amount` = Σ its parts (kept by the writer, `personal_debts/bill_parts.go`); the last part removed leaves the debt as a plain debt. Only `kind = 'debt'` rows: paybacks are claimed as repayment rows and keep `personal_debts.source_project_transaction_id` (091). During 0.4.1-2 per-bill debts keep `source_project_transaction_id` set as well (dropped for debts once nothing reads it).
+
+| Column           | Type            | Constraints                                                 | Description |
+| ---------------- | --------------- | ----------------------------------------------------------- | ----------- |
+| `id`             | `UUID`          | PK                                                          | |
+| `debt_id`        | `UUID`          | FK → `personal_debts.id`, NOT NULL, ON DELETE CASCADE       | The debt (kind debt) |
+| `user_id`        | `UUID`          | FK → `users.id`, NOT NULL, ON DELETE CASCADE                | Book owner (= the debt's) |
+| `pt_id`          | `UUID`          | FK → `project_transactions.id`, NOT NULL, ON DELETE CASCADE | The bill (parent row) |
+| `member_id`      | `UUID`          | FK → `project_members.id`, NOT NULL, ON DELETE CASCADE      | The other person of the pair on that bill |
+| `transaction_id` | `UUID`          | FK → `transactions.id`, NULLABLE, ON DELETE SET NULL        | My transaction of that bill: the "จ่ายโดย X" copy, or my origin when I paid |
+| `amount`         | `DECIMAL(15,2)` | NOT NULL, CHECK `>= 0`                                      | This bill's part, as my book holds it (≠ the bill's pair amount = "ไม่ตรง") |
+| `created_at` / `updated_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()` (trigger)              | |
+
+**Indexes:** `UNIQUE (user_id, pt_id, member_id)` (a bill + person is booked once per user: X7) · `(debt_id)` · `(pt_id)` · `(transaction_id) WHERE NOT NULL`.
+
+**Backfill (100):** every per-bill debt (`source_project_transaction_id` → a non-payback bill or one of its split rows) became one part; the member = the bill's member who is the debt's person (linked contact → user, else the name); the tx = my origin / copy of that bill. Unmatched debts and a second debt on the same bill + person were left out.
+
 ---
 
 ## 13 — Notifications
@@ -1161,7 +1248,7 @@ In-app notification rows. One row per recipient per event.
 
 **Check constraints:**
 
-- `notifications_type_check` (as of migration 084): `type IN ('split_created', 'split_paid', 'split_received', 'split_changed', 'project_tx_recorded_for_you', 'project_tx_changed', 'project_invite', 'contact_link_request', 'account_invite', 'project_added', 'recurring_due', 'recurring_ending', 'recurring_auto_created', 'debt_disconnected')` — trigger registry in spec §2. Added over time: `account_invite` (039), `project_added` (041), `split_changed` (052), `recurring_due` + `recurring_ending` (057), `recurring_auto_created` (068), `debt_disconnected` (084). `split_paid` is retired (054 deleted its rows; the value stays in the CHECK)
+- `notifications_type_check` (as of migration 095): `type IN ('split_created', 'split_paid', 'split_received', 'split_changed', 'project_tx_recorded_for_you', 'project_tx_changed', 'project_invite', 'contact_link_request', 'account_invite', 'project_added', 'recurring_due', 'recurring_ending', 'recurring_auto_created', 'debt_disconnected', 'shared_bill_created', 'shared_bill_deleted', 'shared_bill_disconnected', 'event_completed', 'event_member_removed', 'event_deleted')` — trigger registry in spec §2. Added over time: `account_invite` (039), `project_added` (041), `split_changed` (052), `recurring_due` + `recurring_ending` (057), `recurring_auto_created` (068), `debt_disconnected` (084), `shared_bill_created` / `shared_bill_deleted` / `shared_bill_disconnected` / `event_completed` / `event_member_removed` (092, 0.4.1-2), `event_deleted` (095: an event deleted, its bills kept as split bills). `split_paid` is retired (054 deleted its rows; the value stays in the CHECK). `project_tx_recorded_for_you` is no longer sent (replaced by `shared_bill_created`; old rows stay). Migration 094 deleted every `split_created` / `split_changed` row (the split mirror is gone; values stay in the CHECK)
 - At most one of `actioned_at` / `dismissed_at` is set (mutually exclusive terminal states)
 
 **Recurring notices (migration 068):** `recurring_due` is ONE grouped notice that counts the occurrences that came due since the rule's `due_notified_until` (§11). `recurring_auto_created` is ONE grouped notice per user per day (upserted by user + type + date, so its payload `{count, date}` accumulates), deep link `/recurring`.
@@ -1181,8 +1268,10 @@ Per-user notification preferences. (May be physically merged into a broader `use
 | ------------------------------------------------- | ------------- | -------------------------------------- | ------------------------------------------------------------------- |
 | `user_id`                                         | `UUID`        | PK, FK → `users.id`, ON DELETE CASCADE |                                                                     |
 | `muted_types`                                     | `TEXT[]`      | NOT NULL, DEFAULT `'{}'`               | Migration 045. Notification types the RECIPIENT does not receive (then nothing auto-runs either) |
-| `auto_types`                                      | `TEXT[]`      | NOT NULL, DEFAULT `'{split_created}'`  | Migration 045. Types whose one-tap action runs as soon as they arrive (`split_created` = add to my debts, on by default) |
-| `auto_resolve_own_in_projects`                    | `BOOLEAN`     | NOT NULL, DEFAULT `false`              | When I save a project_transaction I'm involved in, skip the modal   |
+| `auto_sync_events`                                | `BOOLEAN`     | NOT NULL, DEFAULT `TRUE`               | Migration 110 (0.4.1-2 S4). Auto sync for event bills: another member's save reaches my copy at once (off = a notice asks). Independent of `muted_types` |
+| `auto_sync_debts`                                 | `BOOLEAN`     | NOT NULL, DEFAULT `TRUE`               | Migration 110. Auto sync for split bills and debts with a connected contact |
+| `auto_accept_events`                              | `BOOLEAN`     | NOT NULL, DEFAULT `TRUE`               | Migration 113 (owner 2026-10-28). A NEW event bill with my share lands in my book at once (off = a notice with "เพิ่มในสมุด") |
+| `auto_accept_debts`                               | `BOOLEAN`     | NOT NULL, DEFAULT `FALSE`              | Migration 113. The same for a new split bill / debt from a connected contact |
 | `default_account_id`                              | `UUID`        | FK → `accounts.id`, NULLABLE           | Account to use when an action runs automatically; NULL when that wallet is deleted |
 | `created_at`                                      | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()`              |                                                                     |
 | `created_by_user_id`                              | `UUID`        | FK → `users.id`, NULLABLE              | NULL = system                                                       |
@@ -1190,6 +1279,8 @@ Per-user notification preferences. (May be physically merged into a broader `use
 | `updated_by_user_id`                              | `UUID`        | FK → `users.id`, NULLABLE              | NULL = system                                                       |
 
 A row is auto-created on user registration with all defaults.
+
+**Dropped in migration 110 (0.4.1-2):** `auto_types` (045, auto per type) and `auto_resolve_own_in_projects` (my own event bills into my book), both replaced by the two switches. `default_account_id` is the main wallet (กระเป๋าหลัก): the quick-create default (X10). The same migration removed the never-sent `theme` / `language` registration defaults from `user_preferences.preferences` (keys now: `timezone`, `theme_mode`, `theme_id`, `language`, `font_th`, `font_en`, `page_prefs`, `fee_category_id`, `money_style`, `money_decimals`).
 
 **Dropped in migration 045:** `auto_notify_linked_split_contacts`, `auto_add_to_personal_debt_on_split_notification`, `auto_record_received_payment` (carried into `auto_types`; the sender has no switch any more). Migration 054 removed `split_paid` from both arrays.
 

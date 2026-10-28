@@ -1,5 +1,7 @@
 # 04 — Transactions
 
+> **0.4.1-2 (BE-1, shared bills — spec 10 §0):** a transaction that is my copy of a shared bill (`event_bill` set; `edit_in_bill` true while connected and the event not completed) edits only my own fields here (category, tags, `private_note`, the wallet when the money is mine); the bill's values go through the bill form (409 `SHARED_BILL_FIELD`). `event_bill.in_sync` / `differences` / `pending_update` show on list rows too; `project` is null on a split bill's copy. Deleting my copy disconnects it (rule f: the bill stays, `also_delete_link` no longer reaches it). `splits` / `paid_by` on create / edit are deprecated (every split is a split bill). Reports count a copy as LEAST(amount, my share) minus my own splits. Tx delete effects list the split / paid-by debts it took along (X4).
+
 Every money movement — expense, income, transfer — lives as one or more rows in the `transactions` table. This is the central module; most other modules reference it.
 
 **Transaction =** a single row affecting one account. For transfers (two accounts involved), two rows are inserted, linked by `transfer_group_id`.

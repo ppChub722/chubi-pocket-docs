@@ -1,5 +1,7 @@
 # 12 — Personal Debts (the person ledger)
 
+> **0.4.1-2 (BE-1, shared bills — spec 10 §0):** a debt of a shared bill (a bill part, `bills[]`) or a "คืนแล้ว" repayment of one follows the bill: amount, date, direction, person, description, note are the bill form's (409 `SHARED_BILL_FIELD` on `PUT /personal-debts/{id}` while the event syncs); `paid`, `due_date`, `private_note` stay mine. The bill engine makes / re-amounts / removes these rows for every member (netted per person from the bill's real pairs). Disconnecting my copy turns them into plain debts (`unlinked_project_transaction_id` remembers the bill).
+
 What the user and each other person owe each other: debts ("Lee paid for my food, I owe 60", "borrowed 500 from Lee") and repayments ("จ่ายคืนลี 400"). One balance per person.
 
 Shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`, tag **Debts**. Global conventions in [`overview.md`](README.md). Owner decisions: `rules/decisions.md` "Debt model" (2026-10-21), "Wording" (2026-10-23).
@@ -148,3 +150,5 @@ The pending `settle_debt` draft (target = a debt) submits as a **repayment trans
 ## 6. Status
 - **Last updated** — 2026-10-26 (0.4.1-0: §0 — due_date, event-book unlink, linked transaction, paid_by on income, ลูกหนี้ / เจ้าหนี้ wording, counterparty_key). 2026-10-21 (0.4.0-3: repayments as transactions; paid by someone else §1.5a; this file rewritten: the 1b-era settle / cancel / settled_amount sections are gone)
 - **Migrations** — 24 (bidirectional table), 054 (person ledger), 069 (repayment transactions), 070 (paid_by), 071 (due_date), 073 (event-book unlink), 076 (linked transaction), 080 (paid_by on income)
+
+- 0.4.1-2 (BE-3): the person page also answers `auto_sync_debts` (the debts switch, spec 13) and `recurring` (the person's "หนี้" recurring settings, spec 11 K13). Deleting an entry that fills a "หนี้" occurrence skips that occurrence with its amount (trigger, migration 112). Contact delete / absorb carry "หนี้" settings along (K7).

@@ -33,8 +33,12 @@ Owner = the session working on that screen this round (STATUS → Team). — = n
 | `/pending` | `pending/.../pending_page.dart` | list | 7d (rows) |
 | `/pending/new` | `pending/.../pending_batch_add_page.dart` | batch add | — |
 | `/notifications` | `notifications/.../notifications_inbox_page.dart` | list | 7d (rows) |
-| `/notifications/settings`, `/settings/notifications` | `notifications/.../notification_settings_page.dart` | settings (two routes, one page) | — |
-| `/settings` | `settings/.../settings_page.dart` | menu + profile card | — |
+| `/notifications/settings`, `/settings/notifications` | `notifications/.../notification_settings_page.dart` | on / off per type (two routes, one page) | App-3 |
+| `/settings` | `settings/.../settings_page.dart` | home: profile card + groups with a one-line summary (0.4.1-2 P7) | App-3 |
+| `/settings/app` | `settings/.../settings_app_page.dart` | theme, mode, language, Thai / English font | App-3 |
+| `/settings/money` | `settings/.../settings_money_page.dart` | currency, money style, main wallet, fee category | App-3 |
+| `/settings/sync` | `settings/.../settings_sync_page.dart` | the two auto-sync switches (`AutoSyncSetting`, also on the event + person pages) | App-3 |
+| `/settings/page-prefs`, `/settings/page-prefs/:page` | `settings/.../settings_page_prefs_page.dart` | remembered sort / filter per list page (spec: `preferences/page_prefs.dart`) | App-3 |
 | `/settings/profile` | `settings/.../edit_profile_page.dart` | view / edit | Lead |
 | `/settings/password` | `settings/.../change_password_page.dart` | form | — |
 | `/archived` | `archived/presentation/archived_page.dart` (all archived items) | list | — |

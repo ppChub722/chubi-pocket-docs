@@ -1,6 +1,6 @@
 # STATUS — read this first (rewritten, not appended)
 
-_Last updated: 2026-10-27, 0.4.1-1 started._
+_Last updated: 2026-10-28, 0.4.1-2 done (not committed / released)._
 
 ## Where we are: 0.4.1-0 — closed (tagged, merged, live)
 - Tag **`v0.4.1-0`** in app `2848aeb` (version **0.4.1-0+172**) · be `21fe2b2` · docs `a2512c1`; `origin/main` = the tag in app and be. Release note: `team/releases/0.4.1-0.md`.
@@ -15,7 +15,16 @@ _Last updated: 2026-10-27, 0.4.1-1 started._
 - **AI-3 (lists + cleanup + close):** E2 list heads, H2 no debt item counts, A5 stuck skeletons, G2 / G3 / G5 cleanup, G6 541 unused l10n keys removed, the full run.
 - **AI-4 (entry flows + recurring + goals):** A1 currency leaks, H1 app (income gets every ผูกกับ tab incl. "รับแทน"), H5 wallet wording, A7 app (future-date hint), C2 rows with no amount + C1 wiring, G1, goals bundle A2–A4 / F1.
 
-## Next (owner decides)
+## Now: 0.4.1-2 — DONE 2026-10-28, tagged `v0.4.1-2` (be `7b1f6bc`, app `809585b` = version 0.4.1-2+175, build 175), releasing; ships together with 0.4.1-1
+- All six sessions DONE (work items, owner additions of 2026-10-28: auto-accept switches, multi-payer bills, delete completed events / event delete keeps bills, plus a test + cleanup round). Rules: `rules/decisions.md` → "Shared bills, events, settings (0.4.1-2)".
+- **Full run (Lead, 2026-10-28):** flutter analyze clean · flutter test **437 passed** · go vet clean · go test ./... **349 passed, 0 fail, 0 skip** on a fresh `chubi_test_0412` (every `migrations/*.up.sql`, head **113**).
+- Migrations 092–095, 100–105, 110–113 are breaking for old app builds (and 094 / 104 wipe retired data): the release needs a forced update (`MIN_APP_BUILD` = the new build).
+- Owner order 2026-10-28: commit, push, tag v0.4.1-2, deploy BE to the VPS, APK to Firebase testers (Lead runs release.sh; all dev sessions closed). MIN = LATEST = 175 (forced update).
+- 0.4.1-1 is done and committed locally (be `15f028a`, app `b049fd3`), NOT pushed / tagged / released; it ships with 0.4.1-2.
+- Plan, owner answers, briefs: `now/briefs/0.4.1-2-plan.md`. Settings page mock (approved): https://claude.ai/artifact/VNo1XWdR82uCkFBwJkuxi7
+- Team: Lead = "lead 0.4.1-2" · BE-1 = chubi-pocket-d9 (shared bills) · BE-2 = chubi-pocket-75 (events) · BE-3 = chubi-pocket-28 ("หนี้" kind + settings + switches) · App-1 = chubi-pocket-e5 (bill form) · App-2 = chubi-pocket-9b (events app + notifications) · App-3 = chubi-pocket-9d (settings page + "หนี้" kind app). Migrations: BE-1 092–099, BE-2 100–109, BE-3 110–119.
+
+## Earlier next steps (kept for history)
 1. Install build 172 from Firebase (firsttester) and try it against prod: the test list in `team/releases/0.4.1-0.md`.
 2. **0.4.1-1 "linked = synced" — DONE + committed locally 2026-10-27, not tagged / pushed / built** (be `15f028a`, app `b049fd3`; full run: flutter analyze clean, flutter test 385 pass; go vet clean, go test 25 packages ok, 0 skip, on a fresh `chubi_test_0411` at 091). Next on the owner's order: local build, then the release flow (version bump, tags, deploy). Plan + briefs: `now/briefs/0.4.1-1-plan.md` (wins over the concept `now/briefs/0.4.1-1-concept.md`). Scope: base (0 amounts written by the system only, one call = one DB tx + effects), person book (repayment rows, 4 debt categories), recurring (slot reads its tx, 3-overdue limit, installments shift, auto-create never fails), event bugs + one "book bill" call. Shared bills (split + event copies, auto-sync switches, `private_note`), the events revamp and the "หนี้" recurring kind → 0.4.1-2.
 

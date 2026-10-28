@@ -4,6 +4,9 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
 
 Release scope comes from `now/roadmap-1.0.md` (owner 2026-10-15). Items here that the roadmap puts out of scope (Play Store, monetization, web / admin, receipt photos, multi-currency) are dropped.
 
+## From 0.4.1-2 (owner 2026-10-27/28)
+- Hide amounts (ซ่อนยอดเงิน): removed in 0.4.1-2 because it didn't really hide; bring it back as a real feature later (a server preference like the others).
+
 ## 0.4.3: per-user navigation (owner 2026-10-26; not designed or briefed yet)
 - **Owner's words:** each user arranges the bottom bar and the More page freely: group, reorder, and hide by how they use the app. Hiding a module hides ALL of it (e.g. no debts at all → every debt entry point is gone).
 - **What it covers:**

@@ -159,6 +159,16 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - statement/due day 31 = last day of month.
 - name / description / note on every record (labels ชื่อ / คำอธิบาย / โน้ต); TextLimits 100 / 200 / 500.
 
+### Shared bills, events, settings (0.4.1-2, owner 2026-10-27/28; details `now/briefs/0.4.1-2-plan.md`)
+- **Shared bill = copies.** An event bill and every split (incl. จ่ายแทน / รับแทน) are bills. An event = a group of split bills; a split outside an event = a bill with no event. Every member with a connected contact holds a COPY (a normal tx in their book, own category / wallet / tags / `private_note`); a name-only person gets no copy. "Edit" on a copy opens the ONE bill form, the same for every member (who splits, who paid, who paid back). Event completed or copy disconnected → the tx's own edit.
+- **Accept + sync switches**, each one value per user, shown in settings and on the event / person pages: รับบิลใหม่อัตโนมัติ (events ON, debts & split OFF) and อัปเดตตามอัตโนมัติ (both ON). Without auto-accept a new bill arrives as a notice to accept; without auto-sync an edit arrives as "อัปเดตตาม", "no" leaves the copy "ไม่ตรง". Muting a notice never stops auto-sync.
+- **Multi-payer bills:** "คนจ่าย" (one or more, Σ = total) and "คนหาร" (Σ = total); net = paid − share; who owes whom is proportional to what each payer paid. Partial จ่ายแทน is a multi-payer bill.
+- **Money:** the payer's wallet moves the whole paid amount; reports / budgets count only my share; the rest is debts.
+- **Payer** can change after creation. **Disconnect** (anyone, the payer too): the copy stops syncing, the bill is unchanged; a disconnected copy is a plain tx. Deleting my copy = disconnect. Deleting a split bill: gone for me, the others' copies are disconnected.
+- **Events:** complete = owner only, confirm, locked for good, links kept but no sync; can't complete with an empty "( ) ____" person; a completed event can be archived or deleted, not cancelled. Deleting an event keeps its bills as standalone split bills. Removing a person leaves an empty person to assign; a member who leaves keeps what they booked, disconnected. After completion a member claims by real pairs or simplified (simplified locks real pairs; real pairs first, simplified subtracts them). Income bills work like expense bills, words change (the receiver owes the others).
+- **Recurring "หนี้" kind:** tied to a person (a name-only person is allowed; a deleted contact leaves the name, the user handles it); จ่ายหนี้ books min(rule, balance); 3 rounds at balance 0 → inactive, a new debt resumes it; sends to a connected contact like a normal debt entry; slots count in ใกล้ถึง / expected totals, budgets only through a booked tx.
+- **Settings:** one central settings page = every user preference, all on the server (groups with a summary line → sub-pages). Per-page sort / filter remember the last choice. กระเป๋าหลัก is the quick-create default (one wallet setting). Hide amounts removed for now.
+
 ## UI
 - **0.4.0-2 polish rules (owner 2026-10-19/20):**
   - **Separator:** the text separator is " | ", never " · ", everywhere. Gaps inside and between cards are all equal (12).
