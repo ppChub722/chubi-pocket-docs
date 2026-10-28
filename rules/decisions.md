@@ -10,6 +10,7 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - Minimal cross-session messages: message a session only when it must act. Reports go to `team/inbox/`, questions go to Lead.
 - Devs may talk to each other directly (owner 2026-10-11): shared files, kit/API needs, blockers, handoffs. DONE pings and owner-level questions still go to Lead.
 - Only the owner runs the app (`./run-web.sh`), except QA, which may run it locally (never prod).
+- **Prod data is real (owner 2026-10-28, after 0.4.1-2).** Every migration keeps or converts existing data; "wipe, pre-release" is no longer a default anywhere. A destructive data change only when a fix needs it, with the owner's OK for that case and a named backup first.
 - QA runs only on the owner's order; checklists list the changed items only; no screenshots by default; FAILs + a PASS count.
 - Local builds happen ONLY when the owner orders one (owner 2026-10-13, final). Lead just reports "done"; the owner builds and checks, and anything wrong gets fixed. No QA verification unless the owner orders it (QA is token-heavy).
 - QA may create any data it needs in the LOCAL DB without asking (owner 2026-10-11). Never prod.

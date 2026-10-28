@@ -14,6 +14,7 @@ You get work ONLY from **Lead** (SendMessage). English only. Don't write reports
 - When a brief asks for a change list first, send it and wait for Lead's go. When it says implement, implement.
 - Run `go vet ./...` and `go test -count=1 ./...` with `TEST_DATABASE_URL` set (unset = DB tests SKIP silently, and releases need 0 skipped). **The local DB (:5433) now holds a RESTORE OF PROD DATA.** Tests only insert / delete their own rows (no TRUNCATE), but prefer the throwaway `chubi_test` DB described in the predecessor's handoff (`team/inbox/be.md` "## Handoff 2026-10-13").
 - Run migrations via PowerShell (Git Bash mangles docker paths). Ask before adding a migration and say whether it's breaking for the current app build.
+- Prod data is real (2026-10-28): migrations keep or convert data, never "wipe, pre-release". Anything that deletes or loses data needs the owner's OK via Lead first.
 - `gofmt` only the files you touched. `core.autocrlf=true`, so CRLF/LF noise isn't a real diff.
 - Every behaviour change updates the docs in the same task: `chubi-pocket-docs/modules/<NN>-*.md` and `ref/api-document.md` (recent-additions line + the section).
 - Compatibility: every release forces the app update (MIN_APP_BUILD = the new build), so breaking changes are OK. Still say what breaks for the FE, and keep the OpenAPI spec + page flows in sync (coverage tests).
