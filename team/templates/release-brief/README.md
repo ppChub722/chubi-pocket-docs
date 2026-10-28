@@ -70,4 +70,8 @@ Same command with an older `VERSION` (its tags already exist). Notes:
 - `LATEST_APP_BUILD` is never lowered, and an APK whose build is not newer
   than LATEST is not uploaded again.
 - `--skip-checks` skips the checks for a tag that already passed them.
+- BE checks (2026-10-28) run on a throwaway DB `chubi_rel_<version>` that the
+  script builds from the tag's `migrations/*.up.sql` in the local postgres
+  container (:5433) and drops afterwards (kept when a test fails). The dev DB
+  `chubi_pocket_db` is never used, so it may lag behind; Docker must be up.
 - `SKIP_APP=y` is the usual rollback: BE only.
