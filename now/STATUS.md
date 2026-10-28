@@ -15,7 +15,10 @@ _Last updated: 2026-10-28, 0.4.1-2 done (not committed / released)._
 - **AI-3 (lists + cleanup + close):** E2 list heads, H2 no debt item counts, A5 stuck skeletons, G2 / G3 / G5 cleanup, G6 541 unused l10n keys removed, the full run.
 - **AI-4 (entry flows + recurring + goals):** A1 currency leaks, H1 app (income gets every ผูกกับ tab incl. "รับแทน"), H5 wallet wording, A7 app (future-date hint), C2 rows with no amount + C1 wiring, G1, goals bundle A2–A4 / F1.
 
-## Now: 0.4.1-2 — DONE 2026-10-28, tagged `v0.4.1-2` (be `7b1f6bc`, app `809585b` = version 0.4.1-2+175, build 175), releasing; ships together with 0.4.1-1
+## Now: 0.4.1-2 — RELEASED 2026-10-28 (with 0.4.1-1), tag `v0.4.1-2` (be `7b1f6bc`, app `809585b` = 0.4.1-2+175, docs `c9e02ca`)
+- **Prod:** BE `7b1f6bc` live on ppForge, migration **113**, backup `chubi_pocket-20261028-1157.dump.gz` (offsite copy on the dev PC); **APK 175** on Firebase (2175, firsttester); gate **MIN = LATEST = 175** (`.env.bak-0.4.1-2`); verify: /health 200, unauth 401, log errors 0. Release note: `team/releases/0.4.1-2.md`. Run by Lead with `release.sh --skip-checks` (the local DB is at 070; Lead's full run on the same trees is in the note).
+- **This dev PC's deploy key** (`~/.ssh/ppforge_vps`, `SHA256:HBZBsM4…`) was added to Admin's authorized_keys on 2026-10-28 via the VPS console; the VPS host key (ED25519 `SHA256:cLAvswtTiO65W6T+s2anB2Fnmxip0f4ODstU1MKIBKA`) is in known_hosts.
+- Next: the owner installs build 175 and tests (list in the release note).
 - All six sessions DONE (work items, owner additions of 2026-10-28: auto-accept switches, multi-payer bills, delete completed events / event delete keeps bills, plus a test + cleanup round). Rules: `rules/decisions.md` → "Shared bills, events, settings (0.4.1-2)".
 - **Full run (Lead, 2026-10-28):** flutter analyze clean · flutter test **437 passed** · go vet clean · go test ./... **349 passed, 0 fail, 0 skip** on a fresh `chubi_test_0412` (every `migrations/*.up.sql`, head **113**).
 - Migrations 092–095, 100–105, 110–113 are breaking for old app builds (and 094 / 104 wipe retired data): the release needs a forced update (`MIN_APP_BUILD` = the new build).
