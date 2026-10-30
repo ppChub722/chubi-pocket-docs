@@ -22,6 +22,7 @@ Owner = the session working on that screen this round (STATUS → Team). — = n
 | Route | Page (file under `lib/features/`) | Modes | Owner |
 |---|---|---|---|
 | `/auth/login`, `/auth/register` | `auth/.../login_page.dart`, `register_page.dart` | — | — |
+| `/auth/telegram`, `/auth/telegram/signup` | `auth/.../telegram_waiting_page.dart`, `telegram_signup_page.dart` (state: `TelegramLoginCubit`, app-wide) | — | — |
 | `/` | `home/.../home_page.dart` (dashboard) | view | — |
 | `/browse?…` (child of `/`) | dashboard browse → `TransactionsListPage` filtered | view | — |
 | `/transactions` | `transactions/.../transactions_list_page.dart` | list + filters (side sheet) | 7d (rows) |
