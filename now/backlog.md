@@ -5,6 +5,10 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
 Release scope comes from `now/roadmap-1.0.md` (owner 2026-10-15). Items here that the roadmap puts out of scope (Play Store, monetization, web / admin, receipt photos, multi-currency) are dropped.
 
 
+## Chatbot billing — pay as you go (owner 2026-10-30: "ต้องทำแยก แต่อย่าพึ่ง"; its own track, not planned)
+- Users pay for chatbot use. This is new monetization, which the roadmap (2026-10-15) had left out; the owner's call of 2026-10-30 wins.
+- Ideas (not decided) and the usage data it builds on: `now/briefs/0.4.2-chatbot.md` → "Out of v1".
+
 ## 0.4.3 (proposed): sign up / log in with Google + Telegram, then Google Sheets + Calendar (owner 2026-10-28: "จดไอเดียไว้ แล้วเดี๋ยวมาคุยกันต่อ"; not decided)
 - **Accounts:** one account, many ways in (email + password, Google, Telegram); password optional; a "ทางเข้าสู่ระบบ" settings page (link / unlink, never the last one). Existing prod accounts converted, data kept. Goes with onboarding + refresh token (already 0.4.3).
 - **Google:** google_sign_in on Android (OAuth client + APK signing SHA-1 in Google Cloud, owner sets it up); BE verifies the ID token; email = recovery.
