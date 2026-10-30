@@ -1,5 +1,7 @@
 # App-wide error reporting: audit (Lead, 2026-10-28; read-only survey of feat/approw; NOT briefed)
 
+_Status 2026-10-30: kit loading states + BE error registry merged; the rest moves to 0.4.2-3, see `now/briefs/0.4.2-3-errors-loading.md`._
+
 Map: global = ConnectionShell → OfflineBanner → ConnectionBanner (10 s × 6 retries, /dev muted); 426 → UpdateRequiredPage; 401 → silent logout; 429 not produced / not handled. Page = ErrorView in AsyncStateView (via ListPageBody / DashboardPageBody 21 files, direct 10, ErrorView 4, PickerSheet). Action = showErrorSnackBar (7 files) vs showAppSnackBar (151 calls / 35 files, ~50 pass raw `e.message`). Mapper = `_AppErrors.describe` (app_ui_config.dart:94, 5 codes) + 4 feature mappers (wallet / event / pending / category), all fall back to `e.message`. 48 of the BE's 69 error codes are never referenced in the FE.
 
 Confirmed:
