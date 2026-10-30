@@ -1,8 +1,8 @@
 # STATUS — read this first (rewritten, not appended)
 
-_Last updated: 2026-10-30. 0.4.2-2 (Telegram login + part C) committed, release in progress; see the first section._
+_Last updated: 2026-10-30. 0.4.2-2 RELEASED (tag v0.4.2-2, build 185, migration 123, MIN = LATEST = 185); see the first section._
 
-## Now: 0.4.2-2 — step 1b / 1b-2 + FE part C (committed, tag v0.4.2-2, release by release.sh)
+## Now: 0.4.2-2 — RELEASED 2026-10-30 (tag v0.4.2-2: be 8c46d8a · app 35fd85a · docs c13e39c; release note team/releases/0.4.2-2.md). Owner relinks Telegram through the app and tests part C on build 185
 Plan + every owner decision: `now/briefs/0.4.2-plan.md` (single source of truth). UI mock (final): https://claude.ai/artifact/DBDqM2xj9HgPkjyBo6A3ry.
 - **Live in prod:** v0.4.2-0 (Telegram webhook, migration 120, bot @chubiPocket_bot) and v0.4.2-1 (settings fix by the 0.4.1-2 Lead, app build 180).
 - **DONE, committed (unreleased):**
