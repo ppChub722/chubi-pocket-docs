@@ -64,6 +64,7 @@ Authorization: Bearer <access_token>
 - `POST /v1/auth/google` *(Phase 3+)*
 - `POST /v1/projects/accept-invite` *(invite codes are URL-shareable)*
 - `GET /v1/health` (`getHealth`, 0.4.1-0) → `200 {status: "ok"}` — the app's online check; also served at `/health` (no `/api/v1`) for the uptime check. Outside the app build check (see below)
+- `GET /v1/brand-logos/{provider}.png` (`getBrandLogo`, 0.4.2 1b) — an outside app's 96 px logo, embedded in the server (§02 note)
 - `POST /v1/telegram/webhook` (`telegramWebhook`, 0.4.2 1a, **internal**: Telegram calls it, never the app) — registered only when `TELEGRAM_BOT_TOKEN` is set. Auth = header `X-Telegram-Bot-Api-Secret-Token` equal to `TELEGRAM_WEBHOOK_SECRET` (constant-time check; missing / wrong → `401 UNAUTHORIZED`). Otherwise always `200` with an empty body, even for a body that isn't an update (Telegram retries non-200). No JWT, no build check, no sync middleware; the request log never holds its body. Behaviour: [`../modules/16-telegram.md`](../modules/16-telegram.md)
 - Contact-invite acceptance endpoints (TBD per [07](#07--contacts))
 
@@ -95,33 +96,194 @@ Most endpoints return `200` even on update/action for client simplicity. `204` i
 
 ### Error envelope
 
+Recent additions (2026-10-28, feat/error-codes; no migration, envelope shape unchanged, codes only added): **one error-code registry** (`chubi-pocket-be/internal/platform/apierr`), the OpenAPI `Error.code` / `SubmitError.code` / sync `errors[*].code` enums generated from it (a test keeps them equal), `details` of VALIDATION_ERROR = `FieldError[]` everywhere, and no raw Go / DB text in any message. **Source of truth: `chubi-pocket-be/internal/apidoc/openapi.yaml`** (`Error`, `FieldError`).
+
 Every error response uses this shape:
 
 ```json
 {
+  "success": false,
   "error": {
-    "code": "ERROR_CODE",
-    "message": "Human-readable message"
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid request body",
+    "details": [
+      { "field": "name", "code": "too_long", "params": { "max": 100 } },
+      { "field": "splits[0].amount", "code": "out_of_range", "params": { "gt": 0 } }
+    ]
   }
 }
 ```
 
-- `code` — stable, uppercase, snake-case identifier. **Clients key on this.**
-- `message` — human-readable. May be localized in future. Clients should **not** parse it.
+- `code` — stable UPPER_SNAKE identifier from the registry below. **Clients key on this** and show their own (Thai) text. Codes are never renamed; a new case gets a new code.
+- `message` — safe human-readable English. Never parse it or show it as is. It never holds raw Go / decoder / DB text: a 500's cause is logged server-side only (request log `error` attribute), and a leaky-looking message is replaced by a generic one.
+- `details` — depends on the code. **VALIDATION_ERROR: always an array of `FieldError`** (maybe empty `[]`). Other codes, where documented: SHARED_BILL_FIELD `{fields}`, BILL_CHANGED `{bill}`, EVENT_HAS_EMPTY_PERSON / NOT_IN_BILL / BILL_ALREADY_BOOKED (claim) `{bill_ids}`, ITEM_ALREADY_LINKED `{ids}` or `{transaction, other}`, INSUFFICIENT_SAVING `{available}`, TAG_EXISTS / NOT_FOUND in a tags batch `{op, index}`, CATEGORY_NAME_DUPLICATE `{field}`, UNSUPPORTED_IMAGE `{detected}`, APP_OUTDATED (the `/app/version` fields). Absent otherwise.
 
-### Common error codes
+**FieldError** = `{field, code, params}` (all three always present; `params` is `{}` when empty):
+- `field` — the JSON path in the request body (`name`, `splits[0].amount`, `items[2].slot`), or the query / path parameter name (`status`, `id`, `notification_id`); `""` = the whole body.
+- `code` — `required` · `too_long` / `too_short` (params.max / min, characters) · `too_many` / `too_few` (params.max / min, items) · `out_of_range` (params: min, max, gt, gte, lt or lte) · `invalid` (wrong value or format; params may hold `allowed`, `format` (`date`, `month`, `email` …) or `len`) · `invalid_type` (params.expected: string / number / integer / boolean / array / object) · `invalid_json` (field `""`, the body is not JSON) · `too_large` (an upload; params.max_bytes).
+- Every `binding:` rule and JSON decode error produces fields; service-level checks add them where the field is known (amount, private_note, paid_by, transfer fields, credit_limit, month, due_date, recurring bulk `items[i].*`, pending drafts …), otherwise `details` is `[]` and the code + message still apply.
 
-These appear across many endpoints. Module-specific codes (e.g., `SPLITS_NOT_100`) are listed under their endpoints.
+### Error codes (the registry)
 
-| Code | HTTP | When |
-|---|---|---|
-| `UNAUTHORIZED` | 401 | Missing, expired, or invalid token |
-| `FORBIDDEN` | 403 | Authenticated but not allowed to access this resource |
-| `NOT_FOUND` | 404 | Resource does not exist (or belongs to someone else — same response, no info leak) |
-| `VALIDATION_ERROR` | 400 | Request body or params failed validation |
-| `CONFLICT` | 409 | State conflict (e.g., duplicate email, already exists) |
-| `RATE_LIMITED` | 429 | Too many requests *(Phase 3+)* |
-| `INTERNAL_ERROR` | 500 | Server fault |
+`Where`: **envelope** = `error.code` of a failed HTTP response; **pending** = a pending draft's `last_error.code` (GET /pending-transactions, submit results; not an HTTP status); **sync** = `POST /sync` `errors[dataset].code`. A code listed with two statuses uses the second when the record is referenced from a request body (400) rather than the path (404 / 409). There is no rate or daily limit yet, so no 429 code. Unknown routes still answer gin's plain-text 404 (not an envelope).
+
+| Code | HTTP | Where | Meaning |
+|---|---|---|---|
+| `VALIDATION_ERROR` | 400 | envelope | The request is invalid; details lists the fields (FieldError[]). |
+| `UNAUTHORIZED` | 401 | envelope | No valid session (missing / expired token); the app signs out. |
+| `FORBIDDEN` | 403 | envelope | The caller may not use this record or action. |
+| `NOT_FOUND` | 404 | envelope, pending | The record does not exist or is not the caller's. |
+| `INTERNAL_SERVER_ERROR` | 500 | envelope | Unexpected server failure; the cause is logged server-side, never sent. |
+| `APP_OUTDATED` | 426 | envelope | The app build is older than MIN_APP_BUILD; the app must update. |
+| `INTERNAL_ERROR` | — | sync | Sync only: one dataset failed to load (in POST /sync errors, not an HTTP status). |
+| `INVALID_CREDENTIALS` | 401 | envelope | Login: wrong identifier or password. |
+| `WRONG_PASSWORD` | 401 | envelope | Change password: the current password is wrong. |
+| `EMAIL_EXISTS` | 409 | envelope | The email is already registered to another account. |
+| `USERNAME_EXISTS` | 409 | envelope | The username is already registered. |
+| `ACCOUNT_INACTIVE` | 403 | envelope | The user deactivated their account; reactivate to continue. |
+| `ALREADY_ACTIVE` | 400 | envelope | Reactivate: the account is already active. |
+| `ACCOUNT_NOT_FOUND` | 404 / 400 | envelope, pending | The wallet does not exist or is not the caller's (400 when it is referenced in a body). |
+| `ACCOUNT_ARCHIVED` | 409 | envelope, pending | The wallet is archived; restore it first. |
+| `ACCOUNT_HAS_MEMBERS` | 409 | envelope | The wallet still has other active members; remove them or transfer ownership first. |
+| `OWNER_MUST_TRANSFER` | 400 | envelope | The owner must transfer ownership before leaving while other members exist. |
+| `USER_ALREADY_MEMBER` | 409 | envelope | Invite: the user is already a member of this wallet. |
+| `USER_NOT_FOUND` | 404 | envelope | Invite: no user matches that email. |
+| `NOT_MEMBER` | 403 | envelope | The caller is not an active member of this wallet / event. |
+| `NOT_OWNER` | 403 | envelope | Only the owner can do this. |
+| `SCOPE_NOT_ALLOWED` | 403 | envelope | Ex-members may only use report_scope none or own. |
+| `INVALID_IDENTIFIER` | 400 | envelope | A wallet identifier (account number, bank code) is invalid, or there are too many. |
+| `BALANCE_NOT_EDITABLE` | 400 | envelope | The balance can't be set directly; use adjust-balance. |
+| `BALANCE_NOT_TRACKED` | 409 | envelope | The wallet doesn't track its balance; turn track_balance on first. |
+| `NO_OP` | 400 | envelope | Adjust balance: the new balance equals the current one. |
+| `WALLET_NOT_TRACKED` | 400 | envelope, pending | The wallet doesn't track its balance (savings need a tracked wallet). |
+| `ROW_LOCKED` | 403 | envelope | Membership on the wallet ended; the row is read-only for the caller. |
+| `CONTACT_NOT_LINKED` | 422 | envelope | Invite: the contact isn't linked to an app account. |
+| `CATEGORY_NAME_DUPLICATE` | 422 | envelope | A category with that name already exists at this level (details.field = name). |
+| `INVALID_PARENT` | 400 | envelope | The parent category is invalid (wrong owner / type / archived / system). |
+| `CYCLE_DETECTED` | 400 | envelope | The parent change would create a cycle. |
+| `MAX_DEPTH_EXCEEDED` | 400 | envelope | The category tree would be deeper than 3 levels. |
+| `SYSTEM_CATEGORY_IMMUTABLE` | 400 | envelope | A system category can't be changed this way. |
+| `SYSTEM_CATEGORY_NOT_ALLOWED` | 400 | envelope | A system category can't be picked; use a user category. |
+| `CATEGORY_TYPE_MISMATCH` | 400 | envelope, pending | The category type does not match the transaction type. |
+| `CATEGORY_AUTHOR_ONLY` | 403 | envelope | Only the row's author may change its category. |
+| `INVALID_CATEGORY` | 400 | envelope | The category can't be used here (budgets: own expense categories; recurring: matching type). |
+| `CATEGORY_NOT_FOUND` | — | pending | Pending: the draft's category is missing or not usable. |
+| `TAG_NOT_FOUND` | 400 | envelope, pending | A tag id in the body is not the caller's. |
+| `TAG_EXISTS` | 409 | envelope | A tag with that name already exists (batch: details {op, index}). |
+| `TAG_NAME_TAKEN` | 409 | envelope | The event already has a tag with that name. |
+| `TRANSACTION_NOT_FOUND` | 404 | envelope, pending | The transaction does not exist or is not the caller's. |
+| `TX_NOT_FOUND` | 404 | envelope | Events quick-create: the transaction does not exist or is not the caller's. |
+| `TRANSFER_SAME_ACCOUNT` | 400 | envelope, pending | A transfer's source and destination wallets must differ. |
+| `TRANSFER_NEEDS_WALLETS` | — | pending | Pending: a transfer needs both wallets. |
+| `SYSTEM_TRANSACTION_IMMUTABLE` | 400 | envelope | A system transaction (opening balance, adjustment) can't be edited or deleted directly. |
+| `SPLITS_NOT_SUPPORTED_YET` | 400 | envelope | Splits are not supported on this operation. |
+| `SPLITS_ON_TRANSFER` | 400 | envelope, pending | A transfer can't have splits. |
+| `SPLITS_AUTHOR_ONLY` | 403 | envelope | Only the transaction's author can change its splits. |
+| `SPLITS_EXCEED_AMOUNT` | 400 | envelope, pending | The splits add up to more than the amount. |
+| `SPLITS_EXCEED_SHARE` | 400 | envelope | The splits add up to more than the caller's share of the event bill. |
+| `SPLIT_MISMATCH` | 400 | envelope | Savings: the wallet splits must add up to the amount. |
+| `INVALID_SPLIT` | — | pending | Pending: a split needs a person name and an amount above 0. |
+| `PAID_BY_EXPENSE_ONLY` | 400 | envelope, pending | paid_by is only for an expense or an income. |
+| `PAID_BY_EXCEEDS_AMOUNT` | 400 | envelope, pending | paid_by.amount is more than the bill. |
+| `INVALID_PAID_BY` | — | pending | Pending: paid_by needs a person and an amount above 0. |
+| `LINK_MODE_CONFLICT` | 400 | envelope, pending | A bill is shared one way at a time: splits, paid_by or an event. |
+| `LINK_MODE_INPUT` | 400 | envelope | link_mode is missing its data (split -> splits, paid -> paid_by, event -> event.project_id). |
+| `SHARED_BILL_FIELD` | 409 | envelope | A copy of a shared bill: this field is edited in the bill form (details.fields). |
+| `PRIVATE_NOTE_NOT_SHARED` | 400 | envelope | private_note is only for a copy of a shared bill. |
+| `SOURCE_PT_NOT_FOUND` | 404 | envelope | Copy from event: the source event row was not found. |
+| `SOURCE_PT_NOT_FOR_USER` | 403 | envelope | Copy from event: the caller is not a member of the source event. |
+| `INVALID_PERSON_KEY` | 400 | envelope | A person key must be c:<contact_id> or n:<name>. |
+| `ENTRY_NOT_FOUND` | 400 | envelope | A debt entry in the body is not one of this person's. |
+| `ENTRY_MANAGED_BY_SOURCE` | 409 | envelope | The entry comes from a split; only description, note and the paid label can change here. |
+| `ENTRY_HAS_TRANSACTION` | 409 | envelope | The entry already has a transaction; delete or disconnect it first. |
+| `DEBT_MANAGED_BY_TX` | 409 | envelope | The debt is the paid-by part of a transaction; edit the transaction instead. |
+| `DEBT_NOT_LINKED` | 409 | envelope | The debt has no copy in another user's book. |
+| `DEBT_TX_ALREADY_LINKED` | 409 | envelope | The transaction is already linked to another debt entry. |
+| `DEBT_TX_AUTHOR_ONLY` | 403 | envelope | Only its author can change a debt entry's transaction. |
+| `DEBT_TX_NEEDS_WALLET` | 400 | envelope | A debt entry's transaction keeps its wallet; edit the entry to change it. |
+| `TX_NOT_LINKABLE` | 400 | envelope | This transaction can't be linked to this entry. |
+| `TX_NOT_DISCONNECTABLE` | 409 | envelope | Only a transaction connected later can be disconnected; delete it instead. |
+| `TAGS_NEED_WALLET` | 400 | envelope | Tags go on the wallet transaction; pick a wallet first. |
+| `LEDGER_ONLY_NO_WALLET` | 400 | envelope | A ledger-only entry has no wallet or tags; turn create_transaction on. |
+| `BILL_NOT_FOUND` | 400 | envelope | The bill is not in an event the caller is a member of. |
+| `USE_CLAIM` | 400 | envelope | bill_id / event_id are retired here; claim the bills on the event. |
+| `DEBT_NOT_FOUND` | — | pending | Pending: the target debt entry was not found. |
+| `CONTACT_NOT_FOUND` | 404 / 400 | envelope, pending | The contact does not exist or is not the caller's (400 when it is referenced in a body). |
+| `CONTACT_ARCHIVED` | 409 / 400 | envelope | The contact is archived. |
+| `ALREADY_ARCHIVED` | 400 | envelope | The contact is already archived. |
+| `NOT_ARCHIVED` | 400 | envelope | The contact is not archived. |
+| `ALREADY_LINKED` | 409 | envelope | The contact is already linked. |
+| `NOT_LINKED` | 400 | envelope | The contact is not linked. |
+| `CANNOT_LINK_SELF` | 400 | envelope | A contact can't be linked to the caller. |
+| `REQUEST_REJECTED` | 409 | envelope | The link request was rejected. |
+| `NOT_ACCEPTED` | 409 | envelope | Accept the link request first. |
+| `STATE_CONFLICT` | 409 | envelope | The link request was already answered. |
+| `NOT_FOR_YOU` | 403 | envelope | The notification is not addressed to the caller. |
+| `NOTIFICATION_STATE_CONFLICT` | 409 | envelope | The notification was already handled the other way. |
+| `NOT_PROJECT_INVITE` | 400 | envelope | The notification is not an event invite. |
+| `TYPE_NOT_MUTABLE` | 400 | envelope | Invites and link requests can't be muted. |
+| `PROJECT_NOT_FOUND` | — | pending | Pending: the event was not found. |
+| `PROJECT_NOT_ACTIVE` | 409 | envelope, pending | The event is not active. |
+| `PROJECT_LOCKED` | 409 | envelope, pending | The event is cancelled or archived; writes are blocked. |
+| `PROJECT_NOT_MEMBER` | — | pending | Pending: a member is not in the event. |
+| `PROJECT_READ_ONLY` | — | pending | Pending: viewers can't change event rows. |
+| `EVENT_COMPLETED` | 409 | envelope | The event is completed; it can't be changed any more. |
+| `EVENT_NOT_COMPLETED` | 409 | envelope | Settle lines can be booked only after the event is completed. |
+| `EVENT_HAS_EMPTY_PERSON` | 409 | envelope | A bill still has an empty person to assign (details.bill_ids). |
+| `USE_COMPLETE_ENDPOINT` | 400 | envelope | Complete an event with POST /projects/{id}/complete. |
+| `ALREADY_MEMBER` | 409 | envelope | The user is already a member of the event. |
+| `MEMBER_NOT_IN_PROJECT` | 400 | envelope | The member does not belong to this event. |
+| `MEMBER_NOT_REMOVED` | 409 | envelope | Only a removed member's spots can be assigned. |
+| `NOT_PENDING` | 409 | envelope | The member isn't waiting for an invite. |
+| `CANNOT_CHANGE_OWNER` | 409 | envelope | The owner's role can't be changed here; use transfer-ownership. |
+| `CANNOT_REMOVE_OWNER` | 400 | envelope | The owner can't be removed; transfer ownership first. |
+| `OWNER_CANNOT_LEAVE` | 409 | envelope | The owner can't leave; transfer ownership first. |
+| `FORBIDDEN_ROLE` | 403 | envelope | The caller's event role can't do this. |
+| `PT_IS_CHILD` | 409 | envelope | A split-child row can't be changed directly; edit its parent. |
+| `SELF_SPLIT` | 400 | envelope | A split's member must differ from the payer. |
+| `NOT_IN_BILL` | 400 | envelope | Claim: no pair with that member on the bill (details.bill_ids). |
+| `BILL_ALREADY_BOOKED` | 409 | envelope | The bill is already booked with that person (details.bill_ids on claim). |
+| `BILL_CHANGED` | 409 | envelope | The bill changed since it was opened; reload (details.bill). |
+| `BILL_DISCONNECTED` | 409 | envelope | The caller disconnected their copy of this bill. |
+| `BILL_GONE` | 410 | envelope | The bill was deleted. |
+| `MOVE_TARGET` | 400 | envelope | Move: exactly one of project_id, new_event or split. |
+| `PAYERS_SUM` | 400 | envelope | The payers must add up to the bill. |
+| `PAYER_FIXED` | 400 | envelope | A bill's payer can't change. |
+| `BAD_PAYBACK` | 400 | envelope | A payback has exactly one split: the receiver, for the whole amount. |
+| `PAYBACK_NOT_COPYABLE` | 422 | envelope | A payback can't be copied as an expense. |
+| `NO_SHARE_TO_COPY` | 422 | envelope | The caller has no part in this event row to copy. |
+| `NO_SHARE` | — | pending | Pending: the caller has no part in the event row to copy. |
+| `SETTLE_BOOKED` | 409 | envelope | The caller already booked this event's settle. |
+| `SETTLE_LINES` | 400 | envelope | lines must list each of the caller's fewest-transfers lines once. |
+| `CLAIM_MIXED_DIRECTION` | 400 | envelope | The bills of one claim must all go the same way. |
+| `TX_ALREADY_IN_PROJECT` | 409 | envelope | The transaction is already in an event. |
+| `TX_NOT_BILLABLE` | 422 | envelope, pending | Only expense and income transactions (not system rows or repayments) can be pulled into an event. |
+| `TX_NOT_IN_PROJECT` | 404 | envelope | The transaction is not in this event. |
+| `TX_SPLIT_PAID` | 422 | envelope | A split on this transaction is labelled paid. |
+| `INVALID_DATE_RANGE` | 400 | envelope | end_date must not be before start_date. |
+| `INVALID_BILL_PEOPLE` | — | pending | Pending: payer / members are invalid. |
+| `INVALID_RULE` | 400 | envelope | The recurrence / budget period rule is invalid. |
+| `INVALID_TRANSITION` | 409 | envelope | This action doesn't apply in the record's current state. |
+| `END_TOO_FAR` | 400 | envelope | The end must be at most 2 years after the start. |
+| `AMOUNT_REQUIRED` | 400 | envelope | The occurrence has no amount yet; send one. |
+| `ALREADY_RECORDED` | 409 | envelope | The occurrence is already recorded. |
+| `NOTHING_OWED` | 409 | envelope | Nothing is owed to or by this person now. |
+| `ITEM_ALREADY_LINKED` | 409 | envelope | The item already has a pending draft or a transaction (details: ids, or transaction + other). |
+| `SAVING_NEEDS_WALLET` | 400 | envelope | A saving needs a wallet. |
+| `INSUFFICIENT_SAVING` | 409 | envelope | Not enough saved there (details.available). |
+| `GOAL_NOT_ACTIVE` | 409 | envelope, pending | The saving goal isn't active. |
+| `GOAL_REACHED` | 409 | envelope | The saving goal already holds its target. |
+| `GOAL_HAS_SAVINGS` | 409 | envelope | The saving goal still holds money; close it first. |
+| `UNSUPPORTED_IMAGE` | 400 | envelope | The image is not a PNG / JPEG or could not be decoded. |
+| `OCR_UNAVAILABLE` | 503 | envelope | OCR is not installed on this server. |
+| `OCR_TIMEOUT` | 504 | envelope | Reading the slip took too long. |
+| `MISSING_TYPE` | — | pending | Pending: the draft has no type. |
+| `MISSING_AMOUNT` | — | pending | Pending: the draft's amount must be above 0. |
+| `MISSING_DATE` | — | pending | Pending: the draft has no date. |
+| `SUBMIT_FAILED` | — | pending | Pending: saving the draft failed for another reason (the cause is logged server-side). |
+| `MISSING_ACCOUNT` | — | pending | Legacy (no longer produced; may remain on stored pending rows): the draft had no wallet. |
+| `DEBT_ALREADY_SETTLED` | — | pending | Legacy (no longer produced; may remain on stored pending rows): the debt was already settled. |
+| `OVERPAYMENT` | — | pending | Legacy (no longer produced; may remain on stored pending rows): the payment was more than owed. |
 
 ### Pagination
 
@@ -649,6 +811,23 @@ Change username. **Rate-limited to once per 30 days per user** — username live
 ## 02 — Users
 
 *Pending — see [`../spec/02-users.md`](../modules/02-users.md) for current endpoint definitions until migration completes.*
+
+Recent additions (2026-10-28, 0.4.2 1b contract — migrations 121–122; code follows): **connections + avatars**. **Source of truth: `chubi-pocket-be/internal/apidoc/openapi.yaml`** (tag Connections). Spec: [`../modules/16-telegram.md`](../modules/16-telegram.md).
+- **`avatar` on every person (BREAKING, forced update):** `UserRef` (wallet authors, notification `actor`), `PersonRef` (splits, debts, drafts), `MemberRef` / `EventMember` (event members, bill people), `AccountMember` / `AccountMemberHistory`, `Contact` + `LinkedUser`, `SenderProfile`, `AuthUser`, `Profile` drop the top-level `icon_code` and carry `avatar {kind photo|icon|initials, photo_url, icon_code, initials, colors[≥1], border}`, resolved by the BE: the picked source when available → the icon → initials. `colors` = the profile colours in order (icon: background → icon → border colours, deduped; photo: `avatar_settings.colors` then the border colours; nothing: the name-hash colour, the app's 12-colour `AppAvatar` palette). Requests (`PUT /users/me`, contact / member create + update) still take `icon_code`.
+- `GET /users/me` gains `avatar_settings {source icon|upload|telegram|line|google, colors[], border {style, colors[]}|null}`; `PUT /users/me` takes it (409 `AVATAR_SOURCE_UNAVAILABLE` for a photo source without a picture / an unlinked app).
+- Contract fixes (2026-10-28): `border.style` is an icon-maker border id `thin | thick | dashed` (enum; anything else → 400 `VALIDATION_ERROR`); no border = `border: null`. Colour lists (`avatar.colors`, `avatar.border.colors`, `avatar_settings.colors` / `border.colors`) hold only SET colours in order — never `""` / `null`; an unset slot is simply missing (photo with a main colour only → `[main]`; with border colours → `[main, border1, …]`). `PUT /users/me` drops empty / null entries from `avatar_settings` colour lists before saving.
+- `GET /connections` (`{data, count}`, telegram · line · google) and `GET /connections/{provider}`: `{provider, name, brand_color, logo_url, available, linked, account, linked_at, photo {source, url, imported_at}|null, permissions [{key, available, on}]}`. LINE / Google `available: false` for now.
+- `POST /connections/{provider}/link` → `{url, expires_at}` (`https://t.me/<bot>?start=<code>`, 10 min, single use; also "เปลี่ยนบัญชี"); 409 `CONNECTION_UNAVAILABLE`. `DELETE /connections/{provider}` unlinks (picture kept). `PATCH /connections/{provider}/permissions {key: bool}` (409 `NOT_LINKED` / `PERMISSION_UNAVAILABLE`). `POST /connections/{provider}/photo` imports the app's picture (404 `NO_PHOTO`, 409 `NOT_LINKED`, 502 `PROVIDER_ERROR`); it does not pick it.
+- `DELETE /avatars/{source}` → `Profile` (the picked source falls back to icon). `GET /avatars/{id}?v=` = the JPEG behind `photo_url` (Bearer, cached by version). `GET /brand-logos/{provider}.png?v=` = a 96 px logo (public, embedded in the server). Both paths are one spec entry each: `/avatars/{id}` (GET id / DELETE source) and `/brand-logos/{file}`.
+- Telegram: linked = allowed (`TELEGRAM_ALLOWED_CHAT_IDS` retired). Bot words: spec 16.
+
+Recent additions (2026-10-28, 0.4.2 1b-2 contract — migration 123; code follows): **sign up / log in with Telegram**. **Source of truth: `chubi-pocket-be/internal/apidoc/openapi.yaml`** (tag Auth). Spec: [`../modules/16-telegram.md`](../modules/16-telegram.md).
+- `POST /auth/login` (BREAKING): every failure, a bad / empty body included, is `401 INVALID_CREDENTIALS` (no 400). An account with no password is refused the same way.
+- Passwordless accounts: only an account created through an outside app has no password. `Profile.has_password` (false → "ตั้งรหัสผ่าน"); `PUT /auth/password` takes `new_password` alone for such an account (`current_password` optional in the schema, still required once a password exists → 401 `WRONG_PASSWORD`). `DELETE /connections/{provider}` of the last linked app of a passwordless account → 409 `LAST_LOGIN_METHOD`.
+- `POST /auth/telegram/start {code_challenge}` (PKCE S256) → `{code, url (t.me/<bot>?start=login_<code>), expires_at}` (5 min, single use, rate-limited per IP → 429 `RATE_LIMITED`; 409 `CONNECTION_UNAVAILABLE` when the bot is off).
+- `POST /auth/telegram/exchange {code, code_verifier}` → 202 `{status: pending}` | 200 `{status: login, auth: AuthResponse}` | 200 `{status: signup, signup: {display_name, username_suggestion, has_photo}}`; 401 `LOGIN_CODE_INVALID` (unknown / used / expired / wrong verifier).
+- `POST /auth/telegram/signup {code, code_verifier, display_name, username, currency?}` → 201 AuthResponse: account without a password, Telegram linked, Telegram photo imported + picked. 409 `USERNAME_EXISTS` (`details.username_suggestion`) / `TELEGRAM_ALREADY_LINKED`, 403 `REGISTRATION_CLOSED`.
+- Bot: `/start login_<code>` answers with inline buttons [✓ ยืนยัน] / [สร้างบัญชีใหม่]; `allowed_updates` gains `callback_query`.
 
 ## 03 — Accounts
 
@@ -1238,6 +1417,7 @@ Error codes specific to shared wallets:
 ## Status
 
 - **Last updated** — 2026-10-28
+- **Version** — 0.11 (0.4.2 1b contract: connections, avatars, brand logos, `avatar` replaces person `icon_code` — §02 note — 2026-10-28)
 - **Version** — 0.10 (0.4.2 1a, migration 120: `POST /v1/telegram/webhook`, internal, in Conventions → public endpoints; spec [`../modules/16-telegram.md`](../modules/16-telegram.md) — 2026-10-28)
 - **Version** — 0.9 (0.4.0-3 … 0.4.1-0, migrations 071–080: `GET /v1/health` (Conventions); paid_by on an income + wider `counterparty_key` (§04); `BudgetPeriod.base_amount` (§08); goal auto-saves removed → recurring kind `saving`, period targets (§09); `POST /recurring/occurrences/bulk`, due check once a day (§11); debt `due_date`, link / unlink an existing transaction, share wording (§12) — 2026-10-26)
 - **Version** — 0.8 (0.4.0-2: computed recurring occurrences + by-slot writes + auto-create + occurrence names + due / auto-created notices (§11, §13); future-dated transactions are plain (§04); goals `?month=` (§09); budget `tag_refs` + `future_tx` / `upcoming` sources (§08); card `month_in` (§03); me / dashboard counts (§11) — 2026-10-20)

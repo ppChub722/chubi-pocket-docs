@@ -178,19 +178,23 @@ The bot is off while `TELEGRAM_BOT_TOKEN` is empty (no route, nothing started). 
 | `TELEGRAM_BOT_TOKEN` | From @BotFather. Never in git / chat / logs. |
 | `TELEGRAM_WEBHOOK_SECRET` | 1–256 chars of `A-Za-z0-9_-`, e.g. `openssl rand -hex 32`. Any other value = bot off + an error log. |
 | `TELEGRAM_WEBHOOK_URL` | `https://chubipocket-api.ppforge.dev/api/v1/telegram/webhook`. Set with `setWebhook` on every start. |
-| `TELEGRAM_ALLOWED_CHAT_IDS` | Comma list. Empty = nobody. Anyone else gets "ยังไม่เปิดให้ใช้ (chat id: N)", which shows the id to add. |
+
+**Who may use it (0.4.2 1b):** the chats linked from the app (profile → Telegram), nobody else. `TELEGRAM_ALLOWED_CHAT_IDS` is retired: the BE no longer reads it, delete the line from `/srv/chubi/.env`. After the 1b deploy the owner links again through the app (unlinked chats get "เชื่อมบัญชีก่อนนะครับ: แอป → โปรไฟล์ → Telegram").
 
 ```bash
 # set the keys (owner pastes the token in an ssh session; it never goes through chat)
 sudo nano /srv/chubi/.env
 cd /srv/chubi && sudo docker compose up -d app          # keys are read at start
 sudo docker logs chubi_pocket_app --since 2m 2>&1 | grep telegram
-#  ok:  "telegram: on" bot=@… allowed_chats=N, then "telegram: webhook" url=… pending=0
-#  bad token: "telegram: getMe failed" (the API keeps running)
-# a message → one line "telegram update" (update_id, chat_id, allowed, kind, text_len, outcome); never the text
-# kept texts (eval set for 1b)
+#  ok:  "telegram: on" bot=@…, then "telegram: webhook" url=… pending=0
+#  bad token: "telegram: getMe failed" (the API keeps running; /connections shows Telegram available, linking fails until getMe works)
+# a message → one line "telegram update" (update_id, chat_id, linked, kind, text_len, outcome); never the text
+# kept texts (eval set)
 sudo docker exec shared_postgres psql -U postgres -d chubi_pocket -c "
-  SELECT received_at, chat_id, from_username, text FROM telegram_messages ORDER BY received_at DESC LIMIT 30;"
+  SELECT received_at, chat_id, user_id, from_username, text FROM telegram_messages ORDER BY received_at DESC LIMIT 30;"
+# who is linked
+sudo docker exec shared_postgres psql -U postgres -d chubi_pocket -c "
+  SELECT c.provider, c.account_label, c.linked_at, u.username FROM user_connections c JOIN users u ON u.id = c.user_id;"
 ```
 
 ---
@@ -234,7 +238,7 @@ sudo docker exec shared_postgres psql -U postgres -d chubi_pocket -c "
 | `MIN_APP_BUILD` | `0` (ปิด) | ตั้งตอน 0.3.1-3 — ขยับเมื่ออยากบังคับอัปเดต (§3 "บังคับอัปเดตแอป") |
 | `LATEST_APP_BUILD` | build ล่าสุดที่อัป Firebase | แอปที่เก่ากว่าจะเห็น "มีเวอร์ชันใหม่" |
 | `APP_DOWNLOAD_URL` | ลิงก์ tester Firebase | |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_WEBHOOK_SECRET` / `TELEGRAM_WEBHOOK_URL` / `TELEGRAM_ALLOWED_CHAT_IDS` | not set yet (0.4.2 1a) | Telegram bot; empty token = off. See §3 "Telegram bot" |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_WEBHOOK_SECRET` / `TELEGRAM_WEBHOOK_URL` | set (0.4.2-0) | Telegram bot; empty token = off. `TELEGRAM_ALLOWED_CHAT_IDS` retired in 1b (linked chats only). See §3 "Telegram bot" |
 
 ## 7. TODO ที่จดค้างไว้
 

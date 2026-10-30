@@ -62,7 +62,7 @@ For module behavior, API endpoints, design rationale, and cross-table invariants
 | [13 — Notifications](#13--notifications)                                    | `notifications`, `user_notification_settings`                                                       |
 | [14 — Shared Wallets](#14--shared-wallets)                                  | `account_members` (wallet rows live in ordinary `transactions`; migrated in 039)                    |
 | [15 — Slip Import](#15--slip-import)                                        | `payment_providers`, `import_logs`                                                                  |
-| [16 — Telegram](#16--telegram)                                              | `telegram_messages`                                                                                 |
+| [16 — Telegram](#16--telegram)                                              | `telegram_messages`, `user_connections`, `connection_link_codes`, `user_avatars`, `avatar_src()`     |
 
 ---
 
@@ -81,9 +81,11 @@ Stores identity. Profile and preference columns are also here but documented in 
 | `email`              | `VARCHAR(255)` | UNIQUE, NULLABLE _(Phase 1)_ / NOT NULL _(Phase 2+)_ | Optional in Phase 1; required when email verification ships |
 | `email_verified_at`  | `TIMESTAMPTZ`  | NULLABLE                                             | Set when user completes verification flow _(Phase 2+)_      |
 | `display_name`       | `VARCHAR(100)` | NOT NULL                                             | Shown in UI; free text, any Unicode                         |
-| `password_hash`      | `VARCHAR(255)` | NOT NULL                                             | argon2id encoded hash (includes salt + params)              |
+| `password_hash`      | `VARCHAR(255)` | NULLABLE (migration 123)                             | argon2id encoded hash (includes salt + params). NULL only for an account made through an outside app (CHECK `users_password_or_external`: `password_hash IS NOT NULL OR created_via <> 'password'`); such an account logs in with that app until it sets a password |
+| `created_via`        | `VARCHAR(20)`  | NOT NULL, DEFAULT `'password'`, CHECK (`password` · `telegram` · `line` · `google`) | 0.4.2 1b-2 (migration 123): how the account was created (POST /auth/register vs POST /auth/telegram/signup) |
 | `currency`           | `VARCHAR(3)`   | NOT NULL, DEFAULT `'THB'`                            | ISO 4217 default currency (preference)                      |
 | `icon_code`          | `JSONB`        | NULLABLE                                             | Icon Maker code — see _icon_code JSONB shape_ convention above |
+| `avatar_settings`    | `JSONB`        | NOT NULL, DEFAULT `{"source":"icon","colors":[],"border":null}` | 0.4.2 1b (migration 122): the picked profile picture `source` (icon / upload / telegram / line / google), profile `colors` and `border {style, colors}` for a photo source — see §16 |
 | `status`             | `VARCHAR(30)`  | NOT NULL, DEFAULT `'active'`, CHECK                  | See `02-users` §1.1 — phase-gated CHECK list                |
 | `created_at`         | `TIMESTAMPTZ`  | NOT NULL, DEFAULT `NOW()`                            |                                                             |
 | `created_by_user_id` | `UUID`         | FK → `users.id`, NULLABLE                            | NULL = system                                               |
@@ -1372,12 +1374,11 @@ user's email etc. come from a join on `users`.
 
 ### `telegram_messages`
 
-Every text an ALLOWED private chat sends the bot, once per Telegram
-`update_id` (Telegram may resend). The real-sentence set for the LLM eval
-(0.4.2 1b; owner OK 2026-10-28). No user link yet (1c adds linking).
-Not-allowed chats, `/start` and non-text messages are not kept.
-Pre-release data, wipe-able. Exempt from the audit columns (written by the
-system only).
+Every text a LINKED private chat (chat permission on) sends the bot, once
+per Telegram `update_id` (Telegram may resend). The real-sentence set for the
+LLM eval (owner OK 2026-10-28). Unlinked chats, commands and non-text
+messages are not kept. Exempt from the audit columns (written by the system
+only).
 
 | Column          | Type          | Constraints                         | Description |
 | --------------- | ------------- | ----------------------------------- | ----------- |
@@ -1387,14 +1388,85 @@ system only).
 | `from_username` | `TEXT`        | NULLABLE                            | Telegram @username without the @; NULL = none |
 | `text`          | `TEXT`        | NOT NULL                            | The message text as sent |
 | `received_at`   | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()`           | The message's Telegram `date` |
+| `user_id`       | `UUID`        | NULLABLE, FK → `users.id` ON DELETE SET NULL | 1b (migration 121): the linked user; NULL = kept before linking existed |
 
 **Indexes:** `(chat_id, received_at DESC)`.
+
+### `user_connections`
+
+0.4.2 1b, migration 121. An outside app linked to a user (Telegram now; LINE /
+Google later). Linked = the bot answers that chat. Exempt from the
+created_by / updated_by columns (written by the user's own calls or the bot).
+
+| Column          | Type          | Constraints                                   | Description |
+| --------------- | ------------- | --------------------------------------------- | ----------- |
+| `id`            | `UUID`        | PK, DEFAULT `gen_random_uuid()`               | |
+| `user_id`       | `UUID`        | NOT NULL, FK → `users.id` ON DELETE CASCADE   | |
+| `provider`      | `VARCHAR(20)` | NOT NULL, CHECK (`telegram` · `line` · `google`) | |
+| `external_id`   | `TEXT`        | NOT NULL                                      | The user in that app: Telegram = the private chat id (= the Telegram user id) |
+| `account_label` | `TEXT`        | NULLABLE                                      | As shown: Telegram "@username", else the first name |
+| `linked_at`     | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()`                     | |
+| `permissions`   | `JSONB`       | NOT NULL, DEFAULT `'{}'`                      | `{key: bool}`, e.g. `{"chat": true}`; a missing key = off |
+| `created_at` / `updated_at` | `TIMESTAMPTZ` | NOT NULL                          | `updated_at` trigger-updated |
+
+**Unique:** `(provider, external_id)` (an app account belongs to one user), `(user_id, provider)` (one account per app). Linking again replaces / moves (spec 16 §2).
+
+### `connection_link_codes`
+
+0.4.2, migration 121. One-time codes for the t.me start payload. Only the
+SHA-256 of the code is stored (`code_hash`, unique); the code (128-bit,
+base64url) travels in the link. Single use (`used_at`).
+
+| Column           | Type          | Constraints                                  | Description |
+| ---------------- | ------------- | -------------------------------------------- | ----------- |
+| `id`             | `UUID`        | PK, DEFAULT `gen_random_uuid()`              | |
+| `code_hash`      | `BYTEA`       | NOT NULL, UNIQUE                             | SHA-256 of the code |
+| `purpose`        | `VARCHAR(10)` | NOT NULL, DEFAULT `'link'`, CHECK (`link` · `login`) | link (1b): a signed-in user links an app, 10 min. login (1b-2): sign up / log in with the app, 5 min |
+| `user_id`        | `UUID`        | NULLABLE, FK → `users.id` ON DELETE CASCADE  | link: the user linking (required); login: set once a linked chat confirms |
+| `provider`       | `VARCHAR(20)` | NOT NULL, CHECK                              | |
+| `code_challenge` | `TEXT`        | NULLABLE                                     | login: the PKCE S256 challenge (required for login) |
+| `external_id` / `account_label` | `TEXT` | NULLABLE                          | login: the chat that opened the code in the bot ("@username" / first name) |
+| `external_name`  | `TEXT`        | NULLABLE                                     | login: the Telegram name (first + last), the sign-up prefill |
+| `confirmed_at`   | `TIMESTAMPTZ` | NULLABLE                                     | login: confirmed in the chat |
+| `expires_at`     | `TIMESTAMPTZ` | NOT NULL                                     | |
+| `used_at`        | `TIMESTAMPTZ` | NULLABLE                                     | |
+| `created_at`     | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()`                    | |
+
+**Checks:** `purpose = 'login' OR user_id IS NOT NULL`; `purpose = 'link' OR code_challenge IS NOT NULL`. **Index:** `(user_id, provider)`. A new link call deletes the user's unused link codes for that app.
+
+### `user_avatars`
+
+0.4.2 1b, migration 122. The user's stored profile pictures, one per source.
+Served at `GET /v1/avatars/{id}?v={version}`.
+
+| Column        | Type          | Constraints                                    | Description |
+| ------------- | ------------- | ---------------------------------------------- | ----------- |
+| `id`          | `UUID`        | PK, DEFAULT `gen_random_uuid()`                | The id in `photo_url` |
+| `user_id`     | `UUID`        | NOT NULL, FK → `users.id` ON DELETE CASCADE    | |
+| `source`      | `VARCHAR(20)` | NOT NULL, CHECK (`upload` · `telegram` · `line` · `google`) | |
+| `image`       | `BYTEA`       | NOT NULL                                       | JPEG, at most 256 px (Telegram: the 160 px size) |
+| `version`     | `INTEGER`     | NOT NULL, DEFAULT 1                            | +1 on every re-import (the `?v=`) |
+| `imported_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()`                      | |
+
+**Unique:** `(user_id, source)`. Unlinking an app keeps its picture; `DELETE /v1/avatars/{source}` removes it.
+
+### Function `avatar_src(p_user_id UUID, p_icon JSONB) → JSONB`
+
+0.4.2 1b, migration 122, `STABLE`. What the avatar builder
+(`shared.AvatarFromSrc`) needs for one person: `{icon_code (the user's, else
+p_icon), settings (users.avatar_settings), photo_id, photo_version}`; the
+photo is the picked source's picture only when it can be shown (stored, and
+for an app source the app is still linked). `p_user_id` NULL (a typed name, an
+unlinked contact) → `{icon_code: p_icon}`. Every person query selects it
+instead of `COALESCE(u.icon_code, c.icon_code)`.
 
 ---
 
 ## Status
 
-- **Last updated** — 2026-10-28 (migration head: **120**)
+- **Last updated** — 2026-10-28 (migration head: **123**)
+- **Version** — 0.20 (2026-10-28 — 0.4.2 1b-2: **123** `users.password_hash` nullable for accounts made through an outside app, `users.created_via`, CHECK `users_password_or_external`; `connection_link_codes.external_name` (in 121).)
+- **Version** — 0.19 (2026-10-28 — 0.4.2 1b: **122** `user_avatars`, `users.avatar_settings`, function `avatar_src()`; **121** `user_connections`, `connection_link_codes` (with the 1b-2 login columns), `telegram_messages.user_id` (§16, §02 users).)
 - **Version** — 0.18 (2026-10-28 — 0.4.2 1a: **120** `telegram_messages` (new §16). The 0.4.2 range is 120–129.)
 - **Version** — 0.17 (2026-10-27 — 0.4.1-1 BE-1, migrations 081–084. **084** `transactions.amount` / `personal_debts.amount` `>= 0` (system-written 0, B1), `personal_debts.disconnected_at`, notification type `debt_disconnected`. **083** one debt link: `transactions.debt_connected` + `debt_prev_category_id`, 076's `personal_debts.linked_transaction_id` folded in and dropped. **082** system categories `LOAN_GIVEN` / `LOAN_TAKEN` seeded, debt transactions moved to them. **081** `personal_debts.kind` (debt | repayment); 069's repayment transactions became rows, wallet-less ones lost their transaction; `transactions.repay_contact_id` / `repay_person_name` + check + indexes dropped. BE-2: **091** `project_transactions.paid_back_for_id` (a "คืนแล้ว" payback row knows its bill; un-ticking removes it). **090** `recurring_rules.pause_reason` (manual / overdue_limit / goal_inactive) + `gaps` (resume / installment shift); `recurring_due_checks` emptied so rules over the limit pause at their first check. 085–089 unused.)
 - **Version** — 0.16 (2026-10-26 — synced against migrations 071–080. **080** `transactions_paid_by_check` allows `income` ("รับแทน"). **079** `saving_goals.period_amount` / `period_freq` / `period_interval` / `period_anchor`. **078** `budget_periods.base_amount`. **077** recurring `type` / `kind` gain `saving`, `recurring_rules.goal_id` FK → ON DELETE CASCADE + `idx_recurring_rules_goal`, `saving_auto` migrated into recurring and dropped. **076** `personal_debts.linked_transaction_id` + unique index. **075** `recurring_due_checks`. **074** `user_preferences.timezone` cleanup. **073** `transactions` / `personal_debts.unlinked_project_transaction_id`, `project_transactions.unlinked_transaction_id`. **072** `project_transactions.type` gains `payback`. **071** `personal_debts.due_date`.)

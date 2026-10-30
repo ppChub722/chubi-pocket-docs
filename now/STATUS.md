@@ -1,6 +1,24 @@
 # STATUS — read this first (rewritten, not appended)
 
-_Last updated: 2026-10-28, 0.4.1-2 done (not committed / released)._
+_Last updated: 2026-10-30. 0.4.2 (LLM via Telegram) in progress; see the first section._
+
+## Now: 0.4.2 — step 1b / 1b-2 (committed locally on main in be / app / docs, NOT pushed / tagged / released)
+Plan + every owner decision: `now/briefs/0.4.2-plan.md` (single source of truth). UI mock (final): https://claude.ai/artifact/DBDqM2xj9HgPkjyBo6A3ry.
+- **Live in prod:** v0.4.2-0 (Telegram webhook, migration 120, bot @chubiPocket_bot) and v0.4.2-1 (settings fix by the 0.4.1-2 Lead, app build 180).
+- **DONE, committed (unreleased):**
+  - BE 1b + 1b-2: migrations 121–123 (connections, avatars, passwordless accounts); /connections, /avatars, /brand-logos, `avatar` object (top-level `icon_code` removed from person payloads), colours built by the BE, bot linking, Telegram login / sign-up (PKCE), login 401-only, `border.style` thin|thick|dashed, only SET colours. Full BE run 2026-10-29: go vet clean, PASS 401, FAIL 0, SKIP 0 (test DB `chubi_test_042b`, head 123).
+  - FE part A: `Avatar` / `AvatarData` / `ProfileColors` / `ServerImageScope`, connections data layer, every person model + widget on `avatar`.
+  - FE part B: settings card logo line, profile view + edit, connection page, icon-maker colour-only mode, photo delete confirm.
+- **PENDING (not started): FE part C** (an agent stalled before doing anything):
+  1. Telegram login / sign-up in the app: login button, PKCE (add `crypto` to pubspec), pending page, short sign-up page, repository + cubit, fill the `auth-telegram` flows.
+  2. Login + register: remove inline "จำเป็น" errors, button always enabled, empty-field check shows the toast ("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" on login), hide the top OfflineBanner on /auth/login and /auth/register (+ the Telegram pages).
+  3. App-wide error toast: unknown error + 5xx become ONE message ("เกิดข้อผิดพลาด" / "กรุณาลองใหม่อีกครั้ง"); delete the unused errorUnknown* / errorServer* keys.
+  4. Leftovers of part B: pick profile colours 1–3 for icon backgrounds with no pickable colour (rainbow, snowflake, wreath, starburst); verify split / bill name pills + contact hero use ProfileColors; make the connection link button label ≥ 4.5:1 contrast (white on Telegram blue is ~2.6:1).
+- **Then (Lead):** full `flutter analyze` + `flutter test`, full `go vet` + `go test` (0 skip); push + tag (next 0.4.2-N); owner's go to release: APK to Firebase first, then BE + `MIN_APP_BUILD = LATEST` (forced update; breaking: no top-level icon_code); the owner links Telegram again through the app (TELEGRAM_ALLOWED_CHAT_IDS is retired).
+- **Not decided / open:** the 5 bot texts BE wrote itself (listed in team/inbox/be.md "1b-2"; default = use them); upload UI + endpoint ("เร็วๆ นี้", needs an image resize lib); real LINE / Google linking (0.4.3 backlog); app-permissions page (handed to the 0.4.1-2 Lead, chubi-pocket-06).
+- **Next steps of 0.4.2 after release:** 1c = LLM drafts from Telegram text → pending rows with [✓ ✎ ✗] buttons; 1d = every module; phase 2 = Q&A (read-only tools); phase 3 = OCR slips.
+- Team: BE dev session (chubi-pocket-22) closed; AppRow lead = chubi-pocket-f7; Lead = this role (lead + test + DevOps). Prod: VPS ppForge, `ssh -i ~/.ssh/ppforge_vps Admin@143.14.147.249`; offsite copy script now defaults to ppForge.
+
 
 ## Where we are: 0.4.1-0 — closed (tagged, merged, live)
 - Tag **`v0.4.1-0`** in app `2848aeb` (version **0.4.1-0+172**) · be `21fe2b2` · docs `a2512c1`; `origin/main` = the tag in app and be. Release note: `team/releases/0.4.1-0.md`.

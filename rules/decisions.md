@@ -424,3 +424,5 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - Top-right shell icons highlight the current page, like the bottom bar tabs.
 - Wallet identifiers: plain digits, no formatting; the section says it exists only to match slips.
 - Mobile portrait first; tablet deferred.
+- Rows (owner 2026-10-28): one kit shell `AppRow`; `AppListRow` (list items) and `AppDetailRow` (= the old `DetailRow`, renamed, with badge / tint / value icon / coming soon) are built on it. Settings rows render through AppDetailRow.
+- Detail-row values (owner 2026-10-28): primary by default; a locked value + its lock icon = the theme muted token (per theme, light / dark), never a literal colour.

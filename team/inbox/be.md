@@ -1492,3 +1492,143 @@ DONE · base be `7b1f6bc`, nothing committed · go vet + go test (telegram, logg
 5. Check that Caddy passes `/api/v1/telegram/webhook` and the `X-Telegram-Bot-Api-Secret-Token` header through (Caddy keeps headers by default).
 
 **Breaking for the app:** none.
+
+## 2026-10-28 — 0.4.2 1b: Telegram linking + avatars + connections (BE session)
+DONE · base be `e9ba545` (v0.4.2-1), nothing committed · go vet ./... clean · go test (the 18 changed packages: shared/…, contacts, personal_debts, projects, accounts, auth, users, transactions, notifications, apidoc/…, pending, recurring, me, sync, telegram, connections, platform/…, cmd) all ok, **0 skip**, on a fresh `chubi_test_042b` (every `migrations/*.up.sql`, head 122; 121/122 down + up checked).
+
+**Contract (B1, pinged earlier):** openapi tag `Connections` + api-document §02 note. Two deviations from the brief, both forced by "one path template per spec path / gin route":
+- `/avatars/{id}` is ONE spec entry. GET takes the picture id; DELETE takes the source (`DELETE /avatars/telegram`).
+- The logo path is `/brand-logos/{file}` with `file = <provider>.png`. The URL is unchanged.
+
+**Migrations (additive):**
+- **121**:
+  - `user_connections`: unique (provider, external_id) and (user_id, provider); permissions JSONB; updated_at trigger.
+  - `connection_link_codes`: only the SHA-256 of the code is stored. It already holds the 1b-2 login columns, folded in on your note: `purpose` link|login, nullable `user_id`, `code_challenge`, `external_id`, `account_label`, `confirmed_at`, plus two CHECKs.
+  - `telegram_messages.user_id` (FK, ON DELETE SET NULL).
+- **122**:
+  - `user_avatars`: JPEG bytea, version, unique (user_id, source).
+  - `users.avatar_settings` (default `{"source":"icon","colors":[],"border":null}`).
+  - SQL function `avatar_src(user_id, own_icon)`, STABLE: icon + settings + the picked photo only when it can be shown.
+
+**Endpoints:**
+- `GET /connections`, `GET|DELETE /connections/{provider}`.
+- `POST /connections/{provider}/link`: returns `https://t.me/<bot>?start=<22-char code>`. The bot username is cached from getMe.
+- `PATCH /connections/{provider}/permissions`.
+- `POST /connections/{provider}/photo`.
+- `GET /avatars/{id}`: JPEG, `Cache-Control: private, max-age=31536000, immutable`.
+- `DELETE /avatars/{source}`: returns Profile.
+- `GET /brand-logos/{p}.png`: public; registered before the build check.
+- `PUT /users/me` takes `avatar_settings`:
+  - 409 `AVATAR_SOURCE_UNAVAILABLE`.
+  - 400 for a bad source or bad colours (≤ 8 entries, each 1–32 chars) or a bad border.
+- Error codes: `CONNECTION_UNAVAILABLE`, `NOT_LINKED`, `PERMISSION_UNAVAILABLE`, `NO_PHOTO`, `PROVIDER_ERROR` (502; never carries Telegram's error text).
+
+**Avatar everywhere (B6/B7):**
+- One builder, `internal/shared/avatar.go`, fed by `avatar_src()`.
+- These now carry `avatar` and no top-level `icon_code`: UserRef (notification actor, tx author), PersonRef, MemberRef, EventMember, AccountMember(+History), Contact + LinkedUser, SenderProfile, AuthUser, Profile.
+- Colours and initials are a port of AppAvatar. The tests check 14 names against reference values printed by the app's own Dart code, Thai and emoji included.
+- `colors` is never empty: PersonRef / UserRef / MemberRef fall back to initials at marshal time when built from a bare name. Several bill-preview / debt paths build them that way; they had no icon before either.
+- New ratchet `TestPersonSchemasCarryAvatar` (apidoc): those 11 schemas must have a required `avatar` $ref and no `icon_code`.
+
+**Bot (B5):**
+- Linked = allowed; `TELEGRAM_ALLOWED_CHAT_IDS` is removed from config, both env examples and the compose key list.
+- Texts follow B5. The link-success text is B5's one line; the mock adds a 2nd line, "ส่งรายการมาได้เลย", which I left out.
+- `/unlink` reply "ยกเลิกการเชื่อมแล้ว" is my wording; the plan has none.
+- A linked `/start` without a code keeps the 1a hello.
+- Binding moves a chat away from another user and replaces the user's old Telegram.
+- Kept texts now carry `user_id`.
+- Photo import: getUserProfilePhotos(limit 1) → the smallest size ≥ 160 px, else the widest → getFile → download. The token stays in the client and is redacted from every error.
+- A link, unlink or new picture bumps `users.updated_at`, so linked contacts' sync fingerprints refresh.
+
+**Logos:** `internal/modules/connections/logos/{telegram,line,google}.png`, 96 px RGBA, rendered once with headless Chrome from the mock's Simple Icons paths and embedded with `go:embed`. Commit the PNGs. `logoVersion = 1`; bump it if a logo changes.
+
+**Also changed:** auth `User` / `AuthUser`, `scanUser` (selects `avatar_src`), users store / service / handler, accounts members_store, transactions detail (author), shared members / notification_view / refs (`PersonIconSQL` → `PersonAvatarSQL` / `AvatarSQL`), contacts store / service + api_test, debts people query, projects members view. gofmt re-aligned a few struct blocks in touched files.
+
+**Not done / for you:**
+- **Upload:** no upload endpoint (the data model and DELETE support it; UI is "เร็วๆ นี้"). It needs an image resize library; say if it's wanted in 1b.
+- **Archived list:** `GET /me/archived` ArchivedItem (also used for archived contacts) still has `icon_code`. It is a generic item, not a person schema; say if it should move to `avatar`.
+- **App ratchet:** the app's API check now lists 9 new operations with no page flow. App-da adds them to `page_flows.dart`; `getAvatarImage` / `getBrandLogo` are image URLs, so either a flow entry or a line in `test/hub/api_unused_baseline.txt` (my 1a line is there already). I did not touch app files this time.
+- **Accidental full run:** my skip-count command ran the whole `./internal/...` suite. It showed 0 skips; I didn't check that run for failures, so your full run stands.
+
+**VPS (with the release):**
+1. Migrations 121 + 122 run with the deploy. Additive, but the payload change is breaking: forced update, MIN = LATEST = the new build, APK uploaded first.
+2. Remove `TELEGRAM_ALLOWED_CHAT_IDS` from `/srv/chubi/.env` (now ignored).
+3. After the deploy the owner links Telegram again from the app (profile → Telegram). Until then the bot answers "เชื่อมบัญชีก่อนนะครับ…".
+
+**Breaking for the app:** every person payload `icon_code` → `avatar` (forced update, as planned).
+
+## 2026-10-28 — 0.4.2 1b-2: sign up / log in with Telegram (BE session)
+DONE · on top of 1b (same tree, nothing committed) · go vet ./... clean · go test of the 18 changed packages (same list as 1b) all ok, **0 skip**, on a fresh `chubi_test_042b` (every `migrations/*.up.sql`, head **123**; 123 down + up checked).
+
+**Contract (pinged "CONTRACT 1b-2 ready"):** openapi + api-document §02 note.
+- `/auth/telegram/{start,exchange,signup}`.
+- `login`: 401 only (x-breaking).
+- `changePassword`: the set variant; `current_password` is optional in the schema.
+- `Profile.has_password`.
+- `unlinkConnection`: 409 `LAST_LOGIN_METHOD`.
+- Shapes: start returns `{code, url, expires_at}`. Exchange has one schema `{status: pending|login|signup, auth, signup}`, with 202 for pending.
+
+**Migrations:**
+- **121** (folded in as you asked) gains the login columns on `connection_link_codes`: `purpose`, nullable `user_id`, `code_challenge`, `external_id`, `account_label`, `external_name`, `confirmed_at`, plus 2 CHECKs. Link codes only ever match `purpose = 'link'`, and login codes only `login`.
+- **123** `passwordless_accounts`:
+  - `users.created_via` (password|telegram|line|google, default password).
+  - `password_hash` becomes nullable.
+  - CHECK `users_password_or_external`: a NULL hash only when `created_via <> 'password'`.
+  - Additive. The down migration needs every account to have a password again.
+
+**Code:**
+- **auth:**
+  - Login: a bad / empty body or a passwordless account → the same 401 `INVALID_CREDENTIALS`.
+  - `ChangePassword`: a passwordless account sets a password without the current one.
+  - New: `CreateExternalUserTx`, `IssueFor`, `UsernameTaken`, `RegistrationOpen`.
+  - The user scan reads `COALESCE(password_hash, '')`.
+- **users:** `has_password` on Profile.
+- **connections/login.go:**
+  - `StartLogin` / `Exchange` / `Signup` (PKCE S256 with a constant-time check; a 22-char code, only its SHA-256 stored).
+  - Bot side: `TelegramLoginOpen` / `TelegramLoginConfirm`.
+  - `lastLoginMethod` guard, used by unlink, `/unlink` and a bind that would move the chat to another account (`shared.ErrLastLoginMethod`).
+  - Per-IP fixed-window limiter (start / signup 10, exchange 120 per 10 min) → 429 `RATE_LIMITED`.
+- **telegram:**
+  - `/start login_<code>` → `SendButtons` with [✓ ยืนยัน] or [สร้างบัญชีใหม่].
+  - `callback_query` handling: only the chat that opened the code can confirm; `answerCallbackQuery` + `editMessageText`.
+  - `allowed_updates` = message + callback_query.
+  - New client calls: `HasProfilePhoto`, `SendButtons`, `AnswerCallback`, `EditText`.
+- **main:** the 3 public routes (inside the build check, outside JWT). The request log never holds the bodies of `/connections/telegram/link` or the 3 `/auth/telegram/*` routes (codes, verifiers).
+
+**My wording (not in the plan), please confirm with the owner:**
+- Bad / expired login code: "ลิงก์หมดอายุ ลองใหม่จากแอป".
+- After [✓ ยืนยัน]: "ยืนยันแล้ว ✓ กลับไปที่แอปได้เลย".
+- After [สร้างบัญชีใหม่]: "กลับไปที่แอปเพื่อสร้างบัญชีต่อได้เลย".
+- Last-login guard in the chat: "ตั้งรหัสผ่านในแอปก่อน ไม่งั้นจะเข้าบัญชีไม่ได้" (the app's line, plus "ในแอป").
+
+**Choices:**
+- Sign-up with `REGISTRATION_OPEN=false` → 403 `REGISTRATION_CLOSED`, not the register decoy. Prod has it open.
+- The photo import on sign-up is best effort: a failure leaves the initials.
+- Username suggestion: the Telegram @username, else the name in a-z 0-9 _, else "user"; taken → plus 2–5 random digits.
+- Exchange decides login vs sign-up from the chat's link at exchange time, so a chat linked in between logs in.
+
+**Tests:**
+- auth: login with a bad / empty / missing-field body → 401 `INVALID_CREDENTIALS`; a passwordless account refused with any password; the DB check refuses a password account with no hash; set password, then the current one is required.
+- connections:
+  - Login with a linked chat: pending → open → another chat can't take or confirm the code → wrong verifier 401 → login with tokens → reuse 401.
+  - Expired code; a login code can't link and a link code can't log in.
+  - Sign-up: the prefill (the taken Telegram username gets a variant suggestion); 409 with a suggestion; 400; 403 when closed; 201 creates a passwordless account linked to the chat with a photo avatar, and the code is used up.
+  - Password login refused; the guard on unlink, `/unlink` and moving the chat; change of own account allowed; unlink allowed once a password is set; `TELEGRAM_ALREADY_LINKED`.
+  - Start: 400 on a bad challenge, 409 with the bot off, 429 after 10 starts; junk exchange → 401.
+- telegram: the login ask for linked / unlinked chats (buttons, callback data), confirm and edit, bad code, a tap from another chat or with junk data, a resent tap = duplicate, a callback from a group ignored, the last-login guard on `/unlink` and bind; client buttons / answer / edit / `HasProfilePhoto`; `allowed_updates`.
+- users: `has_password` true, then false.
+
+**VPS:** migration 123 runs with the release. No env changes. At start, `setWebhook` asks for `callback_query`, so the buttons only work after this deploy.
+
+**Breaking for the app:**
+- Login no longer answers 400; map 401 `INVALID_CREDENTIALS` to "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง".
+- New: `Profile.has_password`.
+- The app ratchet gets 3 more operations without page flows (`startTelegramLogin`, `exchangeTelegramLogin`, `signupWithTelegram`); app-da adds them.
+
+## 0.4.2 1b contract fixes (2026-10-28) — avatar border style + colour lists
+- `border.style` = icon-maker ids `thin | thick | dashed` (enum in openapi `AvatarBorder`; example was "solid"); no border = `border: null`. PUT /users/me `avatar_settings.border.style` anything else → 400 VALIDATION_ERROR (`shared.AvatarBorderStyles`, `users.normalizeAvatarSettings`).
+- Colours: only SET colours, in order, never "" / null. New `shared.CleanColors`; builder copies `avatar.border` with cleaned colours; `avatar.colors` = photo [main, border1, …] / icon bg→icon→border deduped / nothing → [name-hash]. Unchanged: a photo with no colours of its own still falls back to the icon's colours (now stated in openapi).
+- PUT /users/me strips empty / null entries from `avatar_settings.colors` and `border.colors` before saving (was 400 on ""); the 8-colour cap applies after stripping. GET /users/me also cleans on read.
+- FE delta: send `border: null` for no ring, style one of thin/thick/dashed; colour lists may be sent with gaps (BE drops them) and come back gap-free.
+- Docs: openapi Avatar / AvatarBorder / AvatarSettings; ref/api-document.md 02 recent-additions line.
+- Tests: shared (TestNewAvatarFallbackChain + empty-slot cases), users (TestAvatarSettings: solid/none/"" → 400, stripping, stored JSON clean), apidoc, connections — go vet clean; all ok on chubi_test_042b, 0 FAIL, 0 SKIP.
