@@ -106,3 +106,13 @@ Format: `- [role] what · why · how to undo — Lead: OK / changed to …`
 ## Questions held for the owner
 - ANSWERED 2026-10-17: YES, archive allowed with money inside; plus goals may have NO target (open-ended, e.g. saving for a child). Not built yet. — **Archive a saving goal that still holds money?** Today BE answers 409 (GOAL_HAS_SAVINGS): archive only when empty; the user closes the goal first (its money goes to ยังไม่จัดสรร or back to the wallets). Archiving with money inside would make that money drop out of every total. Lead's pick: keep the block, with a hint in the end zone "ปิดเป้าหมายก่อน".
 - ANSWERED 2026-10-17: NO, viewers stay read-only (as built). — **Event tags: may a VIEWER edit them?** Owner said "every member". BE reads it as every member who can write (owner + contributors); viewers stay read-only, like for bills. One-line switch (`tagWriteGate`). Lead's pick: keep viewers read-only.
+
+## 2026-10-31 15:30 — 0.4.2-3 released
+DONE · tags `v0.4.2-3`: be `9f8f3ee` · app `f58f669` (build 220) · docs `b48c939` · prod migration 130, MIN = LATEST = 220 · analyze clean · flutter test 851 passed · go vet clean · go test 425 passed / 0 failed / 0 skipped (throwaway DB from the tag's migrations)
+- Split phase A1 + A2, F1–F3 notification model, B2 (Idempotency-Key on every edit page), B3 (field errors, offline / slow / server-down), loading gaps, B 30–33, A merge, currency lock; details `team/releases/0.4.2-3.md`, `now/briefs/0.4.2-3-plan.md`.
+- Deviations / notes:
+  - 2 BE tests failed on 31 Oct = a real month-end bug (`AddDate` rolled 31 Oct + 1 month into 1 Dec in a card's next due date and a saving goal's ETA). Fixed in BE `9f8f3ee` with plain tests; the BE tag was moved from `982057f` to `9f8f3ee` before anything used it (force-pushed once).
+  - `release.sh` offsite step failed on the old Happy-Host address in `ppforge-infra/backup/pull-to-dev.sh`; default fixed (ppforge-infra `33bd11f`, local, not pushed), release.sh re-run finished the offsite copy and wrote the entry.
+  - Migrations 129 / 130 are irreversible; the pre-deploy dump is `chubi_pocket-20261031-1517.dump.gz`. Rehearsed on the 2026-10-31 snapshot first (books identical).
+  - Housekeeping: merged branches / `wip/*` deleted (local + remote); kept app `refactor/pp-forge-decouple` and BE `origin/feat/split-transactions` (old history). Prod dump copy on the dev PC kept as a backup (owner).
+  - Owner still to do: hub review (A0, Thai error texts, BusyLock fading) and the on-phone test list in the release note.
