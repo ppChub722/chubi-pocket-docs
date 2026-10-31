@@ -839,6 +839,13 @@ Recent additions (2026-10-28, 0.4.2 1b-2 contract — migration 123; code follow
 - `POST /auth/telegram/signup {code, code_verifier, display_name, username, currency?}` → 201 AuthResponse: account without a password, Telegram linked, Telegram photo imported + picked. 409 `USERNAME_EXISTS` (`details.username_suggestion`) / `TELEGRAM_ALREADY_LINKED`, 403 `REGISTRATION_CLOSED`.
 - Bot: `/start login_<code>` answers with inline buttons [✓ ยืนยัน] / [สร้างบัญชีใหม่]; `allowed_updates` gains `callback_query`.
 
+Recent additions (2026-11-01, 0.4.2-4 — no migration): **Log In With Telegram (OIDC)**, replacing the `/start` code flows above for new app builds (the old routes stay until the force-update gate passes the new build). **Source of truth: `chubi-pocket-be/internal/apidoc/openapi.yaml`**. Plan: [`../now/briefs/telegram-oidc-login.md`](../now/briefs/telegram-oidc-login.md).
+- The app runs OIDC with Telegram itself (client_id = the bot id `9059620815`, PKCE, scope `openid profile telegram:bot_access`, redirect `https://app3978689569-login.tg.dev/tglogin`) and sends the `id_token` (lives 30 s). The BE checks RS256 / Telegram JWKS / iss / aud / exp, each token once; Telegram id = the `id` claim.
+- `POST /auth/telegram/token {id_token}` (public, 20 per 10 min per IP) → 200 `{status: login, auth}` | 201 `{status: signup, auth}`: no account → made at once, no form (no password, username = Telegram username or from the name, + digits when taken; THB; Telegram photo; chat on; welcome DM). 401 `TELEGRAM_TOKEN_INVALID`, 403 `REGISTRATION_CLOSED`, 409 `CONNECTION_UNAVAILABLE`.
+- `POST /connections/{provider} {id_token}` (Telegram only) → `Connection`: links that Telegram to me (moves it from another user; 409 `LAST_LOGIN_METHOD` if that leaves them no way in), chat on, welcome DM; already mine → unchanged. 401 `TELEGRAM_TOKEN_INVALID`.
+- `Connection.bot_url`: Telegram `https://t.me/<bot>` while the bot is on (the "open the bot" row), else null.
+- Bot: the "Allow Messages" service message (`write_access_allowed`) gets no reply; a plain `/start` from a linked chat gets the welcome text.
+
 ## 03 — Accounts
 
 Recent additions (2026-10-13, 0.3.1-10, migration 058): `Account.track_balance` (create / `PUT` take it; `PUT {track_balance: true, current_balance}` turns it back on in one call), `AccountList.totals.untracked_count`, 409 `BALANCE_NOT_TRACKED` on adjust-balance; untracked wallets are left out of every total and the dashboard net worth — [`../spec/03-accounts.md`](../modules/03-accounts.md) (0.3.1-10 note). **Source of truth for shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`.**
