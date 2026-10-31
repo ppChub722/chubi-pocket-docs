@@ -386,6 +386,16 @@ Endpoints carry a phase marker indicating the earliest phase they ship in:
 
 Each endpoint header lists its phase. See [`../now/`](../now/) phase docs for milestone definitions.
 
+### 0.4.2-3 — what changed in the API (the OpenAPI at `/api/docs` is the full source)
+
+- **`Idempotency-Key` (migration 124).** A client sends one key per save and the SAME key on every retry. The first request is run normally and, when it answers 2xx, its answer is stored under (user, key); a retry with the same key and the same request gets the stored answer (header `Idempotent-Replay: true`) and runs nothing. The same key for another method / URI / body → 422 `IDEMPOTENCY_KEY_REUSED`; a retry while the first still runs → 409 `IDEMPOTENCY_IN_PROGRESS`. No header, a read, or a multipart upload = untouched. A non-2xx answer is never stored. The app sends it on every save of the edit pages, the quick create sheet and the event bill sheet.
+- **Error registry.** `error.code` is one of the registered codes (the OpenAPI `Error` enum = `internal/platform/apierr`; a test keeps them equal). `message` is safe English, never raw Go / DB text; clients key on `code` and show their own text. The app maps every code to Thai (`errorText`, a test keeps the app list equal to the enum).
+- **`VALIDATION_ERROR` `details`** is always an array of `FieldError { field, code, params }`: `field` = JSON path in the body (`name`, `splits[0].amount`) or the query / path parameter, `""` = the whole body; `code` ∈ `required`, `too_long`, `too_short`, `too_many`, `too_few`, `out_of_range`, `invalid`, `invalid_type`, `invalid_json`, `too_large`; `params` e.g. `{max: 100}`. The app shows the Thai text under the field (register, change password) or in the snack.
+- **Notification settings** (`GET/PUT /users/me/notification-settings`, also on `/users/me`): new booleans `auto_accept_event_invites`, `auto_accept_contact_links`, `auto_accept_wallet_invites` (default false). `types[].mutable` is true for every type (requests too); แจ้ง and อัตโนมัติ are independent (a muted type no longer forces an "ask" notice). `project_added` is retired (a linked person added to an event is a plain member plus ONE `project_invite`); a retired type in `muted_types` is dropped quietly.
+- **`PUT` / `DELETE /projects/{id}/members/{member_id}/my-contact`** (body `{contact_id}`): bind / unbind this member to one of MY contacts, for me only. Answers the event patch with my `contact_id` on the members.
+- **`PUT /users/me`:** `currency` is locked: the current currency is accepted as a no-op, any other → 409 `CURRENCY_LOCKED`.
+- **Split bills:** no endpoint changed. A bill with no event answers with its own bill id where it used to answer with the hidden event's id (`project_id` / event id fields), so old apps keep working; no forced update.
+
 ---
 
 ## 01 — Auth

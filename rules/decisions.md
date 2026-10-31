@@ -170,6 +170,16 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - **Recurring "หนี้" kind:** tied to a person (a name-only person is allowed; a deleted contact leaves the name, the user handles it); จ่ายหนี้ books min(rule, balance); 3 rounds at balance 0 → inactive, a new debt resumes it; sends to a connected contact like a normal debt entry; slots count in ใกล้ถึง / expected totals, budgets only through a booked tx.
 - **Settings:** one central settings page = every user preference, all on the server (groups with a summary line → sub-pages). Per-page sort / filter remember the last choice. กระเป๋าหลัก is the quick-create default (one wallet setting). Hide amounts removed for now.
 
+
+### Split bills, notifications, errors (0.4.2-3, owner 2026-10-30/31; details `now/briefs/0.4.2-3-plan.md`)
+- **A split bill is not an event.** One bill model: a bill's people are rows of `split_transaction_people` (share, paid, paid_back, marked_at, disconnected_at); an event is a group of bills. A plain split bill has no shared tags; an event's bills carry the event's tags through `event_transaction_tags` (name for phase B). Phase A ships in 0.4.2-3 (migrations 127–130, irreversible); phase B (renames) is later.
+- **แจ้ง and อัตโนมัติ are independent** per request type: on/on = notice already applied; on/off = notice waits for my answer; off/on = applied silently; off/off = nothing happens. Event invites, contact link requests and wallet invites are three rows, all mutable, all auto-acceptable.
+- **A linked person added to an event** becomes a normal member right away (not linked yet) and gets ONE `project_invite`; accept (or auto-accept) links them. The same person is never invited twice. Old bills with an unaccepted member: left as they are (no fan-out).
+- **Member ↔ contact is per viewer** (`project_member_contacts`): never matched by name for new members; a viewer binds a member to their own contact ("ผูกกับผู้ติดต่อของฉัน").
+- **Currency is locked** after registration (BE rejects a change with `CURRENCY_LOCKED`; the settings row reads as a plain value).
+- **Errors:** one place turns an API error into words (`errorText`); offline / slow / server-down / other throws are classified in one place (`ApiException`); offline shows only the connection snack; a field error shows under its field where the form has one, otherwise the snack names the first field's problem.
+- **Safe saves:** every save carries an `Idempotency-Key` that stays the same until it saves or is cancelled (Retry never writes twice). While a save runs, every kit piece with its own tap fades and locks (`BusyLock`).
+
 ## UI
 - **0.4.0-2 polish rules (owner 2026-10-19/20):**
   - **Separator:** the text separator is " | ", never " · ", everywhere. Gaps inside and between cards are all equal (12).

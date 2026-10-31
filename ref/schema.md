@@ -756,6 +756,64 @@ Migration 060. One row moves an amount of ONE wallet between buckets: the wallet
 
 Owned by [`../spec/10-projects.md`](../modules/10-projects.md).
 
+### 0.4.2-3 — what changed (migrations 124–130; read this first: the tables below describe 0.4.2-2 where they differ)
+
+**One bill model for split bills and events (split phase A, migrations 127–130; plan `now/briefs/split-transactions-plan.md`).** `project_transactions` holds BILLS only. The people of a bill are rows of the new table `split_transaction_people`. A split bill is no longer an event: the hidden `projects.kind = 'split'` projects are gone (`projects_kind_event` CHECK: every project is an event).
+
+| Gone (migration 129 / 130) | Replaced by |
+| --- | --- |
+| child rows of a bill (`parent_project_transaction_id` rows) | one `split_transaction_people` row per person (`share`) |
+| `project_transaction_payers` | `split_transaction_people.paid`; the main payer is the row with `sort = 0` |
+| `shared_bill_opt_outs` | `split_transaction_people.disconnected_at` |
+| `project_transactions.marks` (UUID[]) | `split_transaction_people.marked_at` |
+| view `project_bill_pairs` | view `bill_pairs` (read from the people table) |
+| hidden split events (`projects.kind = 'split'`) | the bill is its own scope, `project_id IS NULL` |
+
+#### `split_transaction_people` (migration 127)
+| Column | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| `id` | `UUID` | PK | |
+| `split_transaction_id` | `UUID` | FK → `project_transactions.id`, NOT NULL, ON DELETE CASCADE | The bill (renamed in phase B) |
+| `user_id` | `UUID` | FK → `users.id`, NULLABLE, ON DELETE SET NULL | A connected user (gets a copy); NULL = a name only |
+| `event_member_id` | `UUID` | FK → `project_members.id`, NULLABLE, ON DELETE SET NULL | The event member this person is; also the person's key for bookings, paybacks and lump lines. A plain split bill's people are `project_members` rows scoped to the bill (see below) |
+| `name` | `VARCHAR(100)` | NOT NULL | |
+| `share` | `NUMERIC(15,2)` | NOT NULL, DEFAULT 0, CHECK ≥ 0 | What this person owes of the bill |
+| `paid` | `NUMERIC(15,2)` | NOT NULL, DEFAULT 0, CHECK ≥ 0 | What this person paid; Σ paid = the bill amount |
+| `paid_back` | `BOOLEAN` | NOT NULL, DEFAULT FALSE | The "คืนแล้ว" tick on this person's part |
+| `marked_at` | `TIMESTAMPTZ` | NULLABLE | "เคลียร์แล้ว" on the event board |
+| `disconnected_at` | `TIMESTAMPTZ` | NULLABLE | This person disconnected their copy |
+| `sort` | `INT` | NOT NULL, DEFAULT 0 | Order on the bill; 0 = the main payer |
+| `created_at` / `updated_at` | `TIMESTAMPTZ` | NOT NULL | `updated_at` trigger-updated |
+
+Unique `(split_transaction_id, user_id)` and `(split_transaction_id, event_member_id)` (partial, NOT NULL). Trigger `split_people_locked` (migration 129): a change of `share` / `paid` / `marked_at` / `event_member_id` on a bill of a completed event raises `EVENT_COMPLETED`. Single writer in the BE: `putBillPeopleTx` (`projects/people_write.go`).
+
+#### Links from the books (migration 127)
+`transactions.split_transaction_id`, `split_person_id`, `unlinked_split_transaction_id` and `personal_debts.split_transaction_id`, `unlinked_split_transaction_id` and `personal_debt_bills.split_transaction_id`, `split_person_id` point at the bill and the person (the old `project_transactions` pointers were moved to them in 129). `project_transactions.project_id` and `transaction_member_id` are NULLABLE (a bill may have no event and no single main payer).
+
+#### A split bill is its own scope (migration 130)
+- `project_members.project_id` is NULLABLE; new `split_transaction_id` (FK → `project_transactions.id`, ON DELETE CASCADE); CHECK `project_members_one_scope` = exactly one of the two. The members of a split bill (its people) are rows with `split_transaction_id = bill`, `project_id NULL`; unique `(split_transaction_id, user_id)`.
+- Generated columns `project_members.scope_id = COALESCE(project_id, split_transaction_id)` and `project_transactions.scope_id = COALESCE(project_id, paid_back_for_id, id)`; readers use `scope_id`, writers of an FK that must point at an event use `event_or_null(scope)` (returns the id only when it is a real `projects` row).
+- View `scopes` = `projects` (events) UNION each split bill as `kind = 'split'` (name = the bill description, owner = who recorded it). `bill_pairs.project_id` is the scope id.
+- API shape unchanged: a split bill's "event id" in the API is the bill id, so no app change and no forced update. Phase B (renames: `project_transactions` → `split_transactions`, `event_member_id` pointers) is NOT in 0.4.2-3.
+
+#### `bill_pairs` (view, migrations 128 / 130)
+`bill_pairs(pt_id, project_id, type, debtor, creditor, debtor_person, creditor_person, amount)`: on a bill, a person who paid owes nothing; every other person owes each payer `share × paid / amount` (2 dp); income is flipped; a payback (from → to) makes the receiver owe the giver.
+
+#### `idempotency_keys` (migration 124)
+| Column | Type | Description |
+| --- | --- | --- |
+| `user_id` | `UUID` | PK part, FK → `users.id`, ON DELETE CASCADE |
+| `key` | `VARCHAR(200)` | PK part, the client's `Idempotency-Key` |
+| `request_hash` | `BYTEA` | sha256(method + URI + body); the same key for another request is refused |
+| `status_code` / `content_type` / `response_body` | | The stored first answer; NULL until the first request finished |
+| `created_at` | `TIMESTAMPTZ` | Rows older than 24 h are deleted by the middleware |
+
+#### `user_notification_settings` (migration 125) — three columns
+`auto_accept_event_invites`, `auto_accept_contact_links`, `auto_accept_wallet_invites` (BOOLEAN NOT NULL DEFAULT FALSE): each request type accepts at once. `project_members.invited_user_id` (UUID NULLABLE, FK → `users.id`, ON DELETE SET NULL, index `(project_id, invited_user_id)`): who was invited into this member's spot, so the same person is never invited twice (also after a reject).
+
+#### `project_member_contacts` (migration 126)
+Which of MY contacts an event member is, per viewer: PK `(project_member_id, user_id)`, `contact_id` FK → `contacts.id` ON DELETE CASCADE (deleting the contact makes the member a plain name again for that viewer), `created_at`. A member is never matched to a contact by name any more; `project_members.name_match` (TRUE on every member that existed before 126, FALSE for new ones) keeps old events reading as before.
+
 ### `projects`
 
 Thin container for a project.
