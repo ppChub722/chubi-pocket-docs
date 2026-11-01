@@ -5,7 +5,7 @@ _Last updated: 2026-11-02. Prod = 0.4.2-3 (build 220, migration 130). 0.4.2-4 in
 ## Now: 0.4.2-4 — in progress (chatbot + Telegram OIDC login)
 Briefs: `now/briefs/0.4.2-chatbot.md`, `now/briefs/telegram-oidc-login.md`.
 - **Done, on `main` (pushed):** BE `b969fae` = LLM slot (Router, `LLM_PROVIDER`) + keyword fake + chatbot cards in memory (✓ / ✗ / Reply edit, `all`, per-minute cap), fake allowed on the test server; BE `68d4d93` + app `b3d288f` = Telegram OIDC login / sign-up / link, welcome DM, "เปิดแชทบอท" row. Owner tested OIDC on the phone OK (2026-11-02).
-- **App, 2026-11-02 (uncommitted):** pending `source = telegram` (label "Telegram", acts like `manual`); hub `telegram-legacy` flow removed (4 endpoints → `api_unused_baseline.txt` until the BE drops them). Tests: auth / connections / pending / hub pass, except `page_flows_test` ratchet (fails since `b3d288f`: the OIDC calls to `oauth.telegram.org` look like our API).
+- **App `86d5149` (2026-11-02, not pushed):** pending `source = telegram` (label "Telegram", acts like `manual`); hub `telegram-legacy` flow removed (4 endpoints → `api_unused_baseline.txt` until the BE drops them); the OIDC client field renamed so the page-flows ratchet no longer reads the `oauth.telegram.org` calls as ours. Tests: auth / connections / pending / hub all pass.
 - **Left — BE:** user tier, K4 pending (`source = telegram`) + K3 + K2 (migration 131 `llm_calls`), Anthropic adapter + K6 eval; after the gate: remove the `/start` code endpoints.
 - **Left — release:** version 0.4.2-4+221, APK, gate MIN = LATEST = 221 (the app changed, so not BE-only). Owner: Anthropic key + spend cap, BotFather app name / logo, confirm the new bot texts. Telegram login is bound to this PC's debug keystore SHA-256.
 
