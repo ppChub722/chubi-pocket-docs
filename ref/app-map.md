@@ -22,7 +22,7 @@ Owner = the session working on that screen this round (STATUS → Team). — = n
 | Route | Page (file under `lib/features/`) | Modes | Owner |
 |---|---|---|---|
 | `/auth/login`, `/auth/register` | `auth/.../login_page.dart`, `register_page.dart` | — | — |
-| `/auth/telegram`, `/auth/telegram/signup` | `auth/.../telegram_waiting_page.dart`, `telegram_signup_page.dart` (state: `TelegramLoginCubit`, app-wide) | — | — |
+| (no route) Telegram login / sign-up | Button "Telegram" on the login page → Telegram's consent sheet → `TelegramLoginActivity` (Android) → `auth/data/telegram_oidc.dart` (state: `TelegramLoginCubit`, app-wide). OIDC since 0.4.2-4; no waiting / sign-up page | — | Lead |
 | `/` | `home/.../home_page.dart` (dashboard) | view | — |
 | `/browse?…` (child of `/`) | dashboard browse → `TransactionsListPage` filtered | view | — |
 | `/transactions` | `transactions/.../transactions_list_page.dart` | list + filters (side sheet) | 7d (rows) |
@@ -41,6 +41,7 @@ Owner = the session working on that screen this round (STATUS → Team). — = n
 | `/settings/sync` | `settings/.../settings_sync_page.dart` | the two auto-sync switches (`AutoSyncSetting`, also on the event + person pages) | App-3 |
 | `/settings/page-prefs`, `/settings/page-prefs/:page` | `settings/.../settings_page_prefs_page.dart` | remembered sort / filter per list page (spec: `preferences/page_prefs.dart`) | App-3 |
 | `/settings/profile` | `settings/.../edit_profile_page.dart` | view / edit | Lead |
+| `/settings/profile/connections/:provider` | `connections/.../connection_page.dart` | not linked: big link button (Telegram = the OIDC flow) · linked: account, avatar, permissions, row "เปิดแชทบอท" (`bot_url`) | Lead |
 | `/settings/password` | `settings/.../change_password_page.dart` | form | — |
 | `/archived` | `archived/presentation/archived_page.dart` (all archived items) | list | — |
 | `/projects` | `projects/.../projects_page.dart` (events list) | list | event (ad) |

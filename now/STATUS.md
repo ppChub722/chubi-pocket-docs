@@ -1,8 +1,15 @@
 # STATUS — read this first (rewritten, not appended)
 
-_Last updated: 2026-10-31. 0.4.2-3 RELEASED (tag v0.4.2-3, build 220, migration 130, MIN = LATEST = 220); see the first section._
+_Last updated: 2026-11-02. Prod = 0.4.2-3 (build 220, migration 130). 0.4.2-4 in progress; see the first section._
 
-## Now: 0.4.2-3 — RELEASED 2026-10-31 (tag v0.4.2-3: be 9f8f3ee · app f58f669 · docs b48c939; release note team/releases/0.4.2-3.md). Owner tests it on build 220 and reviews the hub (A0 + the Thai error texts)
+## Now: 0.4.2-4 — in progress (chatbot + Telegram OIDC login)
+Briefs: `now/briefs/0.4.2-chatbot.md`, `now/briefs/telegram-oidc-login.md`.
+- **Done, on `main` (pushed):** BE `b969fae` = LLM slot (Router, `LLM_PROVIDER`) + keyword fake + chatbot cards in memory (✓ / ✗ / Reply edit, `all`, per-minute cap), fake allowed on the test server; BE `68d4d93` + app `b3d288f` = Telegram OIDC login / sign-up / link, welcome DM, "เปิดแชทบอท" row. Owner tested OIDC on the phone OK (2026-11-02).
+- **App, 2026-11-02 (uncommitted):** pending `source = telegram` (label "Telegram", acts like `manual`); hub `telegram-legacy` flow removed (4 endpoints → `api_unused_baseline.txt` until the BE drops them). Tests: auth / connections / pending / hub pass, except `page_flows_test` ratchet (fails since `b3d288f`: the OIDC calls to `oauth.telegram.org` look like our API).
+- **Left — BE:** user tier, K4 pending (`source = telegram`) + K3 + K2 (migration 131 `llm_calls`), Anthropic adapter + K6 eval; after the gate: remove the `/start` code endpoints.
+- **Left — release:** version 0.4.2-4+221, APK, gate MIN = LATEST = 221 (the app changed, so not BE-only). Owner: Anthropic key + spend cap, BotFather app name / logo, confirm the new bot texts. Telegram login is bound to this PC's debug keystore SHA-256.
+
+## Before: 0.4.2-3 — RELEASED 2026-10-31 (tag v0.4.2-3: be 9f8f3ee · app f58f669 · docs b48c939; release note team/releases/0.4.2-3.md). Owner tests it on build 220 and reviews the hub (A0 + the Thai error texts)
 Plan + progress table: `now/briefs/0.4.2-3-plan.md`. Split design: `now/briefs/split-transactions-plan.md`.
 - **Live in prod:** BE `9f8f3ee` (migrations 124–130, backup `chubi_pocket-20261031-1517.dump.gz`; 129 and 130 are irreversible, restore from that dump if ever needed) and APK 220 (Firebase 2220). Gate MIN = LATEST = 220 (`.env.bak-0.4.2-3`). Prod rehearsal on the 2026-10-31 snapshot (123 → 130): bill pairs, transactions, debts and lump lines identical before and after.
 - **What shipped:** split bills are no longer hidden events (one bill model: `split_transaction_people`, bill scope = `scope_id`; API shape unchanged); notification model F1–F3 (แจ้ง and อัตโนมัติ independent, three request rows with auto-accept, event invites as plain members, member ↔ contact per viewer); safe saves (Idempotency-Key on every edit page + quick create + event bill sheet); errors (one Thai text per API code, offline / slow / server-down told apart, field errors under the field); loading (kit pieces with their own tap fade and lock while a save runs); B 30–33; currency locked; tab-reset + page-prefs merged. Docs: `ref/schema.md`, `ref/api-document.md`, `rules/decisions.md` have a "0.4.2-3" block.

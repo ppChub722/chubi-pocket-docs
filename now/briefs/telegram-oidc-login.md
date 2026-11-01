@@ -1,6 +1,6 @@
 # Telegram login + linking → OpenID Connect (release 0.4.2-4, owner 2026-10-31)
 
-_Lead, 2026-10-31 / 11-01. Replaces the 0.4.2-2 code flows (`/start login_<code>`, `/start link_<code>`, polling `/auth/telegram/exchange`). Sources: https://core.telegram.org/bots/telegram-login, https://github.com/TelegramMessenger/telegram-login-android. Lead builds it (owner: "คุณนั้นแหละทำ"). Step 0 (spike) DONE 2026-11-01; step 1 (BE) and step 2 (app) coded 2026-11-01, uncommitted, tests not run, BE not deployed._
+_Lead, 2026-10-31 / 11-01. Replaces the 0.4.2-2 code flows (`/start login_<code>`, `/start link_<code>`, polling `/auth/telegram/exchange`). Sources: https://core.telegram.org/bots/telegram-login, https://github.com/TelegramMessenger/telegram-login-android. Lead builds it (owner: "คุณนั้นแหละทำ"). Step 0 (spike) DONE 2026-11-01; step 1 (BE `68d4d93`) and step 2 (app `b3d288f`) committed + pushed 2026-11-01; owner tested on the phone OK (2026-11-02); app tests run 2026-11-02 (auth / connections / pending / hub: all pass except the page-flows ratchet, see Open). Not released: needs the 0.4.2-4 APK + gate._
 
 ## Owner decisions (2026-10-31)
 - **No `/start` codes any more.** The user never has to find the bot to log in or link. Login, sign-up and linking all go through Telegram OIDC: one "allow" in Telegram, back into the app.
@@ -67,9 +67,11 @@ B) link (signed in) — POST /connections/telegram {id_token}
 - Old APKs (≤ 220) still call these: keep them until the force-update gate passes the new build, then remove.
 - `connection_link_button.dart` keeps its job (the big `เชื่อม Telegram` button). The "open the bot" row is a plain `AppDetailRow` (เปิดแชทบอท, `Connection.bot_url`) in the linked page's account section.
 - `connection_link_codes` stops being used. Keep the table (prod is additive only); drop later on its own.
-- The spike debug page + the `chubipocket://` redirect, once the real flow is in.
+- The spike debug page + the `chubipocket://` redirect, once the real flow is in. **Done in `b3d288f`.**
+- App done early (2026-11-02, owner): the hub `telegram-legacy` flow is gone; its 4 endpoints sit in `test/hub/api_unused_baseline.txt` until the BE removes them after the gate.
 
 ## Open
 - Later: a landing page for new members (owner 2026-11-01), fed by status `signup`.
 - Set the app name / logo in BotFather so the consent sheet stops saying "Unverified App" (owner, BotFather).
-- Ships with the chatbot in 0.4.2-4 (owner: "ลง 0.4.2-4").
+- Ships with the chatbot in 0.4.2-4 (owner: "ลง 0.4.2-4"). The app changed, so 0.4.2-4 is NOT BE-only: APK 221 + gate MIN = LATEST = 221.
+- `test/hub/page_flows_test.dart` ratchet fails since `b3d288f`: it scans every `dio.get/post` in `lib/` and takes `telegram_oidc.dart`'s calls to `oauth.telegram.org` (`GET /crossapp`, `POST /token`) for our own API.
