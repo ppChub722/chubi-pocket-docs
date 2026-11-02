@@ -62,7 +62,7 @@ B) link (signed in) — POST /connections/telegram {id_token}
 - Refused users reach the bot through the "open the bot" row; Telegram's START sends a plain `/start` → the bot answers a plain `/start` from a linked chat with the welcome text.
 - Not on a plain login. Content: hello + what the bot does + 2–3 example messages (chatbot style "ข้าว 60"); written with the chatbot texts.
 
-## Remove after it ships
+## Remove after it ships — DONE 2026-11-02 (be `8134681`, app `d1dcad9`; gate 223)
 - The bot `/start login_` and `/start link_` handlers and confirm buttons; `/auth/telegram/start`; `/auth/telegram/exchange` polling; the link-code endpoint; polling in `TelegramLoginCubit`; `telegram_waiting_page.dart`; `telegram_signup_page.dart` + `/auth/telegram/signup` (no form any more).
 - Old APKs (≤ 220) still call these: keep them until the force-update gate passes the new build, then remove.
 - `connection_link_button.dart` keeps its job (the big `เชื่อม Telegram` button). The "open the bot" row is a plain `AppDetailRow` (เปิดแชทบอท, `Connection.bot_url`) in the linked page's account section.

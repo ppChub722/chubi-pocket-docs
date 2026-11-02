@@ -16,8 +16,7 @@ Status: **1a "hello" live (v0.4.2-0). 1b linking + avatars and 1b-2 sign up / lo
 
 ## 2. Linking (1b)
 - **Linked = allowed.** `TELEGRAM_ALLOWED_CHAT_IDS` is retired; a chat is answered only when it is linked to a user (`user_connections`, provider telegram, `external_id` = the chat id).
-- The app (profile → การเชื่อมต่อ → Telegram) calls `POST /connections/telegram/link` → `https://t.me/<bot>?start=<code>`. The code is 128-bit random (base64url, 22 chars), single use, 10 minutes; only its SHA-256 is stored; a newer link call cancels older unused codes. The user types nothing.
-- The bot's `/start <code>` binds: the chat leaves any other user it was linked to, and the user's old Telegram is replaced (that is also "เปลี่ยนบัญชี"). The account shows as "@username", else the first name. Permissions start as `{chat: true}`.
+- **Since 0.4.2-4 linking is Telegram OIDC** (the `/start <code>` links were removed 2026-11-02): the app runs Log In With Telegram and sends the `id_token` to `POST /connections/telegram`. The chat leaves any other user it was linked to, and the user's old Telegram is replaced (that is also "เปลี่ยนบัญชี"). The account shows as "@username", else the name. Permissions start as `{chat: true}`; the bot sends the welcome.
 - Unlink: `DELETE /connections/telegram` from the app, or `/unlink` in the chat. The imported picture is kept.
 - Permissions (`PATCH /connections/{provider}/permissions`): Telegram `chat` is live; `ask`, `slip`, `notify` are "เร็วๆ นี้" (`available: false`, 409 `PERMISSION_UNAVAILABLE`). LINE and Google rows exist but are `available: false`.
 
@@ -26,17 +25,15 @@ Only private chats; each reply is a Telegram reply to the user's message.
 
 | Incoming | Reply | Kept in `telegram_messages` |
 |---|---|---|
-| `/start <code>`, code good | "เชื่อมกับบัญชี <ชื่อที่แสดง> แล้ว ✓" | no |
-| `/start <code>`, code bad / used / expired | "ลิงก์หมดอายุ กดเชื่อมใหม่จากแอป" | no |
 | unlinked chat (anything else, `/start` and `/unlink` too) | "เชื่อมบัญชีก่อนนะครับ: แอป → โปรไฟล์ → Telegram" | no |
 | linked, `/unlink` | "ยกเลิกการเชื่อมแล้ว" (BE wording, not in the plan) | no |
-| linked, `/start` (no code) | "สวัสดีครับ ส่งข้อความมาได้เลย" | no |
+| linked, `/start` (anything after it is ignored) | the welcome text (`TextWelcome`) | no |
 | linked, `chat` permission off | "ปิดการจดรายการไว้ เปิดได้ในแอป" | no |
 | linked, not text (photo, voice, sticker, document …) | "ตอนนี้รับแค่ข้อความตัวอักษรนะครับ" | no |
 | linked, text | "ได้รับข้อความแล้ว ✓" | yes, with `user_id` |
 | group / supergroup / channel / edited message / other update types | none | no |
 
-- `/start@bot <code>` and `/unlink@bot` work the same.
+- `/start@bot` and `/unlink@bot` work the same. A tap on an old login button (sent before 0.4.2-4) is answered silently, nothing else.
 - **Dedupe** by `update_id`: the last 1000 ids in memory, plus the table's unique key for kept texts (a resend after a restart gets no second reply).
 - A failed save still replies (the eval set misses one line, the error is logged). A failed reply is logged. A failed DB lookup sends no reply (outcome `error`).
 
@@ -52,21 +49,13 @@ Only private chats; each reply is a Telegram reply to the user's message.
 ## 5. Sign up / log in with Telegram (1b-2)
 - **Passwordless accounts:** only an account created through an outside app (`users.created_via` telegram) may have no password (DB check). Password login refuses it with the same `401 INVALID_CREDENTIALS` as a wrong password. `Profile.has_password` false → the app shows "ตั้งรหัสผ่าน": `PUT /auth/password` with `new_password` only. Once a password exists the current one is required again.
 - **Login is one answer:** `POST /auth/login` answers every failure (unknown user, wrong password, no password, a bad / empty body) with `401 INVALID_CREDENTIALS` (owner 2026-10-28; app text "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง").
-- **Guard:** an account with no password can't lose its last linked app: `DELETE /connections/{provider}` → 409 `LAST_LOGIN_METHOD`; `/unlink` in the chat and a link code that would move the chat to another account answer "ตั้งรหัสผ่านในแอปก่อน ไม่งั้นจะเข้าบัญชีไม่ได้". Changing the account's own Telegram (a new link) is allowed.
-- **Flow (PKCE S256):**
-  1. The app keeps a random `code_verifier` and calls `POST /auth/telegram/start {code_challenge}` → `{code, url: t.me/<bot>?start=login_<code>, expires_at}` (5 min, single use; only the code's SHA-256 is stored, purpose `login`).
-  2. In the chat, `/start login_<code>` binds the code to that chat (another chat can't take it) and answers with one inline button:
-     - chat linked to an account → "เข้าสู่ระบบ chubi-pocket เป็น <ชื่อที่แสดง> ไหมครับ?" [✓ ยืนยัน];
-     - unlinked chat → "Telegram นี้ยังไม่มีบัญชี chubi-pocket" [สร้างบัญชีใหม่];
-     - bad / used / expired code → "ลิงก์หมดอายุ ลองใหม่จากแอป" (BE wording).
-  3. The tap (`callback_query`; `allowed_updates` now message + callback_query) confirms the code; only the chat that opened it can. The message is edited to "ยืนยันแล้ว ✓ กลับไปที่แอปได้เลย" / "กลับไปที่แอปเพื่อสร้างบัญชีต่อได้เลย" (BE wording); a stale tap shows "ลิงก์หมดอายุ ลองใหม่จากแอป".
-  4. The app calls `POST /auth/telegram/exchange {code, code_verifier}`: 202 pending (not confirmed yet) · 200 `login` (the chat is linked now: tokens; the code is used up) · 200 `signup` (`{display_name, username_suggestion, has_photo}`; the code stays valid). Unknown / used / expired code or a wrong verifier: one `401 LOGIN_CODE_INVALID`.
-  5. `POST /auth/telegram/signup {code, code_verifier, display_name, username, currency?}` creates the passwordless account (same preferences / registration hooks as register), links the chat (`{chat: true}`), uses the code, then imports the Telegram photo and picks it (best effort). 409 `USERNAME_EXISTS` carries `details.username_suggestion`; 409 `TELEGRAM_ALREADY_LINKED` when the chat got an account meanwhile; 403 `REGISTRATION_CLOSED` when `REGISTRATION_OPEN=false` (no decoy here).
-- **Username suggestion:** the Telegram @username (lower case, a-z 0-9 _), else the name in those characters, else "user"; taken → the same + 2–5 random digits.
-- **Limits:** per IP, in memory: start and signup 10, exchange 120 (the app polls) per 10 minutes → 429 `RATE_LIMITED`.
-- The request log never holds the bodies of the link / login routes (codes, verifiers).
+- **Guard:** an account with no password can't lose its last linked app: `DELETE /connections/{provider}` → 409 `LAST_LOGIN_METHOD`; `/unlink` in the chat answers "ตั้งรหัสผ่านในแอปก่อน ไม่งั้นจะเข้าบัญชีไม่ได้"; an OIDC link that would move the chat to another account → 409 `LAST_LOGIN_METHOD`. Changing the account's own Telegram (a new link) is allowed.
+- **Flow (0.4.2-4, OIDC):** the app gets an `id_token` from Telegram and calls `POST /auth/telegram/token {id_token}`: a linked Telegram → 200 `login`; an unknown one → the account is made at once (no form) → 201 `signup`. Details: `now/briefs/telegram-oidc-login.md`, the API spec. The 1b-2 `/start login_<code>` flow (`/auth/telegram/start`, `/exchange`, `/signup`) was removed on 2026-11-02 once the gate passed build 223.
+- **Username:** the Telegram @username (lower case, a-z 0-9 _), else the name in those characters, else "user"; taken → the same + 2–5 random digits.
+- **Limit:** `/auth/telegram/token`, per IP in memory: 20 per 10 minutes → 429 `RATE_LIMITED`.
+- The request log never holds the bodies of `/auth/telegram/token` and `POST /connections/telegram` (id_tokens).
 
 ## 6. Privacy
 - The token is never logged and never in an error: Bot API errors drop the request URL (it holds the token) and mask the token.
-- One log line per update: `update_id`, `chat_id`, `chat_type`, `linked`, `kind`, `text_len`, `outcome`. Never the text or a link code. The HTTP request log skips the webhook's body even with `LOG_BODIES=true`.
+- One log line per update: `update_id`, `chat_id`, `chat_type`, `linked`, `kind`, `text_len`, `outcome`. Never the text or a token. The HTTP request log skips the webhook's body even with `LOG_BODIES=true`.
 - Kept texts are the real sentences for the LLM eval set (owner OK 2026-10-28), now with the linked `user_id`.
