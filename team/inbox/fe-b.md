@@ -888,3 +888,7 @@ The payer chip reads "รับ" on income (`BillPeopleCard.payLabel`; a row wit
 - F1 decision (goals page owner): **no month stepper**. The 2026-10-21 owner call stands (current month only; past months would be recomputed from today's rules). Owner, say so if you want it anyway.
 
 **Shared files touched:** app_th.arb / app_en.arb (keys appended, gen-l10n run), ui/domain/transactions/bill_people_card.dart, ui/molecules/amount_input.dart (AI-2's E1 ± button lives there too).
+
+## 2026-11-02 23:30 — paper model, round 1 (BE + DB)
+DONE · files: be `feat/paper` (migrations/000001_baseline, internal/shared/paper.go, modules/projects/paper*.go + lump.go, personal_debts/paper_debts.go, notifications/paper.go, apidoc/openapi.yaml); docs now/briefs/paper-plan.md §8, ref/schema.md §10, ref/api-document.md §10, rules/decisions.md · analyze/test: go vet clean; go test ./... on fresh baseline DB chubi_paper_test 31 ok, 0 fail, 0 skip
+deviations/notes: listed in paper-plan.md §8 (json key split_transaction_id, nullable part person, wallet claim → debt_repaid, auto-accepted repayment into the main wallet, 40 unused error codes removed). Not pushed / deployed; the local BE not restarted. App round waits for the owner review.

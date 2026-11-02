@@ -180,6 +180,14 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - **Errors:** one place turns an API error into words (`errorText`); offline / slow / server-down / other throws are classified in one place (`ApiException`); offline shows only the connection snack; a field error shows under its field where the form has one, otherwise the snack names the first field's problem.
 - **Safe saves:** every save carries an `Idempotency-Key` that stays the same until it saves or is cancelled (Retry never writes twice). While a save runs, every kit piece with its own tap fades and locks (`BusyLock`).
 
+
+### Papers: split bills + event bills (owner 2026-11-02; details `now/briefs/paper-plan.md`; replaces the two blocks above where they differ)
+- **One paper, everyone's own books.** A split bill or an event bill is ONE shared record (the paper) that everyone on it sees the same; it holds only amount, date, description, shared note, who paid and who owes. Nobody's book is written by the paper: each user **claims** it (a transaction; on a split bill also the debts of their pairs) and follows it **one way** (paper → books) by "อัปเดต" or their auto-sync switch. Editing my books never touches the paper; category, wallet, tags and private note are mine. Unlink a tx or a debt on its own.
+- **Split bills:** linked contacts are invited and must join before they see it (declined / left = a name). Anyone joined edits it (version check); only the owner removes people; the owner leaving passes ownership on; the last user leaving deletes it. Claim = debt branch by default, or "จ่ายแล้ว" from my wallet (the payers who hold my debt get `debt_repaid`). "คืนแล้ว" is a mark only.
+- **Event bills:** the same paper with event members; no debts per bill — the event settles as lumps from the settle page (one debt per person and direction, any time) or the fewest transfers once after completion. Adding a person / moving a paper in matches members (same user, bound contact, exact same name; case-sensitive), else a new member; merging members adds shares (equal bills re-split); two users never merge. Moving papers between split ↔ event ↔ event = paper owner, never for a completed event.
+- **Debt partners:** the two debts of one pair from one paper are partners; a repayment saved with "แจ้ง" tells the other user (`debt_repaid`; their auto-accept writes it into their main wallet).
+- **One migration baseline:** the DB starts from `000001_baseline`; the test server is wiped and starts from it.
+
 ## UI
 - **0.4.0-2 polish rules (owner 2026-10-19/20):**
   - **Separator:** the text separator is " | ", never " · ", everywhere. Gaps inside and between cards are all equal (12).

@@ -756,63 +756,71 @@ Migration 060. One row moves an amount of ONE wallet between buckets: the wallet
 
 Owned by [`../spec/10-projects.md`](../modules/10-projects.md).
 
-### 0.4.2-3 — what changed (migrations 124–130; read this first: the tables below describe 0.4.2-2 where they differ)
+### Paper baseline (feat/paper, 2026-11-02) — read this first
 
-**One bill model for split bills and events (split phase A, migrations 127–130; plan `now/briefs/split-transactions-plan.md`).** `project_transactions` holds BILLS only. The people of a bill are rows of the new table `split_transaction_people`. A split bill is no longer an event: the hidden `projects.kind = 'split'` projects are gone (`projects_kind_event` CHECK: every project is an event).
+Every migration up to 130 is squashed into **one baseline, `migrations/000001_baseline.up.sql`** (down = drop schema public). Plan: [`../now/briefs/paper-plan.md`](../now/briefs/paper-plan.md). Where the table sections below differ, this block wins.
 
-| Gone (migration 129 / 130) | Replaced by |
-| --- | --- |
-| child rows of a bill (`parent_project_transaction_id` rows) | one `split_transaction_people` row per person (`share`) |
-| `project_transaction_payers` | `split_transaction_people.paid`; the main payer is the row with `sort = 0` |
-| `shared_bill_opt_outs` | `split_transaction_people.disconnected_at` |
-| `project_transactions.marks` (UUID[]) | `split_transaction_people.marked_at` |
-| view `project_bill_pairs` | view `bill_pairs` (read from the people table) |
-| hidden split events (`projects.kind = 'split'`) | the bill is its own scope, `project_id IS NULL` |
+**The model.** A split bill and an event bill are the same thing: a **paper** = one row of `project_transactions` (`project_id` NULL = a split bill, set = a bill of that event), the same for everyone on it. Its people are rows of `split_transaction_people`. Nobody's book is written by the paper itself: each user **claims** it into their own book (a transaction, plus debts on a split bill) and follows it one way (paper → books, "อัปเดต" or their auto-sync switch). Unlinking a transaction or a debt is per record.
 
-#### `split_transaction_people` (migration 127)
-| Column | Type | Constraints | Description |
-| --- | --- | --- | --- |
-| `id` | `UUID` | PK | |
-| `split_transaction_id` | `UUID` | FK → `project_transactions.id`, NOT NULL, ON DELETE CASCADE | The bill (renamed in phase B) |
-| `user_id` | `UUID` | FK → `users.id`, NULLABLE, ON DELETE SET NULL | A connected user (gets a copy); NULL = a name only |
-| `event_member_id` | `UUID` | FK → `project_members.id`, NULLABLE, ON DELETE SET NULL | The event member this person is; also the person's key for bookings, paybacks and lump lines. A plain split bill's people are `project_members` rows scoped to the bill (see below) |
-| `name` | `VARCHAR(100)` | NOT NULL | |
-| `share` | `NUMERIC(15,2)` | NOT NULL, DEFAULT 0, CHECK ≥ 0 | What this person owes of the bill |
-| `paid` | `NUMERIC(15,2)` | NOT NULL, DEFAULT 0, CHECK ≥ 0 | What this person paid; Σ paid = the bill amount |
-| `paid_back` | `BOOLEAN` | NOT NULL, DEFAULT FALSE | The "คืนแล้ว" tick on this person's part |
-| `marked_at` | `TIMESTAMPTZ` | NULLABLE | "เคลียร์แล้ว" on the event board |
-| `disconnected_at` | `TIMESTAMPTZ` | NULLABLE | This person disconnected their copy |
-| `sort` | `INT` | NOT NULL, DEFAULT 0 | Order on the bill; 0 = the main payer |
-| `created_at` / `updated_at` | `TIMESTAMPTZ` | NOT NULL | `updated_at` trigger-updated |
-
-Unique `(split_transaction_id, user_id)` and `(split_transaction_id, event_member_id)` (partial, NOT NULL). Trigger `split_people_locked` (migration 129): a change of `share` / `paid` / `marked_at` / `event_member_id` on a bill of a completed event raises `EVENT_COMPLETED`. Single writer in the BE: `putBillPeopleTx` (`projects/people_write.go`).
-
-#### Links from the books (migration 127)
-`transactions.split_transaction_id`, `split_person_id`, `unlinked_split_transaction_id` and `personal_debts.split_transaction_id`, `unlinked_split_transaction_id` and `personal_debt_bills.split_transaction_id`, `split_person_id` point at the bill and the person (the old `project_transactions` pointers were moved to them in 129). `project_transactions.project_id` and `transaction_member_id` are NULLABLE (a bill may have no event and no single main payer).
-
-#### A split bill is its own scope (migration 130)
-- `project_members.project_id` is NULLABLE; new `split_transaction_id` (FK → `project_transactions.id`, ON DELETE CASCADE); CHECK `project_members_one_scope` = exactly one of the two. The members of a split bill (its people) are rows with `split_transaction_id = bill`, `project_id NULL`; unique `(split_transaction_id, user_id)`.
-- Generated columns `project_members.scope_id = COALESCE(project_id, split_transaction_id)` and `project_transactions.scope_id = COALESCE(project_id, paid_back_for_id, id)`; readers use `scope_id`, writers of an FK that must point at an event use `event_or_null(scope)` (returns the id only when it is a real `projects` row).
-- View `scopes` = `projects` (events) UNION each split bill as `kind = 'split'` (name = the bill description, owner = who recorded it). `bill_pairs.project_id` is the scope id.
-- API shape unchanged: a split bill's "event id" in the API is the bill id, so no app change and no forced update. Phase B (renames: `project_transactions` → `split_transactions`, `event_member_id` pointers) is NOT in 0.4.2-3.
-
-#### `bill_pairs` (view, migrations 128 / 130)
-`bill_pairs(pt_id, project_id, type, debtor, creditor, debtor_person, creditor_person, amount)`: on a bill, a person who paid owes nothing; every other person owes each payer `share × paid / amount` (2 dp); income is flipped; a payback (from → to) makes the receiver owe the giver.
-
-#### `idempotency_keys` (migration 124)
-| Column | Type | Description |
+#### `project_transactions` (papers)
+| Column | Type | Notes |
 | --- | --- | --- |
-| `user_id` | `UUID` | PK part, FK → `users.id`, ON DELETE CASCADE |
-| `key` | `VARCHAR(200)` | PK part, the client's `Idempotency-Key` |
-| `request_hash` | `BYTEA` | sha256(method + URI + body); the same key for another request is refused |
-| `status_code` / `content_type` / `response_body` | | The stored first answer; NULL until the first request finished |
-| `created_at` | `TIMESTAMPTZ` | Rows older than 24 h are deleted by the middleware |
+| `id` | `UUID` | PK |
+| `project_id` | `UUID` | NULL = split bill; FK → `projects.id` |
+| `owner_user_id` | `UUID` | NOT NULL; was `record_user_id`. Removes people, moves the paper; leaving passes it on |
+| `type` | `VARCHAR(20)` | `expense` \| `income` \| `payback` (payback: event bills only) |
+| `payback_kind` | `VARCHAR(10)` | `payback` \| `loan` \| NULL |
+| `amount` / `date` / `description` / `note` | | `note` is shared (everyone sees it) |
+| `version` | `INT` | NOT NULL DEFAULT 1; an edit sends the version it read (409 BILL_CHANGED) |
+| `split_mode` | `VARCHAR(10)` | `equal` \| `custom` (DEFAULT custom); equal re-splits on every change |
+| audit columns | | |
 
-#### `user_notification_settings` (migration 125) — three columns
-`auto_accept_event_invites`, `auto_accept_contact_links`, `auto_accept_wallet_invites` (BOOLEAN NOT NULL DEFAULT FALSE): each request type accepts at once. `project_members.invited_user_id` (UUID NULLABLE, FK → `users.id`, ON DELETE SET NULL, index `(project_id, invited_user_id)`): who was invited into this member's spot, so the same person is never invited twice (also after a reject).
+Gone: `scope_id`, `parent_project_transaction_id`, `transaction_member_id`, `linked_transaction_id`, `unlinked_transaction_id`, `paid_back_for_id`, `currency`, `marks`. Triggers lock the papers of a completed event (insert / update / delete / moving `project_id`).
 
-#### `project_member_contacts` (migration 126)
-Which of MY contacts an event member is, per viewer: PK `(project_member_id, user_id)`, `contact_id` FK → `contacts.id` ON DELETE CASCADE (deleting the contact makes the member a plain name again for that viewer), `created_at`. A member is never matched to a contact by name any more; `project_members.name_match` (TRUE on every member that existed before 126, FALSE for new ones) keeps old events reading as before.
+#### `split_transaction_people`
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | `UUID` | PK |
+| `split_transaction_id` | `UUID` | NOT NULL, FK → `project_transactions.id` ON DELETE CASCADE |
+| `user_id` | `UUID` | an app user; NULL = a name |
+| `project_member_id` | `UUID` | event bills: the member (was `event_member_id`) |
+| `name` | `VARCHAR(100)` | NOT NULL |
+| `share` / `paid` | `NUMERIC(15,2)` | Σ share = Σ paid = amount |
+| `status` | `VARCHAR(10)` | `invited` \| `joined` \| `declined` \| `left` (DEFAULT joined). A split bill invites linked users; declined / left = shown as a name |
+| `paid_back` / `paid_back_by_user_id` / `paid_back_at` | | "คืนแล้ว": a mark only, moves no money |
+| `sort` | `INT` | order |
+
+Gone: `marked_at`, `disconnected_at`. Trigger `split_people_locked` (completed event). Trigger `trg_sync_split_people_member` keeps `user_id` / `name` in step with the member.
+
+#### `split_person_contacts` (new)
+Which of MY contacts a paper person is, per viewer: PK `(split_person_id, user_id)`, `contact_id` FK → `contacts.id`. Event bills read `project_member_contacts` the same way.
+
+#### `project_my_defaults` (new)
+`(project_id, user_id)` PK, `category_id`, `account_id`: my category / wallet for claims of that event's bills (auto claim uses them).
+
+#### `projects` / `project_members`
+`projects.kind` is gone (no hidden split "events"). `project_members`: `project_id` NOT NULL again; `scope_id`, `split_transaction_id`, `name_match` gone.
+
+#### My books of a paper
+- `transactions`: `split_transaction_id` + `split_person_id` = the paper this row is my book of (unique per user and paper); `my_share` = my part when the row is the whole bill (I paid), else NULL (reports count `COALESCE(my_share, amount)`). Gone: `project_id`, `source_project_transaction_id`, `unlinked_project_transaction_id`, `unlinked_split_transaction_id`, `paid_by_amount`.
+- `personal_debts`: `source_kind` = `paper` \| NULL; `counterpart_debt_id` = the partner debt in the other user's book (same paper, same pair). Gone: `source_transaction_id`, `source_project_transaction_id`, `unlinked_*`, `split_transaction_id`, `paid_for_transaction_id`.
+- `personal_debt_bills` = the ONLY link from a debt to papers: one row per paper part (`split_transaction_id` NOT NULL, `split_person_id` = the other person of the pair, NULLABLE: a person taken off the paper leaves the part out of sync until "อัปเดต" drops it), `transaction_id` = my book of that paper, `amount`. Unique `(user_id, split_transaction_id, split_person_id)`. debt.amount = Σ parts. A split bill claim = a debt of one part; an event lump = one debt of many parts.
+- `event_settle_bookings`: I booked the simplified lines once.
+
+#### Views
+`bill_pairs(pt_id, project_id, type, debtor_person, creditor_person, debtor, creditor, amount)`: on a paper everyone with a share owes each payer `share × paid / amount` (income flipped); `debtor` / `creditor` = `project_member_id`.
+
+#### `user_notification_settings`
+New: `on_split_removed` (`ask` \| `keep` \| `delete`, DEFAULT ask), `auto_accept_repayments` (BOOLEAN DEFAULT FALSE). `auto_accept_debts` / `auto_sync_debts` now mean split bills (claim at once / follow at once), `auto_accept_events` / `auto_sync_events` event bills.
+
+#### `notifications.type`
+`contact_link_request`, `account_invite`, `project_invite`, `recurring_due`, `recurring_ending`, `recurring_auto_created`, `debt_disconnected`, `debt_repaid`, `event_completed`, `event_member_removed`, `event_deleted`, `bill_invite`, `bill_new`, `bill_changed`, `bill_removed`, `bill_owner_changed`, `bill_moved`.
+
+#### Gone
+Tables `project_transaction_payers`, `shared_bill_opt_outs`; views `scopes`, `event_or_null`, `split_bill_of`; the `links_*` triggers.
+
+#### `idempotency_keys`, `project_member_contacts`, the three request auto-accept switches
+Unchanged from 0.4.2-3 (migrations 124–126).
 
 ### `projects`
 
@@ -937,20 +945,6 @@ The canonical project ledger. Every transaction recorded in a project context go
 - `UNIQUE INDEX idx_project_transactions_linked_tx ON project_transactions(linked_transaction_id) WHERE linked_transaction_id IS NOT NULL` — one bill per personal transaction (migration 056)
 - `INDEX idx_project_transactions_project_updated ON project_transactions(project_id, updated_at)` — sync fingerprints (migration 066)
 
-### `project_transaction_payers`
-
-Migration 105 (0.4.1-2 multi-payer, owner 2026-10-28). A bill's payers ("คนจ่าย") with what each paid, ONLY when there are 2+; none = the bill's `transaction_member_id` paid it all. `transaction_member_id` is always the main (biggest) payer, so the shares stay "child rows + the main payer's rest". PK `(project_transaction_id, member_id)` (FK CASCADE both), `amount > 0`; Σ = the bill (API). Trigger `project_transaction_payers_locked` refuses changes on a completed event.
-
-| Column                   | Type            | Constraints                                                 | Description |
-| ------------------------ | --------------- | ----------------------------------------------------------- | ----------- |
-| `project_transaction_id` | `UUID`          | PK, FK → `project_transactions.id`, NOT NULL, ON DELETE CASCADE | The bill (parent row) |
-| `member_id`              | `UUID`          | PK, FK → `project_members.id`, NOT NULL, ON DELETE CASCADE  | One payer |
-| `amount`                 | `DECIMAL(15,2)` | NOT NULL, CHECK `> 0`                                       | What this payer paid |
-
-No audit columns. **Indexes:** `PRIMARY KEY (project_transaction_id, member_id)`, `INDEX idx_project_transaction_payers_member ON project_transaction_payers(member_id)`. **Trigger:** `project_transaction_payers_locked` (function `project_transaction_payers_locked_check`, BEFORE INSERT OR UPDATE) raises `EVENT_COMPLETED` (P0001) when the bill's event has `completed_at` set (locks the event row FOR SHARE). DELETE is not covered by the trigger (the API checks).
-
-**View `project_bill_pairs(pt_id, project_id, type, debtor, creditor, amount)`** — every bill's real pairs: each share is split over the payers by what they paid (member m owes payer p = share_m × paid_p / bill, 2 dp); income flipped (the one who received owes); a payback = the receiver owes the giver. Settle, claims, `Event.my_net` read it.
-
 ### `event_settle_bookings`
 
 Migration 103 (0.4.1-2 V12). One row per member who booked a completed event's fewest-transfers settle into their book ("ลงในสมุดฉัน", once). PK `(project_id, user_id)`, both FK CASCADE; `lines` JSONB `[{member_id, amount, pay, transaction_id}]`; `booked_at`. Once booked, that member's real pairs count as claimed.
@@ -963,18 +957,6 @@ Migration 103 (0.4.1-2 V12). One row per member who booked a completed event's f
 | `booked_at`  | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()`                       | |
 
 No audit columns, no extra index.
-
-### `shared_bill_opt_outs`
-
-Migration 093 (0.4.1-2 rule a / f). "I disconnected my copy of this bill" (tx-detail disconnect, `POST /event-bills/{pt_id}/disconnect`, or deleting my copy). The bill no longer reaches that user (no copy, no notices) until they connect again (row deleted).
-
-| Column                   | Type          | Constraints                                                     | Description |
-| ------------------------ | ------------- | --------------------------------------------------------------- | ----------- |
-| `project_transaction_id` | `UUID`        | PK, FK → `project_transactions.id`, NOT NULL, ON DELETE CASCADE | The bill |
-| `user_id`                | `UUID`        | PK, FK → `users.id`, NOT NULL, ON DELETE CASCADE                | The member who disconnected |
-| `created_at`             | `TIMESTAMPTZ` | NOT NULL, DEFAULT `NOW()`                                       | |
-
-No audit columns. **Indexes:** `PRIMARY KEY (project_transaction_id, user_id)`.
 
 ### `event_tags`
 

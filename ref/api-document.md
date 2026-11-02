@@ -27,7 +27,7 @@ This document is the **canonical API contract**. Postman / OpenAPI exports are d
 | [07 — Contacts](#07--contacts) | Contact book, invites, linking *(pending)* |
 | [08 — Budgets](#08--budgets) | Budget CRUD, overview *(pending)* |
 | [09 — Saving Goals](#09--saving-goals) | Goal CRUD, progress *(pending)* |
-| [10 — Projects](#10--projects) | Projects, members, invites, project transactions (with splits), per-row marks |
+| [10 — Projects](#10--projects) | Events, members, papers (split bills + event bills), claims, settle |
 | [11 — Recurring](#11--recurring-replaces-scheduled-transactions) | Recurring rules, computed occurrences, by-slot writes, auto-create, occurrence names, readers |
 | [12 — Personal Debts](#12--personal-debts) | Debts (ledger records) + repayments (transactions tied to the person) |
 | [13 — Notifications](#13--notifications) | Inbox, settings *(pending)* |
@@ -141,6 +141,8 @@ Every error response uses this shape:
 | `EMAIL_EXISTS` | 409 | envelope | The email is already registered to another account. |
 | `USERNAME_EXISTS` | 409 | envelope | The username is already registered. |
 | `ACCOUNT_INACTIVE` | 403 | envelope | The user deactivated their account; reactivate to continue. |
+| `AVATAR_SOURCE_UNAVAILABLE` | 409 | envelope | Profile: the picked avatar source has no picture (or the app is no longer linked). |
+| `CURRENCY_LOCKED` | 409 | envelope | Profile: the currency can't be changed after sign-up (sending the current one is a no-op). |
 | `ALREADY_ACTIVE` | 400 | envelope | Reactivate: the account is already active. |
 | `ACCOUNT_NOT_FOUND` | 404 / 400 | envelope, pending | The wallet does not exist or is not the caller's (400 when it is referenced in a body). |
 | `ACCOUNT_ARCHIVED` | 409 | envelope, pending | The wallet is archived; restore it first. |
@@ -172,29 +174,13 @@ Every error response uses this shape:
 | `TAG_EXISTS` | 409 | envelope | A tag with that name already exists (batch: details {op, index}). |
 | `TAG_NAME_TAKEN` | 409 | envelope | The event already has a tag with that name. |
 | `TRANSACTION_NOT_FOUND` | 404 | envelope, pending | The transaction does not exist or is not the caller's. |
-| `TX_NOT_FOUND` | 404 | envelope | Events quick-create: the transaction does not exist or is not the caller's. |
 | `TRANSFER_SAME_ACCOUNT` | 400 | envelope, pending | A transfer's source and destination wallets must differ. |
 | `TRANSFER_NEEDS_WALLETS` | — | pending | Pending: a transfer needs both wallets. |
 | `SYSTEM_TRANSACTION_IMMUTABLE` | 400 | envelope | A system transaction (opening balance, adjustment) can't be edited or deleted directly. |
-| `SPLITS_NOT_SUPPORTED_YET` | 400 | envelope | Splits are not supported on this operation. |
-| `SPLITS_ON_TRANSFER` | 400 | envelope, pending | A transfer can't have splits. |
-| `SPLITS_AUTHOR_ONLY` | 403 | envelope | Only the transaction's author can change its splits. |
-| `SPLITS_EXCEED_AMOUNT` | 400 | envelope, pending | The splits add up to more than the amount. |
-| `SPLITS_EXCEED_SHARE` | 400 | envelope | The splits add up to more than the caller's share of the event bill. |
 | `SPLIT_MISMATCH` | 400 | envelope | Savings: the wallet splits must add up to the amount. |
-| `INVALID_SPLIT` | — | pending | Pending: a split needs a person name and an amount above 0. |
-| `PAID_BY_EXPENSE_ONLY` | 400 | envelope, pending | paid_by is only for an expense or an income. |
-| `PAID_BY_EXCEEDS_AMOUNT` | 400 | envelope, pending | paid_by.amount is more than the bill. |
-| `INVALID_PAID_BY` | — | pending | Pending: paid_by needs a person and an amount above 0. |
-| `LINK_MODE_CONFLICT` | 400 | envelope, pending | A bill is shared one way at a time: splits, paid_by or an event. |
-| `LINK_MODE_INPUT` | 400 | envelope | link_mode is missing its data (split -> splits, paid -> paid_by, event -> event.project_id). |
-| `SHARED_BILL_FIELD` | 409 | envelope | A copy of a shared bill: this field is edited in the bill form (details.fields). |
 | `PRIVATE_NOTE_NOT_SHARED` | 400 | envelope | private_note is only for a copy of a shared bill. |
-| `SOURCE_PT_NOT_FOUND` | 404 | envelope | Copy from event: the source event row was not found. |
-| `SOURCE_PT_NOT_FOR_USER` | 403 | envelope | Copy from event: the caller is not a member of the source event. |
 | `INVALID_PERSON_KEY` | 400 | envelope | A person key must be c:<contact_id> or n:<name>. |
-| `ENTRY_NOT_FOUND` | 400 | envelope | A debt entry in the body is not one of this person's. |
-| `ENTRY_MANAGED_BY_SOURCE` | 409 | envelope | The entry comes from a split; only description, note and the paid label can change here. |
+| `ENTRY_NOT_FOUND` | 400 / 404 | envelope | A debt entry in the body is not one of this person's (404: the debt of a paper sync / unlink is not mine). |
 | `ENTRY_HAS_TRANSACTION` | 409 | envelope | The entry already has a transaction; delete or disconnect it first. |
 | `DEBT_MANAGED_BY_TX` | 409 | envelope | The debt is the paid-by part of a transaction; edit the transaction instead. |
 | `DEBT_NOT_LINKED` | 409 | envelope | The debt has no copy in another user's book. |
@@ -205,15 +191,14 @@ Every error response uses this shape:
 | `TX_NOT_DISCONNECTABLE` | 409 | envelope | Only a transaction connected later can be disconnected; delete it instead. |
 | `TAGS_NEED_WALLET` | 400 | envelope | Tags go on the wallet transaction; pick a wallet first. |
 | `LEDGER_ONLY_NO_WALLET` | 400 | envelope | A ledger-only entry has no wallet or tags; turn create_transaction on. |
-| `BILL_NOT_FOUND` | 400 | envelope | The bill is not in an event the caller is a member of. |
-| `USE_CLAIM` | 400 | envelope | bill_id / event_id are retired here; claim the bills on the event. |
+| `BILL_NOT_FOUND` | 404 | envelope | No such split / event bill for the caller (not on it, not invited, or the other kind of route). |
 | `DEBT_NOT_FOUND` | — | pending | Pending: the target debt entry was not found. |
 | `CONTACT_NOT_FOUND` | 404 / 400 | envelope, pending | The contact does not exist or is not the caller's (400 when it is referenced in a body). |
 | `CONTACT_ARCHIVED` | 409 / 400 | envelope | The contact is archived. |
 | `ALREADY_ARCHIVED` | 400 | envelope | The contact is already archived. |
 | `NOT_ARCHIVED` | 400 | envelope | The contact is not archived. |
 | `ALREADY_LINKED` | 409 | envelope | The contact is already linked. |
-| `NOT_LINKED` | 400 | envelope | The contact is not linked. |
+| `NOT_LINKED` | 400 / 409 | envelope | The contact is not linked (400), or the app is not linked (connections, 409). |
 | `CANNOT_LINK_SELF` | 400 | envelope | A contact can't be linked to the caller. |
 | `REQUEST_REJECTED` | 409 | envelope | The link request was rejected. |
 | `NOT_ACCEPTED` | 409 | envelope | Accept the link request first. |
@@ -222,46 +207,29 @@ Every error response uses this shape:
 | `NOTIFICATION_STATE_CONFLICT` | 409 | envelope | The notification was already handled the other way. |
 | `NOT_PROJECT_INVITE` | 400 | envelope | The notification is not an event invite. |
 | `TYPE_NOT_MUTABLE` | 400 | envelope | Invites and link requests can't be muted. |
-| `PROJECT_NOT_FOUND` | — | pending | Pending: the event was not found. |
 | `PROJECT_NOT_ACTIVE` | 409 | envelope, pending | The event is not active. |
 | `PROJECT_LOCKED` | 409 | envelope, pending | The event is cancelled or archived; writes are blocked. |
-| `PROJECT_NOT_MEMBER` | — | pending | Pending: a member is not in the event. |
-| `PROJECT_READ_ONLY` | — | pending | Pending: viewers can't change event rows. |
 | `EVENT_COMPLETED` | 409 | envelope | The event is completed; it can't be changed any more. |
 | `EVENT_NOT_COMPLETED` | 409 | envelope | Settle lines can be booked only after the event is completed. |
 | `EVENT_HAS_EMPTY_PERSON` | 409 | envelope | A bill still has an empty person to assign (details.bill_ids). |
 | `USE_COMPLETE_ENDPOINT` | 400 | envelope | Complete an event with POST /projects/{id}/complete. |
 | `ALREADY_MEMBER` | 409 | envelope | The user is already a member of the event. |
 | `MEMBER_NOT_IN_PROJECT` | 400 | envelope | The member does not belong to this event. |
-| `MEMBER_NOT_REMOVED` | 409 | envelope | Only a removed member's spots can be assigned. |
-| `NOT_PENDING` | 409 | envelope | The member isn't waiting for an invite. |
 | `CANNOT_CHANGE_OWNER` | 409 | envelope | The owner's role can't be changed here; use transfer-ownership. |
 | `CANNOT_REMOVE_OWNER` | 400 | envelope | The owner can't be removed; transfer ownership first. |
 | `OWNER_CANNOT_LEAVE` | 409 | envelope | The owner can't leave; transfer ownership first. |
 | `FORBIDDEN_ROLE` | 403 | envelope | The caller's event role can't do this. |
-| `PT_IS_CHILD` | 409 | envelope | A split-child row can't be changed directly; edit its parent. |
-| `SELF_SPLIT` | 400 | envelope | A split's member must differ from the payer. |
 | `NOT_IN_BILL` | 400 | envelope | Claim: no pair with that member on the bill (details.bill_ids). |
 | `BILL_ALREADY_BOOKED` | 409 | envelope | The bill is already booked with that person (details.bill_ids on claim). |
 | `BILL_CHANGED` | 409 | envelope | The bill changed since it was opened; reload (details.bill). |
-| `BILL_DISCONNECTED` | 409 | envelope | The caller disconnected their copy of this bill. |
-| `BILL_GONE` | 410 | envelope | The bill was deleted. |
-| `MOVE_TARGET` | 400 | envelope | Move: exactly one of project_id, new_event or split. |
-| `PAYERS_SUM` | 400 | envelope | The payers must add up to the bill. |
-| `PAYER_FIXED` | 400 | envelope | A bill's payer can't change. |
-| `BAD_PAYBACK` | 400 | envelope | A payback has exactly one split: the receiver, for the whole amount. |
-| `PAYBACK_NOT_COPYABLE` | 422 | envelope | A payback can't be copied as an expense. |
-| `NO_SHARE_TO_COPY` | 422 | envelope | The caller has no part in this event row to copy. |
-| `NO_SHARE` | — | pending | Pending: the caller has no part in the event row to copy. |
+| `NOTHING_TO_CLAIM` | 422 | envelope | Claim: the bill gives you nothing to put in your books. |
+| `ALREADY_CLAIMED` | 409 | envelope | Claim: your books already hold every piece of this bill. |
+| `NOT_BILL_OWNER` | 403 | envelope | Only the bill's owner can remove people or move it. |
+| `MERGE_TWO_USERS` | 409 | envelope | Two different users can't be merged into one member. |
+| `SETTLE_NOTHING` | 422 | envelope | Nothing left to book with that member. |
+| `NOT_PAPER_BOOK` | 400 | envelope | This transaction / debt is not linked to a bill. |
 | `SETTLE_BOOKED` | 409 | envelope | The caller already booked this event's settle. |
-| `SETTLE_LINES` | 400 | envelope | lines must list each of the caller's fewest-transfers lines once. |
-| `CLAIM_MIXED_DIRECTION` | 400 | envelope | The bills of one claim must all go the same way. |
-| `TX_ALREADY_IN_PROJECT` | 409 | envelope | The transaction is already in an event. |
-| `TX_NOT_BILLABLE` | 422 | envelope, pending | Only expense and income transactions (not system rows or repayments) can be pulled into an event. |
-| `TX_NOT_IN_PROJECT` | 404 | envelope | The transaction is not in this event. |
-| `TX_SPLIT_PAID` | 422 | envelope | A split on this transaction is labelled paid. |
 | `INVALID_DATE_RANGE` | 400 | envelope | end_date must not be before start_date. |
-| `INVALID_BILL_PEOPLE` | — | pending | Pending: payer / members are invalid. |
 | `INVALID_RULE` | 400 | envelope | The recurrence / budget period rule is invalid. |
 | `INVALID_TRANSITION` | 409 | envelope | This action doesn't apply in the record's current state. |
 | `END_TOO_FAR` | 400 | envelope | The end must be at most 2 years after the start. |
@@ -284,6 +252,17 @@ Every error response uses this shape:
 | `MISSING_ACCOUNT` | — | pending | Legacy (no longer produced; may remain on stored pending rows): the draft had no wallet. |
 | `DEBT_ALREADY_SETTLED` | — | pending | Legacy (no longer produced; may remain on stored pending rows): the debt was already settled. |
 | `OVERPAYMENT` | — | pending | Legacy (no longer produced; may remain on stored pending rows): the payment was more than owed. |
+| `TELEGRAM_TOKEN_INVALID` | 401 | envelope | Telegram login (OIDC): the id_token is not Telegram's, not for this app, expired (30 s) or already used; log in with Telegram again. |
+| `TELEGRAM_ALREADY_LINKED` | 409 | envelope | Telegram sign-up: this Telegram already has an account; log in instead. |
+| `REGISTRATION_CLOSED` | 403 | envelope | Sign-up is closed. |
+| `CONNECTION_UNAVAILABLE` | 409 | envelope | The app (provider) can't be linked or used for login yet. |
+| `RATE_LIMITED` | 429 | envelope | Too many tries; wait a few minutes. |
+| `PERMISSION_UNAVAILABLE` | 409 | envelope | Connections: that permission can't be turned on for this app. |
+| `NO_PHOTO` | 404 | envelope | Connections: the linked app gave no picture. |
+| `LAST_LOGIN_METHOD` | 409 | envelope | Unlink: it is the account's only way in (no password); set a password first. |
+| `PROVIDER_ERROR` | 502 | envelope | The linked app did not answer; try again. |
+| `IDEMPOTENCY_KEY_REUSED` | 422 | envelope | The Idempotency-Key was already used for a different request. |
+| `IDEMPOTENCY_IN_PROGRESS` | 409 | envelope | The first request with this Idempotency-Key is still running; retry in a moment. |
 
 ### Pagination
 
@@ -980,170 +959,57 @@ Recent additions (2026-10-26, 0.4.0-5 — migration 079): **a target per period 
 
 ## 10 — Projects
 
-Recent additions (2026-10-28, 0.4.1-2, BE-2 — migration 105): **multi-payer bills** — `EventBillInput.payers` [{BillPerson + amount}] (Σ = the bill; `payer` = shorthand for one), `BoardRow.payers` / `ClaimableBill.payers` [{member, amount}] (biggest first); the real pairs split each share over the payers by what they paid (settle, claims, `my_net`, positions follow). **Deleting an event keeps its bills:** each becomes a standalone split bill, copies / debts still connected; `EventDeleteResult` = {id, split_bill_count, effects}; `delete_linked_txs` retired; completed events can be deleted; notice `event_deleted`. **Source of truth: `chubi-pocket-be/internal/apidoc/openapi.yaml`.**
-- **Payers, errors:** `payers` on expense / income only; Σ ≠ the bill → 400 `PAYERS_SUM`; each > 0, a person once (400 `VALIDATION_ERROR`). `event_deleted` payload `{project_id, project_name, split_bill_count}`, deep link `/projects` (migration 095).
-- **Income payer (Q-E3):** `EventBillInput.payer` may be someone else on an income bill too ("รับแทน", same as an expense), and it may change on an edit.
+**Paper model (feat/paper, 2026-11-02; plan [`../now/briefs/paper-plan.md`](../now/briefs/paper-plan.md)).** Shapes, statuses and every error per operation: **`chubi-pocket-be/internal/apidoc/openapi.yaml`** (tags `Events`, `Split bills`). This section is the map.
 
-Recent additions (2026-10-27, 0.4.1-2, BE-2 — migrations 102–103): **claims + lumps** — `GET /v1/projects/:id/claimable[?member_id]` (my real pairs per bill, claimed or not, totals per person) and `POST /v1/projects/:id/claim` (one person's bills → ONE debt with a part per bill + "จ่ายโดย X" copies; debt-type bills → a row each by `payback_kind`; `link_transaction_id`; 409 `BILL_ALREADY_BOOKED` / `SETTLE_BOOKED`, 400 `NOT_IN_BILL` / `CLAIM_MIXED_DIRECTION`). **Debt-type bill:** `payback_kind` payback | loan on BoardRow / EventBillInput. **Removed members:** `MemberRef.removed`, `EventMember.removed_at`, `Event.empty_person_bill_count`, `POST /v1/projects/:id/members/:member_id/assign`; remove / leave disconnect that member's book. **Settle:** income bills count (the receiver owes each split); `EventSettle.simplified_available` / `my_settle_booking`; `POST /v1/projects/:id/settle/book` ("ลงในสมุดฉัน", completed only, once; 409 `EVENT_NOT_COMPLETED` / `SETTLE_BOOKED`, 400 `SETTLE_LINES`). Deleting an event bill (`DELETE /v1/event-bills/:pt_id`, BE-1's route) follows each member's `auto_sync_events`. **Retired (V8 / V9):** `bill_id` / `event_id` on `POST /v1/personal-debts/people/:key/entries` and `…/repayments` → 400 `USE_CLAIM` (migration 104 deletes the old per-line `{event_id}` debts); `SettleLine.recorded` = the pair's bills all claimed, or my settle booked. **Removed (V16):** `POST /v1/projects/quick`, `POST /v1/projects/:id/bills`, `DELETE /v1/projects/:id/bills/:transaction_id`, `POST /v1/projects/:id/project-transactions/:pt_id/copy`, `PUT …/my-books` (and their schemas QuickCreateEvent*, AddBills*, EventCopyResult, MyBooks*): use `/event-bills` (book / rebook with move / disconnect / apply) and `PUT /transactions/:id` link mode อีเวนต์. **Source of truth: `chubi-pocket-be/internal/apidoc/openapi.yaml`.**
+A split bill and an event bill are one thing, a **paper**: one record everyone on it sees the same (`PaperView`). Two contracts over one core: `/split-bills` (no event) and `/projects/:id/bills` (an event's bills). A paper of the other kind answers 404 `BILL_NOT_FOUND`. Nobody's book is written by the paper: each user **claims** it (`my_books`, or their auto switch) and follows it one way ("อัปเดต" or auto sync). Category, wallet, tags and the private note are each user's own and never synced.
 
-Recent additions (2026-10-27, 0.4.1-2, BE-2 — migrations 100–101): **complete = locked for good** — `POST /v1/projects/:id/complete` (owner, active only; answers `EventPatch` + `effects`; 409 `PROJECT_NOT_ACTIVE` / `EVENT_HAS_EMPTY_PERSON` {bill_ids}); `Event.completed_at` / `can_complete`; on a completed event every write answers 409 `EVENT_COMPLETED` except my `tag_ids` and archive; restore of an archived completed event → `completed`; `PUT status completed` → 400 `USE_COMPLETE_ENDPOINT`. **Lumps:** `DebtEntry.bills[]` (`DebtBillPart`: pt_id, event, description, amount, in_sync, differences, edit_in_bill). Notices `event_completed`, `event_member_removed` (spec 13). Budgets count a bill once after an unlink (X5). **Source of truth: `chubi-pocket-be/internal/apidoc/openapi.yaml`.**
+### Events and members
 
-Recent additions (2026-10-27, 0.4.1-1 contract, BE-2; code follows): **one call for the bill sheet ("ลงบัญชีของฉัน", E8).** `POST /v1/event-bills` (`project_id` or `new_event`) and `PUT /v1/event-bills/:pt_id` save the bill / payback, the payback rows of people marked `paid_back` ("คืนแล้ว"), and every part of my book (`my_books {on, tx, debt, account_id, category_id, tag_ids}`) in ONE DB transaction; they replace the app's chain of addBills / createProjectTransaction / resolvePeople / my-books / debt entries / repayments / transactions. Fixed inside: "คืนแล้ว" when I paid = debt + immediate repayment (balance 0, E2); me paid back = my share from my wallet, no debt (E3); someone else paid and I did not pay back = my share with no wallet + the debt, never both (E4); a payback's default `debt` looks at this event only (E5); a payer booking later becomes the bill's origin (E6); a bill edit updates its split rows in place (B4). `?preview=true` → `EventBillBookPreview {people, wallets, debt_default}`. Answer: `EventBillBookResult` = EventPatch + `my_books` + `paybacks` + `transaction_id` + `effects`. Close-out (migration 091): a payback row remembers the bill it was ticked on (`paid_back_for_id`); `BoardSplit.paid_back` shows the tick; on `PUT` an un-ticked member's payback row and my repayment of it go in the same DB transaction (effects `removed_bill_ids` / `removed_debt_ids` / `removed_transaction_ids`), a changed share remakes it. **Source of truth: `chubi-pocket-be/internal/apidoc/openapi.yaml`.**
+- `POST /v1/projects`, `GET /v1/projects`, `GET|PUT|DELETE /v1/projects/:id`, `GET /v1/projects/:id/detail` (one call: event, summary, members, tags, board = `PaperList`), `POST /v1/projects/:id/archive|restore|leave|transfer-ownership`
+- `POST /v1/projects/:id/complete` — owner; locks the bills for good, books stop syncing, a later claim is a one-time copy, "จ่ายน้อยครั้งสุด" opens
+- `DELETE /v1/projects/:id` — the bills stay: each becomes a split bill (same paper, same id)
+- Members: `GET|POST /v1/projects/:id/members` (`{contact_id}` = an app user is invited / a name is added; `{display_name, ad_hoc: true}`; `{email, display_name}`), `PUT|DELETE …/members/:member_id`, `PUT|DELETE …/members/:member_id/my-contact`, `POST …/members/:member_id/merge {into}` (one person: shares and paid add up on every bill, equal-mode bills re-split; two app users can't merge)
+- `PUT /v1/projects/:id/my-defaults {category_id, account_id}` — my claim defaults for this event (auto claim uses them)
+- Tags: `GET|POST /v1/projects/:id/tags`, `PUT|DELETE …/tags/:tag_id`, `POST …/tags/import`
 
-Recent additions (2026-10-21, 0.4.0-3 B2): **a new bill with any payer and members** (spec 10 §0.4a). `POST /v1/projects/:id/bills`, `POST /v1/projects/quick` and pending event drafts take `payer` (`BillPerson`: `{me}` default | `{member_id}` | `{contact_id}` | `{person_name}`) + `members: [BillMember {…person, share}]` next to `new_transaction` (`amount` = the bill). Non-members (contacts, typed names) are added by any member who may add bills. Someone else paid → the board bill is theirs, my transaction = my share, no wallet (a copy; `new_transaction_id` null when I have no share). Tx `event_bill` gains `payer`, `bill_amount`, `members` (detail / write answers). Errors: 400 `VALIDATION_ERROR` (bad / duplicate person, income paid by another, payer / members without new_transaction), `SPLITS_EXCEED_AMOUNT`, `MEMBER_NOT_IN_PROJECT`, `CONTACT_NOT_FOUND`, `LINK_MODE_CONFLICT` (with splits / paid_by). Pending: `draft.payer` / `draft.members`, `resolved.bill_people`, codes `INVALID_BILL_PEOPLE`, `NO_SHARE`. Additive. **Source of truth: `chubi-pocket-be/internal/apidoc/openapi.yaml`.**
+### Papers
 
-Recent additions (2026-10-13, 0.3.1-10): page-ready `Event` rows (no `type`, my tags, totals, flags), `GET /v1/projects/:id/detail` (one call), the board with nested splits / event tags / `linked` / `source_tx`, event tags CRUD + `POST /v1/projects/:id/tags/import`, my tags via `PUT /v1/projects/:id {tag_ids}`, every write returns `EventPatch`, a pulled bill's money is linked BY PROMPT (`also_update_link`; another member's edit notifies the tx owner, `409 BILL_MONEY_LINKED` dropped), `DELETE /v1/projects/:id?delete_linked_txs=true` → `EventDeleteResult`, `Event.linked_tx_count` — spec 10 §0. **Source of truth for shapes: `chubi-pocket-be/internal/apidoc/openapi.yaml`.** The sections below describe the pre-0.3.1-10 shapes.
+| Split bills | Event bills | What |
+| --- | --- | --- |
+| `GET /v1/split-bills` (`status` invited \| joined) | `GET /v1/projects/:id/bills` | list (`type`, `mine`, `q`, `tag_id`, `sort`, page) |
+| `POST /v1/split-bills` | `POST /v1/projects/:id/bills` | create `{paper, my_books?}`; I own it |
+| `GET /v1/split-bills/:id` | `GET /v1/projects/:id/bills/:bid` | read (an invitee may read before answering) |
+| `PUT /v1/split-bills/:id` | `PUT /v1/projects/:id/bills/:bid` | edit `{paper, version}` (409 `BILL_CHANGED`); only the owner takes people off |
+| `POST …/join`, `POST …/decline` | — | answer an invite (declined = shown as a name) |
+| `POST …/claim` | `POST …/claim` | "ลงสมุดของฉัน" `{pay: debt \| wallet, account_id, category_id, tag_ids, private_note}` |
+| `POST …/leave {books: keep \| delete}` | same | owner leaving passes it on; the last user deletes a split bill |
+| `POST …/move-to-event {project_id}` | `POST …/move {project_id \| null}` | owner; people matched to members (same user, bound contact, exact name), else new members |
+| `DELETE …/people/:pid` | same | owner removes a person |
+| `PATCH …/people/:pid {paid_back}` | same | "คืนแล้ว" — a mark only |
 
-Post-migration 27 endpoint surface (project as a separate book — see [`project-as-separate-book.md`](../archive/engineering/project-as-separate-book.md), archived).
+A paper's people (`PaperPersonInput`): exactly one of `me`, `member_id` (event bills), `contact_id`, `person_name`; `person_id` keeps a row on an edit. Σ paid = Σ share = amount (`split_mode` equal = the BE splits).
 
-### Projects CRUD
+Claims: a split bill gives my transaction + the debts of my pairs (`pay` debt), or my transaction from my wallet and no debt (`pay` wallet — the payers holding "they owe me" get `debt_repaid`). An event bill gives my transaction only; event debts are made from the settle page.
 
-- `POST   /v1/projects` — create
-- `GET    /v1/projects` — list (`?status=active|completed|cancelled|archived|all`, `?type=`, `?page=`, `?per_page=`)
-- `GET    /v1/projects/:id`
-- `PUT    /v1/projects/:id` (owner only — name/type/description/start_date/end_date/status/planned_amount; `planned_amount` nullable — set a number to enable the plan-vs-actual display, null to hide) *(planned_amount: planned)*
-- `DELETE /v1/projects/:id` (owner only; rejected with `409 PROJECT_HAS_TRANSACTIONS` if any rows exist)
-- `POST   /v1/projects/:id/leave`
-- `POST   /v1/projects/:id/transfer-ownership` `{new_owner_user_id}`
+### My books of a paper
 
-### Members
+- `POST /v1/transactions/:id/paper-sync`, `POST /v1/personal-debts/:id/paper-sync` — "อัปเดต": take what the paper says now (a debt part whose pair is gone is dropped; a debt left with no paper goes)
+- `POST /v1/transactions/:id/unlink-paper`, `POST /v1/personal-debts/:id/unlink-paper` — keep the record, plain from now on
+- A transaction / debt shows its paper: `split_bill` / `event_bill` (`PaperBookRef`, `in_sync`); a debt's `bills[]` = its paper parts
+- `POST /v1/personal-debts/people/:key/repayments {…, notify: true}` — tells the partner (`debt_repaid`; written at once when their `auto_accept_repayments` is on)
 
-Two variants on `POST /v1/projects/:id/members` (the from-contact variant was dropped in migration 27 — contacts are user-scoped; for "add my contact", look up `contacts.linked_user_id` client-side and use the by-email or ad-hoc variant):
+### Settle
 
-- by-email: `{email, display_name, role?}` — pending until accepted via project_invite notification
-- ad-hoc: `{display_name, ad_hoc: true, role?}` — active immediately, no user link
+- `GET /v1/projects/:id/settle` — `pairs` (any time) and `simplified` (completed); my lines carry `booked` / `unbooked` / `in_sync`
+- `POST /v1/projects/:id/settle/book` — `{mode: pairs, with: member}` = one lump debt per direction with that member (any time, again as bills come; 422 `SETTLE_NOTHING`); `{mode: simplified}` = my fewest-transfers lines once, completed only
 
-Endpoints:
+### Notifications
 
-- `GET    /v1/projects/:id/members`
-- `POST   /v1/projects/:id/members`
-- `PUT    /v1/projects/:id/members/:member_id` (owner only — `{role}`)
-- `DELETE /v1/projects/:id/members/:member_id` (owner only; cannot remove the owner)
-- `POST   /v1/projects/:id/members/:member_id/request-link` (re-issue invite — owner only)
-- `POST   /v1/projects/link-requests/:notification_id/accept`
-- `POST   /v1/projects/link-requests/:notification_id/reject`
+`bill_invite` (join / decline), `bill_new` (claim), `bill_changed` (update), `bill_removed` (keep / delete my books, by `on_split_removed`), `bill_owner_changed`, `bill_moved`, `debt_repaid`. `payload.applied` = my switch already did it. Payload `split_transaction_id` = the paper.
 
-### Project transactions
+### Errors specific to papers
 
-The project ledger is decoupled from personal books. Splits are represented as child rows of the parent (linked via `parent_project_transaction_id`).
-
-- `GET    /v1/projects/:id/transactions` — flat list of parents + their children. Pagination applies to **parent rows only**; children of returned parents are appended without counting against `per_page`. Client groups into a tree via `parent_project_transaction_id`.
-- `POST   /v1/projects/:id/project-transactions` — body:
-  ```json
-  {
-    "transaction_member_id": "uuid",
-    "type": "expense | income",
-    "amount": 1000.00,
-    "currency": "THB",
-    "date": "YYYY-MM-DD",
-    "note": "optional",
-    "splits": [
-      {"member_id": "uuid", "amount": 500.00}
-    ]
-  }
-  ```
-  Children inherit `type/currency/date/note` from the parent — do not send them per child. Server validates: each split's member belongs to the project, no self-split (split member ≠ parent actor), Σ split amounts ≤ parent amount.
-- `PUT    /v1/projects/:id/project-transactions/:pt_id` — body fields all optional: `amount`, `date`, `note`, `splits`. When `splits` is non-null, all existing children are deleted and the new list is inserted (full replacement). Children cannot be edited directly; rejected with `400 PT_IS_CHILD` if `:pt_id` is a child.
-- `DELETE /v1/projects/:id/project-transactions/:pt_id` — deleting a parent FK-cascades children. Deleting a child removes that one split. Personal rows linked to the deleted row(s) (the author's bill, members' copies) are unlinked first and stay as loose transactions (2026-10-10; this used to fail with 500 on CHECK `transactions_project_id_implies_source`).
-- `PUT    /v1/projects/:id/project-transactions/:pt_id/mark` — body `{"marked": bool}`. Toggles caller's `project_member_id` in the row's `marks` array. Idempotent. Independent of personal-book actions.
-
-There is **no `/claim` endpoint** — the resolve flow is client-side. The FE creates personal entries via the regular `POST /v1/transactions` (with `source_project_transaction_id` set for traceback) or `POST /v1/personal-debts`. The transactions module auto-derives `project_id` from `source_project_transaction_id` and validates caller is a project member.
-
-### Quick create / add / remove bills *(spec §4.24–4.25)* — REMOVED in 0.4.1-2 (V16)
-
-> These three routes are gone (and `…/copy`, `…/my-books`). Use `POST|PUT|DELETE /v1/event-bills` and `PUT /v1/transactions/:id` (link mode อีเวนต์). Kept below as history only.
-
-`POST /v1/projects/quick` — atomic: create project + auto-add members +
-board rows for every included bill, born auto-claimed. Settled debt state
-is never modified.
-
-Request:
-
-```json
-{
-  "name": "แฟน, บี · 15 ก.ย. 2026",
-  "new_transaction": { "…same body as POST /v1/transactions, splits[] allowed…": true },
-  "transaction_ids": ["uuid", "uuid"],
-  "move": false
-}
-```
-
-- `name` — required (FE composes the members+date default, editable)
-- `new_transaction` — optional (2026-10-10); processed through the normal
-  personal transaction create path (account balance moves, splits create
-  debts). At least one of `new_transaction` / non-empty `transaction_ids`.
-- `transaction_ids` — optional; each must be the caller's own expense /
-  income, not a debt repayment, and have `project_id IS NULL` (or
-  `move`), else the whole call fails (atomic). Wallet-less bills are fine:
-  the board row's currency is the bill's wallet currency, else the
-  caller's user currency (a project has no currency of its own).
-- `move` — optional, default false: a listed bill already in **another**
-  project leaves it first (same rules as DELETE below), in the same DB
-  transaction. A bill already in the target project is always 409.
-
-`POST /v1/projects/:id/bills` — the same pull into an existing project:
-body `{new_transaction?, transaction_ids?, move?}` (no `name`). Caller must
-be an active non-viewer member; project must accept new rows.
-
-`DELETE /v1/projects/:id/bills/:transaction_id` → `204` — take the
-caller's own transaction out of the project; the transaction stays as a
-loose one. Only the transaction's author; no project lock / membership
-check (removal is always allowed).
-- The transaction is its board row's origin (caller recorded the row and is
-  its actor) → the board row + its split children are deleted and every
-  personal row linked to them (members' copies too) is unlinked;
-  `project_tx_changed` (`deleted`) goes to the row's linked stakeholders.
-- Otherwise (caller's copy of someone else's row) → only the caller's row
-  is unlinked; the board row stays.
-- The transaction's own splits stay; they only lose `project_id`. Members
-  auto-added to the project stay.
-
-Errors (`DELETE`): `404 TX_NOT_FOUND` (missing or not the caller's);
-`404 TX_NOT_IN_PROJECT`.
-
-Behavior: caller becomes `owner`; members = union of split counterparties
-across all included bills (linked contact → active linked member +
-`project_added` notification, free-text → ad-hoc member) plus active
-members of any shared wallet a bill lives on. Every included bill (new +
-listed) gets a `project_transactions` parent (+ split children from its
-debts) and the personal row is linked back (`project_id` +
-`source_project_transaction_id`) — auto-claimed. The bills' splits move
-onto the board (see below).
-
-Response `201` (quick + bills): the project (same shape as `POST
-/v1/projects`) plus `"linked_count": n` (board rows created) and
-`"transaction_id"` — the new bill's id, **absent** when no
-`new_transaction` was sent.
-
-Errors (quick + bills): `400 VALIDATION_ERROR` (incl. nothing to add, a
-transfer); `404 TX_NOT_FOUND` (missing or not the caller's); `409
-TX_ALREADY_IN_PROJECT`; `422 TX_NOT_BILLABLE` (a debt repayment, or an
-opening balance / balance adjustment row); `422 TX_SPLIT_HAS_REPAYMENT` (a
-split on the bill was already repaid); `422 TX_SPLIT_CANCELLED` (a split
-was forgiven); `400 CONTACT_NOT_FOUND` (a new bill's split contact).
-
-Splits **move** onto the board (spec 10 §4.25): a listed bill's personal
-splits become the board row's member splits and leave the bill; a new
-bill's splits go straight onto the board. `DELETE …/bills/:transaction_id`
-(and the author deleting the board row) moves them back as personal
-splits; `move` carries them to the new board row.
-
-### Summary
-
-- `GET    /v1/projects/:id/summary` — totals (parents only, children excluded), member count. *(planned)* when `projects.planned_amount` is set, also returns `planned_amount`, `spent_net` (Σ expense − Σ income parents), `remaining` (may be negative — FE renders "เกินงบ X" instead of a raw negative); all three omitted when planned_amount is NULL.
-
-### Error codes specific to projects
-
-- `NOT_OWNER` — owner-only action attempted by non-owner
-- `NOT_MEMBER` — caller isn't an active project member
-- `PROJECT_LOCKED` — write attempted on cancelled/archived project
-- `PROJECT_NOT_ACTIVE` — `create_pt` attempted on non-active project
-- `PROJECT_HAS_TRANSACTIONS` — delete attempted with rows present (409)
-- `USER_ALREADY_MEMBER` — duplicate user→project membership (409)
-- `MEMBER_NOT_IN_PROJECT` — referenced member belongs to a different project
-- `PT_IS_CHILD` — direct edit attempted on a split-child row
-- `SELF_SPLIT` — split member equals parent actor
-- `SPLITS_EXCEED_PARENT` — Σ splits > parent amount
+`BILL_NOT_FOUND` 404, `BILL_CHANGED` 409, `NOT_BILL_OWNER` 403, `NOT_IN_BILL` 400, `NOTHING_TO_CLAIM` 422, `ALREADY_CLAIMED` 409, `BILL_ALREADY_BOOKED` 409, `NOT_PAPER_BOOK` 400, `MERGE_TWO_USERS` 409, `SETTLE_NOTHING` 422, `SETTLE_BOOKED` 409, `EVENT_NOT_COMPLETED` 409, `EVENT_COMPLETED` 409, `EVENT_HAS_EMPTY_PERSON` 409.
 
 ## 11 — Recurring (replaces Scheduled Transactions)
 

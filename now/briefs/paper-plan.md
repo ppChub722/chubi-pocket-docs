@@ -87,21 +87,21 @@ Kept as is: events (`projects`), members (`project_members`, now `project_id` NO
 | `projects` | drop `kind` |
 | `project_members` | drop `split_transaction_id`, `scope_id`, `name_match`; `project_id` NOT NULL |
 | `project_transactions` | keep id, project_id (NULL = split bill), type, payback_kind, amount, date, description, note, created/updated; `record_user_id` → `owner_user_id`; add `version`, `split_mode`; drop scope_id, parent_project_transaction_id, transaction_member_id, linked/unlinked_transaction_id, paid_back_for_id, currency |
-| `split_transaction_people` | `event_member_id` → `project_member_id`; add status, invited_user_id, paid_back_by_user_id, paid_back_at; drop marked_at, disconnected_at |
+| `split_transaction_people` | `event_member_id` → `project_member_id`; add status, paid_back_by_user_id, paid_back_at; drop marked_at, disconnected_at (built: no invited_user_id, `user_id` + status is enough) |
 | `split_person_contacts` | new: which of MY contacts a paper person is (person_id, user_id, contact_id) |
 | `project_my_defaults` | new: (project_id, user_id, category_id, account_id) |
 | `transactions` | add `my_share`; drop project_id, source_project_transaction_id, unlinked_project_transaction_id, unlinked_split_transaction_id, paid_by_amount |
-| `personal_debts` | keep project_id (= lump of that event), add split_person_id; drop source_project_transaction_id, unlinked_project_transaction_id, split_transaction_id, unlinked_split_transaction_id; `counterpart_debt_id` gets written (§2.16) |
+| `personal_debts` | keep project_id (= lump of that event); drop source_project_transaction_id, unlinked_project_transaction_id, split_transaction_id, unlinked_split_transaction_id; `counterpart_debt_id` gets written (§2.16) (built: no split_person_id, the parts carry the person) |
 | `personal_debt_bills` | (debt_id, split_transaction_id, split_person_id, transaction_id, amount); drop pt_id, member_id |
 | `user_notification_settings` | add `on_split_removed`, `auto_accept_repayments` |
-| views / functions | `bill_pairs` rewritten on people; completed-event lock kept; drop `scopes`, `event_or_null`, `split_bill_of`, the `links_*` triggers, `sync_split_people_member`, `project_transaction_payers_locked_check` |
+| views / functions | `bill_pairs` rewritten on people; completed-event lock kept; drop `scopes`, `event_or_null`, `split_bill_of`, the `links_*` triggers, `project_transaction_payers_locked_check` (built: `sync_split_people_member` kept, it keeps a person's user / name in step with the member) |
 
 Every link from a debt to papers goes through `personal_debt_bills` (a split-bill debt = one row; a lump = many).
 
 ## 6. Removed
 
 - `/event-bills/*`, `/transactions/:id/apply-event`, `PUT /transactions/:id/splits`, `splits` / `paid_by` / `link_mode` / `my_share` on transaction create and update, `QuickCreate`, the routes the app never called (`/projects/:id/summary`, `/projects/:id/project-transactions*`, member `request-link`), `/projects/:id/claimable` + `/claim` (folded into settle/book), the board mark.
-- Notification types `split_created`, `split_changed`, `split_received`, `project_added`; added `split_invite`, `split_removed`, `split_owner_changed`, `bill_moved`, `debt_repaid`. The app must also learn `event_deleted` (sent today, unknown to the app).
+- Notification types `split_created`, `split_changed`, `split_received`, `project_added`, `shared_bill_*`, `project_tx_*`; added `bill_invite`, `bill_new`, `bill_changed`, `bill_removed`, `bill_owner_changed`, `bill_moved`, `debt_repaid`. The app must also learn `event_deleted` (sent today, unknown to the app).
 - Pending drafts keep personal fields only (no splits / event / payer / members); a bill is made through the paper form.
 
 ## 7. Order
@@ -114,3 +114,23 @@ Every link from a debt to papers goes through `personal_debt_bills` (a split-bil
 6. Tests: go vet, go test ./... on a fresh DB from the baseline; the API document + schema doc.
 
 Then: report to the owner, app round.
+
+## 8. Round 1 status — BE + DB done (2026-11-02)
+
+Branch `feat/paper` in chubi-pocket-be (12 commits, f971d56 … c2919f7). Not pushed, not deployed, the local BE not restarted.
+
+- **DB:** one file `migrations/000001_baseline.up.sql` (+ down). A fresh DB from it = 43 tables. Schema record: [`../../ref/schema.md`](../../ref/schema.md) §10 "Paper baseline".
+- **API:** `internal/apidoc/openapi.yaml` updated (19 retired ops gone, 21 new ops, schemas follow the Go types); map in [`../../ref/api-document.md`](../../ref/api-document.md) §10.
+- **Tests:** `go vet ./...` clean; `go test ./...` on a fresh baseline DB (`chubi_paper_test`): 31 packages ok, 0 fail, 0 skipped (the DB tests ran). New paper suite: split bill life, wallet claim → debt_repaid, remove + leave + last-leaver delete, decline + mark, event bills + lump + complete lock, move in / out with member matching, merge, repayment notice + disconnect, completed-event claim + simplified settle.
+
+Built differently from §1–6, or decided while building:
+1. JSON key of the paper id on debts / notices = `split_transaction_id` (owner 2026-11-02).
+2. `personal_debt_bills.split_person_id` is NULLABLE: when a person is taken off a paper, the other users' parts with them stay (out of sync) until "อัปเดต" drops them; a debt left with no part is then deleted (its amount would be 0).
+3. B claims a split bill with `pay: wallet` → every payer who already holds "B owes me" gets `debt_repaid` (the owner's "B กดจ่ายแล้ว → แจ้ง A"). The same notice comes from a repayment saved with `notify: true`. Auto-accepted = a repayment in A's main wallet (`default_account_id`), ledger-only when there is none or it can't take it.
+4. Notices that still ask: `bill_invite`; `bill_new` / `bill_changed` / `bill_removed` with `applied` false; `debt_repaid` with no `repayment_id` (inbox + dashboard).
+5. Budgets / reports count my books only (`COALESCE(my_share, amount)`); a claimed event bill carries its event tags into the budget.
+6. Pending drafts are personal only (§6); an old draft's `splits` / `project_id` are ignored.
+7. Removed while building because nothing used them: 40 error codes (SPLITS_*, PAID_BY_*, LINK_MODE_*, PT_IS_CHILD, …, ENTRY_MANAGED_BY_SOURCE), `also_delete_link` / `also_update_link` / delete `bill_id` on transactions, the notification `Auto` switch map. New codes: NOTHING_TO_CLAIM, ALREADY_CLAIMED, NOT_BILL_OWNER, MERGE_TWO_USERS, SETTLE_NOTHING, NOT_PAPER_BOOK.
+8. Bugs found and fixed on the way: event board list 500 (an unused SQL parameter), effects of a claim missing rows not yet committed, `my_share` null on plain rows, dashboard attention list on the old notice names, add-member bad request 500.
+
+Next: owner review → app round (forms, my books, notices) → VPS wipe + baseline + deploy as PRD.

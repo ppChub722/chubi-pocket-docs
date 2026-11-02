@@ -2,6 +2,12 @@
 
 _Last updated: 2026-11-02. Test server (ppForge VPS; not production, that starts at 1.0) = 0.4.2-4 (build 223, migration 130, MIN = LATEST = 223)._
 
+## In progress: the paper model (branch `feat/paper` in be + docs) — BE + DB done 2026-11-02, waiting for the owner's review, then the app round
+Brief + round-1 status: `now/briefs/paper-plan.md` §8. Split bills and event bills = one shared paper; everyone claims their own books and follows one way. One migration baseline `000001_baseline` (the test server gets wiped and starts from it when this ships).
+- **BE:** 12 commits on `feat/paper` (not pushed, not deployed, local BE not restarted). `go vet` clean; `go test ./...` on a fresh baseline DB: 31 packages ok, 0 skip. Spec: `internal/apidoc/openapi.yaml`.
+- **Docs:** `ref/schema.md` §10 "Paper baseline", `ref/api-document.md` §10 + error codes, `rules/decisions.md` "Papers".
+- **Next:** owner review → app (paper form, claim, my books "อัปเดต" / unlink, invites, settle lumps, notices `bill_*` / `debt_repaid`) → release with the wipe.
+
 ## Now: 0.4.2-4 — RELEASED 2026-11-02 (tag v0.4.2-4: be 2031875 · app fe4f96c · docs 15353b4; release note team/releases/0.4.2-4.md)
 Briefs: `now/briefs/0.4.2-chatbot.md`, `now/briefs/telegram-oidc-login.md`.
 - **Live on the test server:** BE `2031875` (no new migrations, backup `chubi_pocket-20261102-1240.dump.gz`), APK 223 (Firebase 2223, firsttester), gate MIN = LATEST = 223 (`.env.bak-0.4.2-4`). Checks: go test 434 passed / 0 skipped, flutter test 841 passed, analyze clean.
