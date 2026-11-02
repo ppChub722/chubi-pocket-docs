@@ -188,7 +188,7 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - **Debt partners:** the two debts of one pair from one paper are partners; a repayment saved with "แจ้ง" tells the other user (`debt_repaid`; their auto-accept writes it into their main wallet).
 - **One migration baseline:** the DB starts from `000001_baseline`; the test server is wiped and starts from it.
 - **Drafts can be papers (owner 2026-11-02):** a pending draft may carry a paper (people, split mode, event, event tags, pay); confirming it creates the paper and my books of it from the draft's wallet, category and tags. The pending summary and budgets count my share.
-- **Event tags never reach a budget (owner 2026-11-02):** personal tags and event tags are separate; a budget's tag scope sees only my own tags on the transaction.
+- **Tags (owner 2026-11-02):** personal tags go only on an event (my tags of it) and on a claimed bill (= my private transaction). Event tags on the bills are for the event page's reports only and never reach a budget. A budget's tag scope sees my tags on the transaction + my tags of its event.
 
 ## UI
 - **0.4.0-2 polish rules (owner 2026-10-19/20):**
