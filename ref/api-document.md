@@ -129,7 +129,7 @@ Every error response uses this shape:
 
 | Code | HTTP | Where | Meaning |
 |---|---|---|---|
-| `VALIDATION_ERROR` | 400 | envelope | The request is invalid; details lists the fields (FieldError[]). |
+| `VALIDATION_ERROR` | 400 | envelope, pending | The request is invalid; details lists the fields (FieldError[]). |
 | `UNAUTHORIZED` | 401 | envelope | No valid session (missing / expired token); the app signs out. |
 | `FORBIDDEN` | 403 | envelope | The caller may not use this record or action. |
 | `NOT_FOUND` | 404 | envelope, pending | The record does not exist or is not the caller's. |
@@ -209,16 +209,16 @@ Every error response uses this shape:
 | `TYPE_NOT_MUTABLE` | 400 | envelope | Invites and link requests can't be muted. |
 | `PROJECT_NOT_ACTIVE` | 409 | envelope, pending | The event is not active. |
 | `PROJECT_LOCKED` | 409 | envelope, pending | The event is cancelled or archived; writes are blocked. |
-| `EVENT_COMPLETED` | 409 | envelope | The event is completed; it can't be changed any more. |
+| `EVENT_COMPLETED` | 409 | envelope, pending | The event is completed; it can't be changed any more. |
 | `EVENT_NOT_COMPLETED` | 409 | envelope | Settle lines can be booked only after the event is completed. |
 | `EVENT_HAS_EMPTY_PERSON` | 409 | envelope | A bill still has an empty person to assign (details.bill_ids). |
 | `USE_COMPLETE_ENDPOINT` | 400 | envelope | Complete an event with POST /projects/{id}/complete. |
 | `ALREADY_MEMBER` | 409 | envelope | The user is already a member of the event. |
-| `MEMBER_NOT_IN_PROJECT` | 400 | envelope | The member does not belong to this event. |
+| `MEMBER_NOT_IN_PROJECT` | 400 | envelope, pending | The member does not belong to this event. |
 | `CANNOT_CHANGE_OWNER` | 409 | envelope | The owner's role can't be changed here; use transfer-ownership. |
 | `CANNOT_REMOVE_OWNER` | 400 | envelope | The owner can't be removed; transfer ownership first. |
 | `OWNER_CANNOT_LEAVE` | 409 | envelope | The owner can't leave; transfer ownership first. |
-| `FORBIDDEN_ROLE` | 403 | envelope | The caller's event role can't do this. |
+| `FORBIDDEN_ROLE` | 403 | envelope, pending | The caller's event role can't do this. |
 | `NOT_IN_BILL` | 400 | envelope | Claim: no pair with that member on the bill (details.bill_ids). |
 | `BILL_ALREADY_BOOKED` | 409 | envelope | The bill is already booked with that person (details.bill_ids on claim). |
 | `BILL_CHANGED` | 409 | envelope | The bill changed since it was opened; reload (details.bill). |
@@ -988,6 +988,8 @@ A split bill and an event bill are one thing, a **paper**: one record everyone o
 | `PATCH …/people/:pid {paid_back}` | same | "คืนแล้ว" — a mark only |
 
 A paper's people (`PaperPersonInput`): exactly one of `me`, `member_id` (event bills), `contact_id`, `person_name`; `person_id` keeps a row on an edit. Σ paid = Σ share = amount (`split_mode` equal = the BE splits).
+
+Drafts: a pending draft may carry `paper {project_id?, split_mode, people[], event_tag_ids, pay}`; confirming it creates the paper and my claim from the draft's wallet / category / tags (`needs_input` `people` when nobody is on it; the summary and budgets count my share). Budgets never count event tags, only my own tags on the transaction.
 
 Claims: a split bill gives my transaction + the debts of my pairs (`pay` debt), or my transaction from my wallet and no debt (`pay` wallet — the payers holding "they owe me" get `debt_repaid`). An event bill gives my transaction only; event debts are made from the settle page.
 

@@ -102,7 +102,7 @@ Every link from a debt to papers goes through `personal_debt_bills` (a split-bil
 
 - `/event-bills/*`, `/transactions/:id/apply-event`, `PUT /transactions/:id/splits`, `splits` / `paid_by` / `link_mode` / `my_share` on transaction create and update, `QuickCreate`, the routes the app never called (`/projects/:id/summary`, `/projects/:id/project-transactions*`, member `request-link`), `/projects/:id/claimable` + `/claim` (folded into settle/book), the board mark.
 - Notification types `split_created`, `split_changed`, `split_received`, `project_added`, `shared_bill_*`, `project_tx_*`; added `bill_invite`, `bill_new`, `bill_changed`, `bill_removed`, `bill_owner_changed`, `bill_moved`, `debt_repaid`. The app must also learn `event_deleted` (sent today, unknown to the app).
-- Pending drafts keep personal fields only (no splits / event / payer / members); a bill is made through the paper form.
+- Pending drafts lose `splits` / `project_id`; a draft carries a paper instead (`draft.paper`, owner 2026-11-02, see §8).
 
 ## 7. Order
 
@@ -117,7 +117,7 @@ Then: report to the owner, app round.
 
 ## 8. Round 1 status — BE + DB done (2026-11-02)
 
-Branch `feat/paper` in chubi-pocket-be (12 commits, f971d56 … c2919f7). Not pushed, not deployed, the local BE not restarted.
+Branch `feat/paper` in chubi-pocket-be (13 commits, f971d56 … 94b4e5a). Not pushed, not deployed, the local BE not restarted.
 
 - **DB:** one file `migrations/000001_baseline.up.sql` (+ down). A fresh DB from it = 43 tables. Schema record: [`../../ref/schema.md`](../../ref/schema.md) §10 "Paper baseline".
 - **API:** `internal/apidoc/openapi.yaml` updated (19 retired ops gone, 21 new ops, schemas follow the Go types); map in [`../../ref/api-document.md`](../../ref/api-document.md) §10.
@@ -128,9 +128,11 @@ Built differently from §1–6, or decided while building:
 2. `personal_debt_bills.split_person_id` is NULLABLE: when a person is taken off a paper, the other users' parts with them stay (out of sync) until "อัปเดต" drops them; a debt left with no part is then deleted (its amount would be 0).
 3. B claims a split bill with `pay: wallet` → every payer who already holds "B owes me" gets `debt_repaid` (the owner's "B กดจ่ายแล้ว → แจ้ง A"). The same notice comes from a repayment saved with `notify: true`. Auto-accepted = a repayment in A's main wallet (`default_account_id`), ledger-only when there is none or it can't take it.
 4. Notices that still ask: `bill_invite`; `bill_new` / `bill_changed` / `bill_removed` with `applied` false; `debt_repaid` with no `repayment_id` (inbox + dashboard).
-5. Budgets / reports count my books only (`COALESCE(my_share, amount)`); a claimed event bill carries its event tags into the budget.
-6. Pending drafts are personal only (§6); an old draft's `splits` / `project_id` are ignored.
+5. Budgets / reports count my books only (`COALESCE(my_share, amount)`). Event tags never count in a budget: only my own tags on the transaction (owner 2026-11-02, commit 94b4e5a).
+6. A pending draft can be a paper (owner 2026-11-02, commit 94b4e5a): `draft.paper {project_id?, split_mode, people[], event_tag_ids, pay}`; confirm = create the paper + my claim from the draft's wallet / category / tags; `needs_input` gains `people` (hard); summary and budgets count my share (all of it while nobody is on it). Paper errors land in `last_error` (VALIDATION_ERROR, EVENT_COMPLETED, MEMBER_NOT_IN_PROJECT, FORBIDDEN_ROLE now allowed there). An old draft's `splits` / `project_id` are ignored.
 7. Removed while building because nothing used them: 40 error codes (SPLITS_*, PAID_BY_*, LINK_MODE_*, PT_IS_CHILD, …, ENTRY_MANAGED_BY_SOURCE), `also_delete_link` / `also_update_link` / delete `bill_id` on transactions, the notification `Auto` switch map. New codes: NOTHING_TO_CLAIM, ALREADY_CLAIMED, NOT_BILL_OWNER, MERGE_TWO_USERS, SETTLE_NOTHING, NOT_PAPER_BOOK.
 8. Bugs found and fixed on the way: event board list 500 (an unused SQL parameter), effects of a claim missing rows not yet committed, `my_share` null on plain rows, dashboard attention list on the old notice names, add-member bad request 500.
 
-Next: owner review → app round (forms, my books, notices) → VPS wipe + baseline + deploy as PRD.
+Owner review 2026-11-02: 1–2 no change asked; 3 drafts → papers and 4 event tags out of budgets done (94b4e5a); 5 removals kept; 6 `bill_*` names OK.
+
+Next: app round (forms, my books, notices) → VPS wipe + baseline + deploy as PRD.
