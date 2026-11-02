@@ -54,6 +54,26 @@ _Follows [`paper-plan.md`](paper-plan.md) (BE + DB done on `feat/paper`). Analys
 5. Notifications + settings; debts partner repayment.
 6. Ratchets / tests; on-device pass.
 
+## 4b. Split flow: today's app → the mockup (2026-11-02)
+
+Mockup: https://claude.ai/artifact/3fjc8r7c2QghEAGuDuq8TC (A = quick create, B = tx → bill → edit, C = other states).
+
+| Mockup | Today | Change |
+| --- | --- | --- |
+| A2–A4 quick create แบ่ง | `LinkSection`: a "แบ่ง" switch row + `BillPeopleCard` (hub); shares = what each owes ME; one payer chip; my row's "A" toggle; "คืนแล้ว" per row → `_repayNow` repayments; event row on top | People hold share + paid of the WHOLE bill; หารเท่ากัน / กำหนดเอง segment (today a button); multi-payer in quick create (today only in the bill sheet); "จ่าย / ส่วน" columns in custom; status line for Σ paid and Σ share; "ใช้แอป | จะได้คำเชิญ" under a linked contact; no "คืนแล้ว" on create |
+| A2–A3 "ลงสมุดของฉัน" | none in quick create (my row's "คืน X แล้ว" = wallet) | New card: wallet / category / tags; when someone else paid, ลงหนี้ไว้ก่อน / จ่ายจากกระเป๋าแล้ว (`pay`); the result lines (my tx, debts) |
+| A save | `bookEventBill(split: true)` → `/event-bills`, or `txCubit.add(splits, link)` + `_repayNow` | ONE `POST /split-bills {paper, my_books}`; rows / debts / balances from `effects`; snackbar "ส่งคำเชิญ n | หนี้ใหม่ n" |
+| B1 tx rows | `TransactionTile`: `eventBill.event.isSplit`, `splitCount` glyph, out-of-sync from `eventBill.inSync` | Read `split_bill` (`PaperBookRef`); "ไม่ตรง" chip kept; "จ่ายโดยบี" from the paper; invite banner = new (`GET /split-bills?status=invited`) |
+| B2–B3 tx detail | `LinkViewRows` (จ่ายโดย / บิลอีเวนต์ rows → read-only card), `applyEvent`, `disconnectEventBill`, splits editable in the detail (`LinkEditSession`, PUT splits) | One "บิลแบ่ง" card → bill detail; "ไม่ตรง" card with before → after (paper values in `PaperBookRef` vs my tx) + อัปเดต (`paper-sync`); "หนี้จากบิลนี้" list (new); เลิกผูก (`unlink-paper`); the detail no longer edits people; แก้ไข = my fields only |
+| B4 bill detail | none: tapping a split tx opens the edit sheet (`openEventBill`, 6 callers) | New read page: amount / note / mode, each person's status chip, paid / share, "คืนแล้ว" tick with who ticked (PATCH), my books card, ย้ายเข้าอีเวนต์, ออกจากบิล |
+| B5 edit | `event_bill_sheet` in split mode (`isSplit`): multi-payer, 409 swap, move | Load / save on `/split-bills/:id` with `version`; people by `person_id`; × only for the owner; no my-books card, no event tags. Best: ONE paper form shared by A2 and B5 |
+| C1 invite | none | New: join / decline |
+| C2 claim | `booksOnly` mode of the bill sheet | New claim sheet (`POST …/claim`) |
+| C3 conflict | 409 silently swaps in the newer bill | A dialog with what changed, then the newer bill |
+| C4 leave / removed | none | Leave sheet keep / delete; `bill_removed` notice with keep / delete |
+
+Hub first: paper people card (BillPeopleCard + paid column + mode segment), my-books card, paper book card (tx detail), person status chip, out-of-sync card. Drop: `LinkMode` / `link_draft`, `SplitDraft` rows, the split part of `LinkEditSession`, `_repayNow`, `txCreateBody` splits / link, `bookEventBill(split)`, `applyEvent`, `disconnectEventBill`, the `splitCount` glyph.
+
 ## 5. Open questions (owner)
 
 1. Where do split bills live as a list (invites waiting, bills I'm on)?
