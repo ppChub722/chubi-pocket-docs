@@ -1,13 +1,15 @@
 # STATUS — read this first (rewritten, not appended)
 
-_Last updated: 2026-11-02. Prod = 0.4.2-3 (build 220, migration 130). 0.4.2-4 in progress; see the first section._
+_Last updated: 2026-11-02. Test server (ppForge VPS; not production, that starts at 1.0) = 0.4.2-4 (build 223, migration 130, MIN = LATEST = 223)._
 
-## Now: 0.4.2-4 — in progress (chatbot + Telegram OIDC login)
+## Now: 0.4.2-4 — RELEASED 2026-11-02 (tag v0.4.2-4: be 2031875 · app fe4f96c · docs 15353b4; release note team/releases/0.4.2-4.md)
 Briefs: `now/briefs/0.4.2-chatbot.md`, `now/briefs/telegram-oidc-login.md`.
-- **Done, on `main` (pushed):** BE `b969fae` = LLM slot (Router, `LLM_PROVIDER`) + keyword fake + chatbot cards in memory (✓ / ✗ / Reply edit, `all`, per-minute cap), fake allowed on the test server; BE `68d4d93` + app `b3d288f` = Telegram OIDC login / sign-up / link, welcome DM, "เปิดแชทบอท" row. Owner tested OIDC on the phone OK (2026-11-02).
-- **App `86d5149` (2026-11-02, not pushed):** pending `source = telegram` (label "Telegram", acts like `manual`); hub `telegram-legacy` flow removed (4 endpoints → `api_unused_baseline.txt` until the BE drops them); the OIDC client field renamed so the page-flows ratchet no longer reads the `oauth.telegram.org` calls as ours. Tests: auth / connections / pending / hub all pass.
-- **Left — BE:** user tier, K4 pending (`source = telegram`) + K3 + K2 (migration 131 `llm_calls`), Anthropic adapter + K6 eval; after the gate: remove the `/start` code endpoints.
-- **Left — release:** version 0.4.2-4+221, APK, gate MIN = LATEST = 221 (the app changed, so not BE-only). Owner: Anthropic key + spend cap, BotFather app name / logo, confirm the new bot texts. Telegram login is bound to this PC's debug keystore SHA-256.
+- **Live on the test server:** BE `2031875` (no new migrations, backup `chubi_pocket-20261102-1240.dump.gz`), APK 223 (Firebase 2223, firsttester), gate MIN = LATEST = 223 (`.env.bak-0.4.2-4`). Checks: go test 434 passed / 0 skipped, flutter test 841 passed, analyze clean.
+- **What shipped:** Telegram OIDC login / sign-up / link (no `/start` codes, no sign-up form), welcome DM, "เปิดแชทบอท" row; pending `source = telegram` (acts like `manual`); hub `telegram-legacy` flow removed. Chatbot BE pieces (LLM slot, keyword fake, in-memory cards) are in; the real chatbot is not.
+- **Fixed on release day:** `TELEGRAM_TOKEN_INVALID` was missing from the spec error enum; the sign-up username test assumed a dash in a taken name. `release.sh` now calls the VPS the test server.
+- **Left — chatbot (next):** user tier, K4 pending (`source = telegram`, counted under `manual` in `SourceCounts`) + K3 + K2 (migration 131 `llm_calls`), Anthropic adapter + K6 eval. Owner: Anthropic key + spend cap, BotFather app name / logo, confirm the new bot texts.
+- **Left — cleanup:** gate is 223, so the BE may now remove the `/start` code endpoints (`/auth/telegram/start`, `/exchange`, `/signup`, `POST /connections/{provider}/link`) and drop them from `test/hub/api_unused_baseline.txt`.
+- Telegram login is bound to this PC's debug keystore SHA-256: a new signing key or build PC → register it in BotFather again.
 
 ## Before: 0.4.2-3 — RELEASED 2026-10-31 (tag v0.4.2-3: be 9f8f3ee · app f58f669 · docs b48c939; release note team/releases/0.4.2-3.md). Owner tests it on build 220 and reviews the hub (A0 + the Thai error texts)
 Plan + progress table: `now/briefs/0.4.2-3-plan.md`. Split design: `now/briefs/split-transactions-plan.md`.
