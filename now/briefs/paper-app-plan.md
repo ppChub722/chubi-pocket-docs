@@ -74,6 +74,27 @@ Mockup: https://claude.ai/artifact/3fjc8r7c2QghEAGuDuq8TC (A = quick create, B =
 
 Hub first: paper people card (BillPeopleCard + paid column + mode segment), my-books card, paper book card (tx detail), person status chip, out-of-sync card. Drop: `LinkMode` / `link_draft`, `SplitDraft` rows, the split part of `LinkEditSession`, `_repayNow`, `txCreateBody` splits / link, `bookEventBill(split)`, `applyEvent`, `disconnectEventBill`, the `splitCount` glyph.
 
+## 4c. Owner 2026-11-02: keep today's UI
+
+The mockup is not the target: today's screens stay, only their data and calls move to the paper API. Mapping:
+
+| Today's UI | Kept as | Under the hood |
+| --- | --- | --- |
+| Quick create "แบ่ง" switch + `BillPeopleCard` (my row + people, payer chip "จ่าย", หารเท่ากัน, เพิ่มคน, event row on top) | as is | Save = `POST /split-bills` (no event) or `POST /projects/:id/bills` (event row set). Rows → paper people: shares as typed (my row = my share), the payer chip → that person's `paid` = amount. |
+| "คืนแล้ว" tick on a row | as is | `paid_back` mark only (no repayment any more; `_repayNow` goes) |
+| My row "คืน X แล้ว" (someone else paid) | as is | `my_books.pay = wallet`; off = `debt` |
+| Wallet / category / tags of the sheet | as is | `my_books` (account, category, tags) |
+| Split tx → edit opens the bill sheet (`openEventBill`) | as is | Loads `GET /split-bills/:id`, saves `PUT` with `version`; 409 swap kept |
+| Multi-payer in the bill sheet | as is | people `paid` |
+| Tx detail `LinkViewRows` (จ่ายโดย / บิล rows, read-only card) | as is | Read from `split_bill` / `event_bill` (`PaperBookRef`) |
+| "ไม่ตรง → อัปเดตตามอีเวนต์" row | as is (word fits split bills too) | `POST /transactions/:id/paper-sync` |
+| "ตัดการเชื่อม" | as is | `POST /transactions/:id/unlink-paper` |
+| Bill sheet `booksOnly` ("ลงบัญชีของฉัน") | as is | `POST …/claim` |
+| Bill sheet delete | becomes ออกจากบิล | `POST …/leave {books}` (the last user deletes); owner × on a row = `DELETE …/people/:pid` |
+| Tx row glyphs (shared / ไม่ตรง) | as is | `split_bill` instead of `eventBill.event.isSplit` / `splitCount` |
+
+Only what today's UI has no place for is added, in today's pieces: a person's status (รอตอบ / ปฏิเสธ / ออกแล้ว) in the row's tag slot; join / decline and keep / delete as notification tile actions (`bill_invite`, `bill_removed`); the keep / delete question on leave as a confirm dialog.
+
 ## 5. Open questions (owner)
 
 1. Where do split bills live as a list (invites waiting, bills I'm on)?
