@@ -5,6 +5,10 @@ Lead keeps this list current. Delete an item once it's briefed, or move it into 
 Release scope comes from `now/roadmap-1.0.md` (owner 2026-10-15). Items here that the roadmap puts out of scope (Play Store, monetization, web / admin, receipt photos, multi-currency) are dropped.
 
 
+## Saving entry: description + note (owner 2026-11-03: "ต้องมีด้วย แต่ยังก่อน"; not planned)
+- Today a saving entry has one text, `note`; the quick create ออม hero's "คำอธิบาย" field writes it. Wanted: a description (the hero field) AND a note row in the card under it, like รายการ / หนี้.
+- BE: `description` on `saving_goal_entries` + `EntryRequest` / `EntryUpdateRequest` / pending saving drafts; app: the ออม form's note row.
+
 ## Change username + currency (owner 2026-11-01: "ค่อยทำ"; not planned)
 - Why now: Telegram sign-up (0.4.2-4) makes the account with no form: username from Telegram, currency THB.
 - **Username** (~1 day): `PUT /users/me` takes `username` (3–50, a-z 0-9 _; 409 `USERNAME_EXISTS`); the edit-profile row becomes editable. Everything keys on user id, so nothing else changes.
