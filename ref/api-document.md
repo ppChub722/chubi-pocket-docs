@@ -977,7 +977,7 @@ A split bill and an event bill are one thing, a **paper**: one record everyone o
 | Split bills | Event bills | What |
 | --- | --- | --- |
 | `GET /v1/split-bills` (`status` invited \| joined) | `GET /v1/projects/:id/bills` | list (`type`, `mine`, `q`, `tag_id`, `sort`, page) |
-| `POST /v1/split-bills` | `POST /v1/projects/:id/bills` | create `{paper, my_books?}`; I own it |
+| `POST /v1/split-bills` | `POST /v1/projects/:id/bills` | create `{paper, my_books?}`; I own it. `/split-bills` also takes `new_event {name, icon_code?}`: the event and its first bill in one transaction (owner 2026-11-03) |
 | `GET /v1/split-bills/:id` | `GET /v1/projects/:id/bills/:bid` | read (an invitee may read before answering) |
 | `PUT /v1/split-bills/:id` | `PUT /v1/projects/:id/bills/:bid` | edit `{paper, version}` (409 `BILL_CHANGED`); only the owner takes people off |
 | `POST …/join`, `POST …/decline` | — | answer an invite (declined = shown as a name) |
