@@ -189,6 +189,7 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - **One migration baseline:** the DB starts from `000001_baseline`; the test server is wiped and starts from it.
 - **Drafts can be papers (owner 2026-11-02):** a pending draft may carry a paper (people, split mode, event, event tags, pay); confirming it creates the paper and my books of it from the draft's wallet, category and tags. The pending summary and budgets count my share.
 - **Tags (owner 2026-11-02):** personal tags go only on an event (my tags of it) and on a claimed bill (= my private transaction). Event tags on the bills are for the event page's reports only and never reach a budget. A budget's tag scope sees my tags on the transaction + my tags of its event.
+- **Quick create = 3 cards (owner 2026-11-03, paper round):** (1) hero card: type + date, description + amount = the bill; (2) แบ่ง card: the switch, ON shows the bill's people inside the same card; (3) tx detail card: category, wallet, tags, note, รายการประจำ = mine only (note = my private note on a split). Replaces the EntryCard rule above where it puts wallet / category inside the card. Scope over pending / หนี้ / ออม: open.
 
 ## UI
 - **0.4.0-2 polish rules (owner 2026-10-19/20):**
