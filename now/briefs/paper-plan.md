@@ -2,7 +2,7 @@
 
 _Owner talk 2026-11-02 (session chubi-pocket-34). Flow charts: https://claude.ai/artifact/WEaHcLtacGYdeekiajXvSz. This brief wins over the artifact where they differ._
 
-Scope of round 1: **DB + BE only** (app after the owner reviews the BE). The VPS data is disposable: when this lands, all migrations are squashed into one baseline, the VPS DB is wiped, and it ships as the PRD version.
+Scope of round 1: **DB + BE only** (app after the owner reviews the BE). Migrations (owner 2026-11-03, replaces the wipe): `000001_baseline` = main's migrations 1-130 in one file, `000002_paper` = old schema → paper model. The old split / event bills are dropped, not converted; everything else on the VPS stays.
 
 ## 1. Model
 
@@ -119,7 +119,7 @@ Then: report to the owner, app round.
 
 Branch `feat/paper` in chubi-pocket-be (13 commits, f971d56 … 94b4e5a). Not pushed, not deployed, the local BE not restarted.
 
-- **DB:** one file `migrations/000001_baseline.up.sql` (+ down). A fresh DB from it = 43 tables. Schema record: [`../../ref/schema.md`](../../ref/schema.md) §10 "Paper baseline".
+- **DB:** `000001_baseline` (main 1-130) + `000002_paper` (be e79b438; irreversible down). A fresh DB from both = 43 tables, identical to the paper schema (checked with migra); a copy of the dev DB at 130 migrates with transactions, balances, debts and events unchanged. Test DB: `psql` 001 then 002. Schema record: [`../../ref/schema.md`](../../ref/schema.md) §10 "Paper baseline".
 - **API:** `internal/apidoc/openapi.yaml` updated (19 retired ops gone, 21 new ops, schemas follow the Go types); map in [`../../ref/api-document.md`](../../ref/api-document.md) §10.
 - **Tests:** `go vet ./...` clean; `go test ./...` on a fresh baseline DB (`chubi_paper_test`): 31 packages ok, 0 fail, 0 skipped (the DB tests ran). New paper suite: split bill life, wallet claim → debt_repaid, remove + leave + last-leaver delete, decline + mark, event bills + lump + complete lock, move in / out with member matching, merge, repayment notice + disconnect, completed-event claim + simplified settle.
 
@@ -137,4 +137,4 @@ Built differently from §1–6, or decided while building:
 
 Owner review 2026-11-02: 1–2 no change asked; 3 drafts → papers and 4 event tags out of budgets done (94b4e5a); 5 removals kept; 6 `bill_*` names OK.
 
-Next: app round (forms, my books, notices) → VPS wipe + baseline + deploy as PRD.
+Next: app round (forms, my books, notices) → VPS: backup, `migrate force 1`, `migrate up` (002), deploy.
