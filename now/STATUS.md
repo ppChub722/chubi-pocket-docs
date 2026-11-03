@@ -2,11 +2,11 @@
 
 _Last updated: 2026-11-02. Test server (ppForge VPS; not production, that starts at 1.0) = 0.4.2-4 (build 223, migration 130, MIN = LATEST = 223)._
 
-## In progress: the paper model (branch `feat/paper` in be + docs) — BE + DB done 2026-11-02, waiting for the owner's review, then the app round
+## In progress: the paper model (branch `feat/paper` in be + app + docs) — BE on the VPS since 2026-11-03; app round under way
 Brief + round-1 status: `now/briefs/paper-plan.md` §8. Split bills and event bills = one shared paper; everyone claims their own books and follows one way. One migration baseline `000001_baseline` (the test server gets wiped and starts from it when this ships).
-- **BE:** 12 commits on `feat/paper` (not pushed, not deployed, local BE not restarted). `go vet` clean; `go test ./...` on a fresh baseline DB: 31 packages ok, 0 skip. Spec: `internal/apidoc/openapi.yaml`.
+- **BE:** `feat/paper` (not pushed), deployed to the VPS 2026-11-03 14:48 at e79b438: migrations re-based to `000001_baseline` (main 1-130) + `000002_paper` (old split / event bills dropped, everything else kept; force 1 → up; pre-002 dump in /srv/backup/manual). `go test ./...` 31 ok, 0 skip. Old APKs (≤ 223) break on split / event screens until an app from feat/paper ships.
 - **Docs:** `ref/schema.md` §10 "Paper baseline", `ref/api-document.md` §10 + error codes, `rules/decisions.md` "Papers".
-- **Next:** owner review → app (paper form, claim, my books "อัปเดต" / unlink, invites, settle lumps, notices `bill_*` / `debt_repaid`) → release with the wipe.
+- **Next:** app round on `feat/paper` (quick create event mode done; edit bill via quick create, then drop `event_bill_sheet`; event page and notices on the new API) → APK release.
 
 ## Now: 0.4.2-4 — RELEASED 2026-11-02 (tag v0.4.2-4: be 2031875 · app fe4f96c · docs 15353b4; release note team/releases/0.4.2-4.md)
 Briefs: `now/briefs/0.4.2-chatbot.md`, `now/briefs/telegram-oidc-login.md`.
