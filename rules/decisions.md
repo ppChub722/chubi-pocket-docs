@@ -184,10 +184,15 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 ### Transaction page on papers (owner 2026-11-03)
 
 - Layout follows quick create, view and edit alike: hero (type, description, amount, date, my share) → the แบ่ง card → the detail card (category + wallet as the detail page's own tiles, out of the hero; tags, recurring, note last).
-- View: a tx that is my book of a bill shows that bill's แบ่ง card (people, shares, marks), read-only. A plain tx has no แบ่ง card. No "Linked to → Event" row for a split bill.
+- View: a tx that is my book of a bill shows that bill's แบ่ง card (people, shares, marks), read-only.
+  - One call (owner 2026-11-04): `GET /transactions/{id}` carries `paper`, the bill this row is my book of, as GET of that bill gives it. The page reads no second call; a row from a list (no `paper`) still reads the bill on its own.
+  - Read-only look (owner 2026-11-04): the hero's amount (the bill's) sits in an input's frame but can't be typed, with its own gap under the top buttons. The hero's line under the amount is only "ส่วนของฉัน ฿x". No "แบ่งบิลกับคนอื่น" switch row. The event row shows only when there is an event, as "อยู่ในอีเวนต์ <name>". No "คนในบิล | n" header, no หารเท่ากัน / เพิ่มคน / ✕ / auto toggle. จ่าย and คืนแล้ว chips show only when on. The note's "กดค้างเพื่อแก้ไข" sits level with its label. A plain tx has no แบ่ง card. No "Linked to → Event" row for a split bill.
 - Edit is its own page (not a sheet), for plain and bill txs alike. The "แบ่งบิลกับคนอื่น" switch turns on / off there; everything is sent only on บันทึก.
   - Plain tx, switch on + people → a NEW split bill whose my-book IS this tx (no second tx).
   - Bill tx, switch off → I leave the bill, my tx stays plain; the last person out deletes the bill. The amount field follows the switch on screen: off → my tx's own amount, on → the bill's; an amount I typed stays. What is shown is what is saved.
+  - Undo (owner 2026-11-04) tracks every action on the page, not just my row's fields. That covers the bill's people, shares, payer and จ่าย / คืนแล้ว marks, the event pick / removal, and the recurring pick / unlink. Picks and unlinks are sent only on บันทึก. Undo only takes back a pick: anything already made from a picker (a new recurring, a new contact) stays.
+  - "สร้างรายการประจำ" from the recurring picker (tx page and quick create): the new rule is made at once. Back on the form, it is picked, with its occurrence nearest the tx date (no second sheet). "สร้างใหม่" from the contact picker already picks the new contact.
+  - Event bill (owner 2026-11-04): always a bill. The แบ่ง switch shows on and is locked until the event is removed from the bill; then it unlocks.
   - Delete a bill tx → leave first (the last one out deletes the bill), then the tx is deleted.
   - No separate "ตัดการเชื่อม" button: switching แบ่ง off is that.
 - Delete is the full-width red outlined button with its consequence line.
