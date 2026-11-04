@@ -181,6 +181,17 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - **Safe saves:** every save carries an `Idempotency-Key` that stays the same until it saves or is cancelled (Retry never writes twice). While a save runs, every kit piece with its own tap fades and locks (`BusyLock`).
 
 
+### Transaction page on papers (owner 2026-11-03)
+
+- Layout follows quick create, view and edit alike: hero (type, description, amount, date, my share) → the แบ่ง card → the detail card (category + wallet as the detail page's own tiles, out of the hero; tags, recurring, note last).
+- View: a tx that is my book of a bill shows that bill's แบ่ง card (people, shares, marks), read-only. A plain tx has no แบ่ง card. No "Linked to → Event" row for a split bill.
+- Edit is its own page (not a sheet), for plain and bill txs alike. The "แบ่งบิลกับคนอื่น" switch turns on / off there; everything is sent only on บันทึก.
+  - Plain tx, switch on + people → a NEW split bill whose my-book IS this tx (no second tx).
+  - Bill tx, switch off → I leave the bill, my tx stays plain; the last person out deletes the bill. The amount field follows the switch on screen: off → my tx's own amount, on → the bill's; an amount I typed stays. What is shown is what is saved.
+  - Delete a bill tx → leave first (the last one out deletes the bill), then the tx is deleted.
+  - No separate "ตัดการเชื่อม" button: switching แบ่ง off is that.
+- Delete is the full-width red outlined button with its consequence line.
+
 ### Papers: split bills + event bills (owner 2026-11-02; details `now/briefs/paper-plan.md`; replaces the two blocks above where they differ)
 - **One paper, everyone's own books.** A split bill or an event bill is ONE shared record (the paper) that everyone on it sees the same; it holds only amount, date, description, shared note, who paid and who owes. Nobody's book is written by the paper: each user **claims** it (a transaction; on a split bill also the debts of their pairs) and follows it **one way** (paper → books) by "อัปเดต" or their auto-sync switch. Editing my books never touches the paper; category, wallet, tags and private note are mine. Unlink a tx or a debt on its own.
 - **Split bills:** linked contacts are invited and must join before they see it (declined / left = a name). Anyone joined edits it (version check); only the owner removes people; the owner leaving passes ownership on; the last user leaving deletes it. Claim = debt branch by default, or "จ่ายแล้ว" from my wallet (the payers who hold my debt get `debt_repaid`). "คืนแล้ว" is a mark only.
@@ -350,6 +361,9 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
   - unlinked contact → contact.display_name
   - no contact → the stored snapshot
   - the same rule everywhere, including the contacts page
+  - **One name, no nickname field (owner 2026-11-03, replaces the nickname lines above):** a contact has ONE name, the one I set (labelled "ชื่อ" unlinked, "ชื่อเล่น" linked). Unlinked → it shows. Linked → their app name shows at once; the "แสดงชื่อเล่น" switch (default off, only when linked) shows my name instead. Unlinking shows my name again (as last edited). Migration 000003 drops `nickname` (prod had none) and resets `show_nickname` to off.
+  - **Icons (owner 2026-11-03):** a typed name = the grey person glyph; an unlinked contact = the icon I set (else initials); a linked contact = THEIR app avatar, always, whatever they set (even none → their initials), also with the nickname switch on — respect what they set; no icon picker while linked (mine is kept for after unlinking); an app user I have no contact for = their own avatar.
+  - ONE BE helper (`shared.PersonNameSQL` / `PersonAvatarSQL` / `ShownNameSQL` / `ShownAvatarSQL`) gives every page the name + avatar to show.
 - **Debts people list:** people whose debts are all settled are hidden by default and shown under the "ทั้งหมด" filter. The API dev page in prod is view-only (no "try it").
 - **Thin FE (owner 2026-10-12):** the FE only displays, as far as possible.
   - **UI AND API come from the hub (owner 2026-10-12, repeated):** a new piece or call goes into the hub first, then pages use it. Optimise API use hard: response payloads may be changed freely so pages make as few calls as possible.
