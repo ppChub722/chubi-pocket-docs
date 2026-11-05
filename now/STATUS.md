@@ -11,12 +11,14 @@ Checked on the VPS 2026-11-05 (read-only): `chubi-be:prod` built 2026-11-04 22:2
   - App 2026-11-03/04: tx edit is its own page (`/transactions/:id/edit`) for plain and bill txs; quick create sheet undo; tx page bill round 2; app language sent on register / Telegram login (starter categories language); notification settings for repayment auto-accept and on-split-removed; system-category rows titled by the category.
   - **Chatbot (Telegram, Haiku 5.5)** live: new card format, several items, alias wallets, reaction ✍ → 👌 / 🤷, Reply edit sends a new card, error code + ref, th / en, `./server chatbot-try` eval (37 cases). Plan and texts: `now/briefs/0.4.2-chatbot.md`; the owner's page: https://claude.ai/artifact/9TspzcZ5NPtj3wudhhykej
 - **Chatbot, in main:** lending then "log it as a category" = an expense; a transfer missing a wallet asks back; every guessed field shows `[value ?]` (confidence levels dropped). Eval case 36 fails until the next BE deploy, then re-run.
+- **Chatbot, built 2026-11-05 in be main (not deployed, not run against a DB here):** K4 (a card = pending rows, `source = telegram`; ✓ books, ✗ drops, Reply replaces), K2 + tier (migration `000005_llm_calls`: `users.tier`, `llm_calls`, monthly cap), and a transfer with one wallet = withdraw / deposit. **Before deploying: set the owner's `users.tier = 'owner'` by SQL, or the bot answers "not open yet" to everyone.** Details: `now/briefs/0.4.2-chatbot.md` "Built 2026-11-05".
 - **Left in 0.4.2-4:**
-  - **K4** card → pending row in the app (`source = telegram`; ✓ confirms, ✗ drops, Reply replaces the row); the card is still in the bot's memory, nothing lands in the app yet.
-  - **K2** `llm_calls` + 1,000 calls / month cap + `users.tier` (free / owner); migration 000005 or later.
+  - **The five create-tx blocks are in 0.4.2-4** (owner 2026-11-05): saving → tx in an event → split bill → recurring-tied tx → debt; one model call, extended `type`; JSON contract on the owner's page, in review before the build (`now/briefs/0.4.2-chatbot.md` "JSON contract", "Scope decision").
+  - Run the new DB tests (Docker / Postgres was off), deploy, re-run the eval (cases 36 + the 3 new transfer cases).
+  - Currency on the card (fixed ฿).
   - Telegram features: stop button, button colours, ✏️ edit button, toast, `/help` + bot photo / description (BotFather), bold / monospace texts.
   - Owner: Anthropic spend cap, BotFather app name / logo, confirm the bot texts, the unsure-category noise (`[category ?]`).
-- **Then:** two-step chatbot (intent, then convert) → debts, savings, split, recurring, event, edit / delete, Q&A (see the chatbot plan §roadmap). Currency on the card (fixed ฿ today) goes with K4.
+- **Then:** edit / delete, Q&A (see the chatbot plan §roadmap). Currency on the card (fixed ฿ today) goes with K4.
 - **Not deployed yet:** the `/start` code-flow cleanup is in main; check the eval re-run after the next deploy. App branch `refactor/pp-forge-decouple` is not merged.
 - Owner order of the day: when 0.4.2-4 closes (K4 + K2 + the owner's test), bump the pubspec, tag be / app / docs and write `team/releases/0.4.2-4.md` again for the final build.
 

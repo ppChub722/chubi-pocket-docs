@@ -756,6 +756,11 @@ Migration 060. One row moves an amount of ONE wallet between buckets: the wallet
 
 Owned by [`../spec/10-projects.md`](../modules/10-projects.md).
 
+### After the baseline (migrations 000003–000005)
+- `000003_contact_one_name`: `contacts.nickname` dropped; `show_nickname` defaults to false.
+- `000004_withdraw_deposit`: system categories `WITHDRAW` (expense) and `DEPOSIT` (income) for every user; a transfer with one wallet = one row in one of them.
+- `000005_llm_calls` (chatbot, 2026-11-05): `users.tier` (`free` default | `owner`, CHECK; set by SQL, no app UI) and `llm_calls` (id, user_id → users ON DELETE CASCADE, channel, provider, model, tokens_in / out, cache_read / write, ms, status = `ok` or an error code, created_at; index `(user_id, created_at)`). One row per model call, never the message text; the monthly cap counts rows since the 1st (Asia/Bangkok). `pending_transactions.source = 'telegram'` + `source_ref {channel, chat_id, card_id, message_id, text}` need no migration (the columns exist).
+
 ### Paper baseline (feat/paper, 2026-11-02) — read this first
 
 Every migration up to 130 is squashed into **one baseline, `migrations/000001_baseline.up.sql`** (down = drop schema public). Plan: [`../now/briefs/paper-plan.md`](../now/briefs/paper-plan.md). Where the table sections below differ, this block wins.
