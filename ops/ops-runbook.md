@@ -178,6 +178,7 @@ The bot is off while `TELEGRAM_BOT_TOKEN` is empty (no route, nothing started). 
 | `TELEGRAM_BOT_TOKEN` | From @BotFather. Never in git / chat / logs. |
 | `TELEGRAM_WEBHOOK_SECRET` | 1–256 chars of `A-Za-z0-9_-`, e.g. `openssl rand -hex 32`. Any other value = bot off + an error log. |
 | `TELEGRAM_WEBHOOK_URL` | `https://chubipocket-api.ppforge.dev/api/v1/telegram/webhook`. Set with `setWebhook` on every start. |
+| `CHATBOT_SAVE` | `false` (default) = the chatbot answers with the real model and shows cards and buttons but writes nothing; a tick says "trial, not in the app yet". `true` = a tick sends the rows to the pending page (or books them at once once auto submit exists). Read at start. |
 
 **Who may use it (0.4.2 1b):** the chats linked from the app (profile → Telegram), nobody else. `TELEGRAM_ALLOWED_CHAT_IDS` is retired: the BE no longer reads it, delete the line from `/srv/chubi/.env`. After the 1b deploy the owner links again through the app (unlinked chats get "เชื่อมบัญชีก่อนนะครับ: แอป → โปรไฟล์ → Telegram").
 
