@@ -1,14 +1,26 @@
 # STATUS — read this first (rewritten, not appended)
 
-_Last updated: 2026-11-02. Test server (ppForge VPS; not production, that starts at 1.0) = 0.4.2-4 (build 223, migration 130, MIN = LATEST = 223)._
+_Last updated: 2026-11-05. Test server (ppForge VPS; not production, that starts at 1.0) = **0.4.2-4, app build 229** (MIN = LATEST = 229, forced update). 0.4.2-4 is still OPEN: the tag `v0.4.2-4` (build 223, 2026-11-02) is an early cut, not the close._
 
-## In progress: the paper model (branch `feat/paper` in be + app + docs) — BE on the VPS since 2026-11-03; app round under way
-Brief + round-1 status: `now/briefs/paper-plan.md` §8. Split bills and event bills = one shared paper; everyone claims their own books and follows one way. One migration baseline `000001_baseline` (the test server gets wiped and starts from it when this ships).
-- **BE:** `feat/paper` (not pushed), deployed to the VPS 2026-11-03 14:48 at e79b438: migrations re-based to `000001_baseline` (main 1-130) + `000002_paper` (old split / event bills dropped, everything else kept; force 1 → up; pre-002 dump in /srv/backup/manual). `go test ./...` 31 ok, 0 skip. Old APKs (≤ 223) break on split / event screens until an app from feat/paper ships.
-- **Docs:** `ref/schema.md` §10 "Paper baseline", `ref/api-document.md` §10 + error codes, `rules/decisions.md` "Papers".
-- **Next:** app round on `feat/paper` (quick create event mode done; edit bill via quick create, then drop `event_bill_sheet`; event page and notices on the new API) → APK release.
+## Now: 0.4.2-4 — open, build 229 on the test server
+Checked on the VPS 2026-11-05 (read-only): `chubi-be:prod` built 2026-11-04 22:20 (+07), up 12 h; DB migration **4** (not dirty); `MIN_APP_BUILD = LATEST_APP_BUILD = 229`; `chatbot: on` (Anthropic), `LLM_LOG_BODIES` on; last auto dump `chubi_pocket-20261105-0300.dump.gz`. The image carries no commit hash: by build time it is be `c3d65a6` (main head, withdraw / deposit) or close to it. The app's `pubspec.yaml` on main still says `0.4.2-4+223`: build 229 was not committed with its number, no tag for it yet.
+- **Done and merged to main (be + app + docs), on the test server:**
+  - Telegram OIDC login / sign-up / link, welcome DM (build 223).
+  - **Paper model** (`feat/paper` merged): split bills and event bills are one shared paper; migrations re-based to `000001_baseline` + `000002_paper`. Record: `ref/schema.md` §10, `ref/api-document.md` §10, `rules/decisions.md` "Papers"; brief `now/briefs/paper-plan.md` §8.
+  - `000003_contact_one_name` (one contact name), `000004_withdraw_deposit` (a transfer with one wallet = one WITHDRAW / DEPOSIT row, system kinds, editable and deletable).
+  - App 2026-11-03/04: tx edit is its own page (`/transactions/:id/edit`) for plain and bill txs; quick create sheet undo; tx page bill round 2; app language sent on register / Telegram login (starter categories language); notification settings for repayment auto-accept and on-split-removed; system-category rows titled by the category.
+  - **Chatbot (Telegram, Haiku 5.5)** live: new card format, several items, alias wallets, reaction ✍ → 👌 / 🤷, Reply edit sends a new card, error code + ref, th / en, `./server chatbot-try` eval (37 cases). Plan and texts: `now/briefs/0.4.2-chatbot.md`; the owner's page: https://claude.ai/artifact/9TspzcZ5NPtj3wudhhykej
+- **Chatbot, in main:** lending then "log it as a category" = an expense; a transfer missing a wallet asks back; every guessed field shows `[value ?]` (confidence levels dropped). Eval case 36 fails until the next BE deploy, then re-run.
+- **Left in 0.4.2-4:**
+  - **K4** card → pending row in the app (`source = telegram`; ✓ confirms, ✗ drops, Reply replaces the row); the card is still in the bot's memory, nothing lands in the app yet.
+  - **K2** `llm_calls` + 1,000 calls / month cap + `users.tier` (free / owner); migration 000005 or later.
+  - Telegram features: stop button, button colours, ✏️ edit button, toast, `/help` + bot photo / description (BotFather), bold / monospace texts.
+  - Owner: Anthropic spend cap, BotFather app name / logo, confirm the bot texts, the unsure-category noise (`[category ?]`).
+- **Then:** two-step chatbot (intent, then convert) → debts, savings, split, recurring, event, edit / delete, Q&A (see the chatbot plan §roadmap). Currency on the card (fixed ฿ today) goes with K4.
+- **Not deployed yet:** the `/start` code-flow cleanup is in main; check the eval re-run after the next deploy. App branch `refactor/pp-forge-decouple` is not merged.
+- Owner order of the day: when 0.4.2-4 closes (K4 + K2 + the owner's test), bump the pubspec, tag be / app / docs and write `team/releases/0.4.2-4.md` again for the final build.
 
-## Now: 0.4.2-4 — RELEASED 2026-11-02 (tag v0.4.2-4: be 2031875 · app fe4f96c · docs 15353b4; release note team/releases/0.4.2-4.md)
+## Earlier in 0.4.2-4 — first cut, APK 223, 2026-11-02 (tag v0.4.2-4: be 2031875 · app fe4f96c · docs 15353b4; release note team/releases/0.4.2-4.md)
 Briefs: `now/briefs/0.4.2-chatbot.md`, `now/briefs/telegram-oidc-login.md`.
 - **Live on the test server:** BE `2031875` (no new migrations, backup `chubi_pocket-20261102-1240.dump.gz`), APK 223 (Firebase 2223, firsttester), gate MIN = LATEST = 223 (`.env.bak-0.4.2-4`). Checks: go test 434 passed / 0 skipped, flutter test 841 passed, analyze clean.
 - **What shipped:** Telegram OIDC login / sign-up / link (no `/start` codes, no sign-up form), welcome DM, "เปิดแชทบอท" row; pending `source = telegram` (acts like `manual`); hub `telegram-legacy` flow removed. Chatbot BE pieces (LLM slot, keyword fake, in-memory cards) are in; the real chatbot is not.
