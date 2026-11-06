@@ -67,6 +67,9 @@ cd chubi-pocket-be
 - host ตั้งต้น = `Admin@143.14.147.249` (ppForge) · เปลี่ยนได้ด้วย `VPS_HOST`
 - APK: build number = จำนวน commit ของ repo แอป → แจกกลุ่ม `firsttester` · ตั้งแต่ build 172 แอปส่ง `X-App-Build` เป็นเลข pubspec (172) · BE อ่าน versionCode แบบแยก ABI (2172) เป็น 172 ด้วย (`appversion.PubspecBuild`)
 
+### Deploy BE บน ppForge: ใช้สคริปต์เดียว (AI ตัวไหนก็ใช้ได้)
+`cd chubi-pocket-be && ./scripts/deploy-ppforge.sh --dry-run` ดูแผน แล้วรันโดยไม่มี flag · build ที่เครื่องเรา, ส่ง image ขึ้น, สลับ, เช็ก health, ถอยเองถ้าไม่ผ่าน · เจอ migration ใหม่จะหยุด (exit 2) รอเจ้าของสั่ง แล้วค่อยรัน `--migrate` · ไม่แตะ gate อัปเดตแอป ไม่ push · skill: `ops/skills/deploy-be/SKILL.md` (ตัวที่ Claude Code โหลดอยู่ที่ `.claude/skills/deploy-be/` ใน root โปรเจกต์ ซึ่งไม่ใช่ git repo จึงไม่ตามไปกับเครื่อง · **เครื่องใหม่:** ก๊อป `chubi-pocket-docs/ops/skills/deploy-be/` ไปไว้ที่ `<root>/.claude/skills/deploy-be/` · ตัวใน docs คือต้นฉบับ แก้ที่นี่ก่อนแล้วก๊อปไปให้ตรงกัน · สคริปต์อยู่ใน repo หลังบ้าน `scripts/deploy-ppforge.sh` ต้อง commit + push ถึงจะตามไป)
+
 ### Deploy BE บน ppForge แบบทำมือ (ใช้เมื่อ script ใช้ไม่ได้)
 ```bash
 cd chubi-pocket-be && ./scripts/local-deploy.sh                      # build image จาก tree ที่ commit แล้ว (ได้ chubi-pocket-be-app:latest)
