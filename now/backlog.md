@@ -14,6 +14,11 @@ Release scope comes from `now/roadmap-1.0.md` (owner 2026-10-15). Items here tha
 - **Username** (~1 day): `PUT /users/me` takes `username` (3–50, a-z 0-9 _; 409 `USERNAME_EXISTS`); the edit-profile row becomes editable. Everything keys on user id, so nothing else changes.
 - **Currency** (~½–1 day): today locked after sign-up (`rules/decisions.md`, 0.4.2-3). Options: (a) changeable until the first money row exists (Lead's pick), (b) always (label only, the old problem), (c) chosen on the new-member landing page.
 
+## Chatbot, postponed with no date (owner 2026-11-06)
+- Slips (OCR) and voice into the chatbot.
+- The separate chat app (looks like Telegram, no history on the server) with a shared Flutter package.
+- Chatbot billing (below).
+
 ## Chatbot billing — pay as you go (owner 2026-10-30: "ต้องทำแยก แต่อย่าพึ่ง"; its own track, not planned)
 - Users pay for chatbot use. This is new monetization, which the roadmap (2026-10-15) had left out; the owner's call of 2026-10-30 wins.
 - Ideas (not decided) and the usage data it builds on: `now/briefs/0.4.2-chatbot.md` → "Out of v1".
