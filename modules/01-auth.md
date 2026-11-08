@@ -297,13 +297,13 @@ Flow:
 
 **Success — `200 OK`:** same shape as `/auth/login`.
 
-#### `PUT /v1/auth/username`
+#### Change username — `PUT /v1/users/me` with `username` (built 2026-11-09)
 
 *Requires auth.*
 
-Change username. Ceremonial — rate-limited to once per 30 days per user.
+Change username. No separate route, no password, no rate limit (owner 2026-11-09). Same rule as register: `A-Z a-z 0-9 _ - .`, 3–50 characters, a dot never first, last or doubled (`auth.ValidUsername`); a bad value → 400 `VALIDATION_ERROR`, taken → 409 `USERNAME_EXISTS`. Case counts: `Alice` and `alice` are two names (exact match, no `LOWER()`). The old name is free at once and login with it stops. Existing names are not re-checked.
 
-**Request body:** `{ "new_username": "new_alice", "current_password": "..." }`
+**Request body:** `{ "username": "new.alice" }` (with any other `PUT /users/me` field)
 
 ---
 
@@ -354,7 +354,7 @@ Errors return the standard envelope:
 
 ### 3.1 Three identity fields: username + email + display_name
 
-- **`username`** — stable login handle; lives in URLs and `@mentions`; lowercase ASCII only so it's safe everywhere
+- **`username`** — stable login handle; the login handle and the `@username` shown in the app; ASCII `A-Z a-z 0-9 _ - .`, case counts; changeable (§3.11)
 - **`email`** — communication channel; used for verification, password reset, contact-linking lookup
 - **`display_name`** — human-readable; free text; mutable; non-unique
 
@@ -421,9 +421,9 @@ Google sign-in is user-visible UX so it feels like a Phase 2 feature, but it bri
 
 That's production-grade work. Phase 3 is the right home — when going public, where Google sign-in dramatically helps conversion, that's also when the complexity is worth paying for.
 
-### 3.11 Username changes are ceremonial
+### 3.11 Username changes (decided 2026-11-09: free, no rate limit)
 
-Username lives in URLs and may be referenced externally. Changing it breaks links and mentions. Allow but rate-limit (once per 30 days) to discourage churn. Phase 3+.
+Every table keys on the user id, the JWT carries no username, and nothing links or mentions by username, so a change breaks nothing except login with the old name. Owner 2026-11-09: allowed through `PUT /users/me`, no rate limit, no password check (Telegram accounts have none). The rule copies Google's: a dot is never first, last or doubled; unlike Gmail, case and dots count.
 
 ---
 

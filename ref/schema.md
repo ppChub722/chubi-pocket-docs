@@ -77,7 +77,7 @@ Stores identity. Profile and preference columns are also here but documented in 
 | Column               | Type           | Constraints                                          | Description                                                 |
 | -------------------- | -------------- | ---------------------------------------------------- | ----------------------------------------------------------- |
 | `id`                 | `UUID`         | PK (v7)                                              | Unique user identifier                                      |
-| `username`           | `VARCHAR(50)`  | UNIQUE, NOT NULL                                     | Login handle; lowercase, `[a-z0-9_-]`, 3–50 chars           |
+| `username`           | `VARCHAR(50)`  | UNIQUE, NOT NULL                                     | Login handle; `[A-Za-z0-9_.-]`, 3–50, case counts, no edge/double dot |
 | `email`              | `VARCHAR(255)` | UNIQUE, NULLABLE _(Phase 1)_ / NOT NULL _(Phase 2+)_ | Optional in Phase 1; required when email verification ships |
 | `email_verified_at`  | `TIMESTAMPTZ`  | NULLABLE                                             | Set when user completes verification flow _(Phase 2+)_      |
 | `display_name`       | `VARCHAR(100)` | NOT NULL                                             | Shown in UI; free text, any Unicode                         |
