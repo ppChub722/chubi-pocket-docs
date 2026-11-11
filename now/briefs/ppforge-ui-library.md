@@ -50,7 +50,35 @@ The layering test (`test/ui/layering_test.dart`) does not catch these:
 
 **Kit freeze:** while steps 1–2 run, the chubi team does not change `lib/ui/` (Lead enforces this). Changes you need in chubi-pocket-app go on a branch / worktree that Lead merges; never commit to chubi's main branch yourself.
 
+## Status 2026-11-09 (re-extraction from main @ 87b041f)
+Worktree `chubi-pocket-app-ppforge`, branch `refactor/pp-forge-ui` (local, not pushed, nothing merged to main); package repo `pp-forge-core`, branch `refactor/from-app-87b041f`. The first extraction (2026-10-17) was dropped; `lib/src` was replaced from main.
+- **Leaks cut** (the list below is done): icons (`PpForgeIcons`, 55 semantic icons; `AppIcons` stays in the app and aliases them), colours (`AppColors` generic; wallet colours moved to `ModuleColors`), navigation (`PageExitScope`, host injects the leave action), theme and font registries (`configure(...)`, `AppTheme` takes any ThemeExtensions), strings. Stays in chubi: `ui/domain/` incl. `tokens/` (AppIcons, modules, currencies, ModuleColors, QuickCreateMode, TextLimits, chubi themes).
+- **Renamed:** 67 `App*` / `Ui*` types to `PpForge*`; the app keeps the old names as typedefs in `lib/ui/app_aliases.dart`. Files `app_*.dart` are `pp_forge_*.dart` in the package.
+- **Layering test** now: generic layers import only generic files + flutter / intl / google_fonts / characters (baseline empty).
+- **Step 4 done:** 210 generic files live in the package (`lib/src/`), the app depends on it by path (`../pp-forge-core`), `lib/ui/ui.dart` re-exports it. `flutter analyze` 0 issues in both repos. **No tests run yet** (run on the owner's word).
+- **Icon system moved in** (owner decision, differs from "leave icons in chubi" above): the engine is in the package (`PpForgeIconCode` with toJson / fromJson, registry, shapes, backgrounds incl. rainbow / snowflake / wreath / starburst, packs type, swatch grid, icon maker via `showPpForgeIconMaker(packs:, strings:)`). The app keeps `IconType`, the pack data, `type_icon_default`, avatar colours and the l10n wrapper. Design: the DB stores the icon code per user / row, the app reads it, the package draws it. Open: `PpForgeIconRegistry.register` so a host can add its own glyph ids.
+- **Step 5 (hub) started:** the portal framework is in the package (`package:pp_forge_core/hub.dart`: `HubLevel` / `HubSection` / `HubPage` as host-extensible classes, `PpForgeHub` registry, `hubRoute()`, an environment-driven toolbar, the playground kit) with 14 kit pages that need no app data. The app keeps `domain` / `api` / `labs` / `debug` and 20 kit-level pages whose demos still use chubi pieces (MoneyText, Avatar, IconDisplay, ApiException, ModuleColors …); they move once their demos use neutral content. `example/` is a new gallery on the framework. Hub order inside a level is now kit pages first, then the app's.
+- **Not moved yet:** those 20 demo pages, shell pieces (`fade_branch_container`, `keyboard_insets_guard`, `tab_root_scaffold`, `tab_nav`), guard tests (step 6), the newer UI pieces listed at the end. The package's old `test/` is stale.
+- **Not reported** to `team/inbox/ui-lib.md` on purpose (owner 2026-11-09: this work is done on our side, no inbox report).
+
+## Direction 2026-11-09: tablet landscape first
+The package targets **mobile and tablet apps only, no web, no desktop**. The next app is **tablet landscape first**; phone and tablet portrait collapse from it later. chubi-pocket-app stays phone-first and is not converted.
+- **Size tokens come only from the package, on two axes:** a named step (xs..xl) per role (icon, avatar, button, chip …) times a screen class. An app never writes a pixel number; widgets take the step and read the screen class themselves. Today's literals (`size: 36`, `28`, `18` …, ~150 in the app) are snapped to steps in a separate round (owner picks: snap to nearest step vs add steps).
+- **Screen class from the window, not the device** (split-screen on tablets): two-pane at width >= 840dp and height >= 480dp, wide single column at 600 to 840, phone below 600. A phone in landscape is wide but short, so it stays single column.
+- **New pieces:** `PpForgeScreenClass`, size tables (`PpForgeSizes.configure`), `PpForgeTwoPane` (list-detail, collapses on phone), a side rail instead of the bottom bar, dialogs / side panels instead of bottom sheets on wide screens, a content max-width for forms and settings. The hub and the gallery preview in a tablet frame (about 1200 x 800dp) with a switch for portrait and phone.
+- The bottom bar / top bar question under "Open" is now answered: they become configurable library pieces, as part of this direction.
+
+## Core toolkit (non-UI), decided 2026-11-09
+The package also carries what apps share besides widgets, as a **toolkit, not a framework**: each app (chubi-pocket now, a separate chubi-note later) is complete in its own repo with its own backend, accounts, strings and routing, and only consumes core pieces. Core never owns routing, lifecycle or the shell; the app builds instances (api client, session, logger, language service) and passes them in. No global `X.instance`.
+- **Entry point `package:pp_forge_core/core.dart`** (the old plan called it `app.dart`); `testing.dart` for test helpers. dio stays out of `ui.dart`.
+- **Pieces:** `Result` / `Failure` / `guard` (I/O returns a Result, never throws); `PpForgeApiClient` (dio, every call a Result, the app supplies how a failed response is read so any backend stack works; idempotency keys, retry, reachability signals); `SessionManager` + `TokenStore` / `SecureTokenStore` + `AuthProvider` (accounts are per app; single-flight refresh, one resend after 401); `runAction` + `ActionGate` (no double tap, Result back, the app shows the snackbar); `LanguageService` (language code, not Locale); `KeyValueStore` / `SecureStore` interfaces (the app adapts its storage); `AppEnv` / `AppConfig`; `PpForgeLogger` with sinks (console, rotating file), `Breadcrumbs`; `runBoot`, `AppVersionInfo`, `versionGateRedirect`; `FakeHttpAdapter`.
+- **Stays in the app:** endpoints, models, error-code to text tables, login pages, ARB strings, real config values, domain code, and the sync layer (`sync_*`, `data_changes`), which is tied to chubi's `X-Sync-Versions` protocol until a second app needs offline.
+- **Rules (test `core_rules_test`):** core imports only downward (foundation < config / storage / log < language / auth < boot < api < action < testing), never the UI layers, only dart / dio / equatable; no `throw` in core code.
+- Plan and checklist: `pp-forge-core/PLAN.md`.
+
 ## Constraints
+_The "Core library deps" line is superseded by the 2026-11-09 decision above (dio, flutter_bloc, secure storage, connectivity, go_router allowed)._
+
 - **Flutter:** 3.47.3 via fvm (the PATH `flutter` 3.38 fails pub resolution). Dart sdk `^3.11.4`. Lints `flutter_lints ^6.0.0`.
 - **Core library deps:** `flutter`, `intl`, `go_router` (shell / edit mode) only.
   - No `flutter_bloc`, `dio` or app models in the core.
@@ -63,9 +91,9 @@ The layering test (`test/ui/layering_test.dart`) does not catch these:
 - **Prod:** never touch chubi-pocket prod, the VPS or the release tags.
 
 ## Open: ask the owner before building
-- Package name (proposal `ppforge_ui`) and repo location (proposal: a sibling folder `…\ppond\projects\ppforge-ui`, its own git repo).
-- How chubi depends on it: a path dependency while developing, then a git tag.
-- Whether the bottom bar / top bar become library pieces now or later.
+- ~~Package name and repo location~~ answered: `pp-forge-core`, sibling folder, its own git repo.
+- How chubi depends on it: a path dependency while developing (today), then a git tag before merging to main.
+- ~~Bottom bar / top bar~~ answered: library pieces, with the tablet direction above.
 
 ## Report
 Write progress and the final report to `chubi-pocket-docs/team/inbox/ui-lib.md` (newest on top). Lead reads it and coordinates the chubi side. Include:
