@@ -55,7 +55,8 @@ The layering test (`test/ui/layering_test.dart`) does not catch these:
 - **App main `dd097e7`** (merge of `refactor/pp-forge-ui`, pushed): `pp_forge_core` from git, `ref: v0.1.1`; the `App*` / `Ui*` aliases are gone (83 names, 284 files now use `PpForge*`); `KeyboardInsetsGuard` and the shader come from the package; hub coverage test reads the package's names too (baseline -19). Analyze 0, flutter test 831 passed (main before: 828), `flutter build web` OK. The owner ran it on the web against the VPS.
 - **APK:** see `now/STATUS.md` (Firebase, firsttester). Gate untouched.
 - **How to change the kit now:** `build/app-hub.md` (generic = pp-forge-core + tag + bump; domain = `lib/ui/domain`); decision in `rules/decisions.md` "UI kit from pp-forge-core".
-- **Left for later:** D3 (CI, CHANGELOG), the size-token snap round (~150 literals), the sync layer into core when chubi-note needs offline; old branches `refactor/pp-forge-ui` (app) and `refactor/from-app-87b041f` (core) are merged and can be deleted; worktree `chubi-pocket-app-ppforge` can go.
+- **D3 done (2026-11-13, core `4d0c8f6`):** CI (GitHub Actions: analyze, tests, example tests + web build), `CHANGELOG.md`, README (Core section, CI, Releasing), example Core section. Merged branches and the `chubi-pocket-app-ppforge` worktree are deleted.
+- **Left for later:** the size-token snap round (~150 literals); the sync layer into core when chubi-note needs offline.
 
 ## Status 2026-11-12 (checked by Lead)
 - **Truth = `pp-forge-core/PLAN.md`** on branch `refactor/from-app-87b041f` (last commit `3f2d222`, 2026-11-11). Roadmap A (core toolkit), B (tablet foundation) and C (remaining UI) are written; **no tests run since the lean-suite change**. D (full test run, merge, tag `v0.1.0`, CI, move chubi-pocket-app) not started.
