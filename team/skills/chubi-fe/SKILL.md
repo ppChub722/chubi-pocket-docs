@@ -24,7 +24,8 @@ You get work ONLY from **Lead** (SendMessage). English only. Don't write reports
 
 ## Kit = the app hub (`/#/dev`), Atomic Design
 - **Layers:**
-  - `lib/ui/{tokens,atoms,molecules,organisms,templates,domain}`, exported through the `ui.dart` gate (a layering lint guards it)
+  - generic layers (tokens, atoms, molecules, organisms, templates, icon engine, glass, page motion) = the **pp-forge-core** package (git tag in `pubspec.yaml`, names `PpForge*`, no `App*` aliases since 2026-11-13); the app keeps `lib/ui/domain`; all exported through the `ui.dart` gate (a layering lint guards it)
+  - a generic change goes into pp-forge-core + a new tag, then the app bumps the tag (`build/app-hub.md`)
   - generic pieces never import features / app models / l10n
   - domain pieces may
 - **EVERY visual widget lives in the kit, even if used once** (owner 2026-10-13):

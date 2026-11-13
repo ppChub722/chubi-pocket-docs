@@ -123,8 +123,9 @@ Add a line whenever the owner decides something. Newest decisions overwrite olde
 - **API rules re-stated (owner 2026-10-17):** as few endpoints as possible (extend existing answers; new endpoint only when needed) · the BE returns everything a page shows, ready to display · one page open = one call for most pages.
 - **Feature-widget audit (owner 2026-10-17):** fixed IN 0.4.0, not as a separate round: a ratchet test (feature visuals may only shrink) + every reworked page moves its own-look widgets into the kit.
 - **Short text values in detail boxes (owner 2026-10-17):** one row (label left, value right) when it fits; a long value falls back to the stacked look.
-- **UI library package name / repo:** parked (owner 2026-10-17).
+- **UI library package name / repo:** repo `pp-forge-core`, package `pp_forge_core`, classes `PpForge*`; a sibling folder of the app, its own git repo (owner, by 2026-11-09).
 - **Kit freeze lifted (owner 2026-10-17):** the library AI works on its own branch; chubi edits lib/ui freely and the library follows later.
+- **UI kit from pp-forge-core (owner 2026-11-13, replaces the 2026-10-18 kit workflow below):** the app takes its generic kit from the pp-forge-core package (git tag, v0.1.1 at the switch) and uses the `PpForge*` names directly; the `App*` / `Ui*` aliases are gone. New or changed generic pieces are built in pp-forge-core (hub page there first), tagged, then the app bumps the tag; app-only pieces stay in `lib/ui/domain`.
 - **Kit workflow (owner 2026-10-18):** build new kit pieces on chubi-pocket-app `main`, hub first (try the piece in the dev hub, then pages use it). Packaging into ppForge comes later, by moving the hub's generic part into the package.
 - **Currency (owner 2026-10-15, replaces 2026-10-12):**
   - USER-level currency on /me, picked at first setup (default THB); every record keeps its currency column, filled by the server from the user's setting; no currency picker on any form

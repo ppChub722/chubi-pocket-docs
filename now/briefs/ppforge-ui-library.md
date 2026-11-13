@@ -50,6 +50,20 @@ The layering test (`test/ui/layering_test.dart`) does not catch these:
 
 **Kit freeze:** while steps 1–2 run, the chubi team does not change `lib/ui/` (Lead enforces this). Changes you need in chubi-pocket-app go on a branch / worktree that Lead merges; never commit to chubi's main branch yourself.
 
+## Status 2026-11-13: DONE, chubi-pocket-app runs on pp-forge-core
+- **Package:** tags `v0.1.0` (`a1e22df`) and `v0.1.1` (`bf81a3f`, = `main`). v0.1.1 fixes the web build (the server image cache used a 64-bit hash JS cannot hold; now two 32-bit FNV-1a lanes, same value on VM and web). Analyze 0, tests 68/68, the example builds for web. App main's generic `lib/ui` work up to `28e9f04` is ported (page motion as `PpForgePageMotion`, glass + `liquid_glass.frag` as a package asset, `StatusBarScrim`, `SkeletonShimmer`, hub page `atoms/glass`). Hub smoke test no longer hangs; a real `HubPlayground` bug (stale values when reused for another page) fixed.
+- **App main `dd097e7`** (merge of `refactor/pp-forge-ui`, pushed): `pp_forge_core` from git, `ref: v0.1.1`; the `App*` / `Ui*` aliases are gone (83 names, 284 files now use `PpForge*`); `KeyboardInsetsGuard` and the shader come from the package; hub coverage test reads the package's names too (baseline -19). Analyze 0, flutter test 831 passed (main before: 828), `flutter build web` OK. The owner ran it on the web against the VPS.
+- **APK:** see `now/STATUS.md` (Firebase, firsttester). Gate untouched.
+- **How to change the kit now:** `build/app-hub.md` (generic = pp-forge-core + tag + bump; domain = `lib/ui/domain`); decision in `rules/decisions.md` "UI kit from pp-forge-core".
+- **Left for later:** D3 (CI, CHANGELOG), the size-token snap round (~150 literals), the sync layer into core when chubi-note needs offline; old branches `refactor/pp-forge-ui` (app) and `refactor/from-app-87b041f` (core) are merged and can be deleted; worktree `chubi-pocket-app-ppforge` can go.
+
+## Status 2026-11-12 (checked by Lead)
+- **Truth = `pp-forge-core/PLAN.md`** on branch `refactor/from-app-87b041f` (last commit `3f2d222`, 2026-11-11). Roadmap A (core toolkit), B (tablet foundation) and C (remaining UI) are written; **no tests run since the lean-suite change**. D (full test run, merge, tag `v0.1.0`, CI, move chubi-pocket-app) not started.
+- **Both branches are pushed:** core `refactor/from-app-87b041f`, app `refactor/pp-forge-ui` (`b4759dc`). Core `main` is still the dropped 2026-10-17 WIP (package `pp_forge`, README points at a wrong `pp-forge.git` URL).
+- **Local clone:** `chubi-pocket\pp-forge-core` (sibling of the app, as the app's `path: ../pp-forge-core` expects), on `refactor/from-app-87b041f`. The old worktree `chubi-pocket-app-ppforge` is gone since the machine move; recreate it from `origin/refactor/pp-forge-ui` when the work resumes.
+- **App main has moved:** `refactor/pp-forge-ui` is 6 commits behind main. Since base `87b041f`, main changed 18 files in `lib/ui` (+1094 / -211): glass look (`tokens/glass_look.dart`), `app_durations`, page transitions, page-set centre button, skeleton cross-fade, hub listings. PLAN's C4 ("no new commits in lib/ui") is outdated; port these into the package before D4.
+- Old app branch `refactor/pp-forge-decouple` (first extraction, path `../pp-forge`) deleted from remote 2026-11-12.
+
 ## Status 2026-11-09 (re-extraction from main @ 87b041f)
 Worktree `chubi-pocket-app-ppforge`, branch `refactor/pp-forge-ui` (local, not pushed, nothing merged to main); package repo `pp-forge-core`, branch `refactor/from-app-87b041f`. The first extraction (2026-10-17) was dropped; `lib/src` was replaced from main.
 - **Leaks cut** (the list below is done): icons (`PpForgeIcons`, 55 semantic icons; `AppIcons` stays in the app and aliases them), colours (`AppColors` generic; wallet colours moved to `ModuleColors`), navigation (`PageExitScope`, host injects the leave action), theme and font registries (`configure(...)`, `AppTheme` takes any ThemeExtensions), strings. Stays in chubi: `ui/domain/` incl. `tokens/` (AppIcons, modules, currencies, ModuleColors, QuickCreateMode, TextLimits, chubi themes).

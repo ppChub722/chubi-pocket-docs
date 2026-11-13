@@ -7,30 +7,31 @@ one-off widgets. The hub is English only; app UI strings stay Thai.
 
 ## Layers (Atomic Design)
 
+Since 2026-11-13 the generic layers live in the **pp-forge-core** package
+(`github.com/ppChub722/pp-forge-core`, a git dependency pinned to a tag in
+`pubspec.yaml`; local clone `chubi-pocket\pp-forge-core`). The app keeps only
+its own pieces:
+
 ```
+pp_forge_core (package)  tokens, atoms, molecules, organisms, templates, icon engine + icon maker,
+                         glass (MirrorSurface), page motion (PpForgePageMotion), hub framework
+                         + the kit's hub pages. Every piece is named PpForge* (or a plain name).
 lib/ui/
-  ui.dart            THE GATE — features import ONLY this from lib/ui
-  tokens/            spacing, radius, durations, chip_size, icon_size, tone, typography   ← structure (generic)
-    app/             colours (money, module), themes, fonts, icons, text limits, currencies ← the app's own values
-  atoms/             app_button, app_icon_button, app_chip, app_badge, app_input, app_switch, app_divider,
-                     app_text, app_card, app_avatar, app_spinner, app_icon, select_check, add_tile, skeletons,
-                     ui_config (UiStrings / UiErrors / UiConfig)…
-  molecules/         detail_row, danger_row, pick_card, stepper_pill, month/day pickers, amount_input,
-                     snackbar, dialogs, empty/error/loading views, chip_row, filter_bar, …
-  organisms/         section_card, hero_card, sheets (app/picker/option/action/side), async_state_view,
-                     pull_to_refresh, saving_overlay, reorder/, charts/
-  templates/         detail_page, list_page, form_sheet, edit_mode_mixin
-  domain/            the app's own pieces: money/, people/, icons/ (icon maker), transactions/ (tx_row),
-                     brand/, feedback/, l10n/ (AppUiConfig — the Thai for the generic kit)
+  ui.dart            THE GATE — re-exports pp_forge_core/ui.dart + the app's domain; features
+                     import ONLY this from lib/ui
+  domain/            the app's own pieces: tokens/ (AppIcons, ModuleColors, chubi themes, currencies,
+                     TextLimits), money/, people/, icons/ (packs, chubiIconMakerStrings), transactions/,
+                     brand/, feedback/, l10n/ (AppUiConfig — the Thai for the kit's PpForgeConfig)
   debug/             secret_tap
-lib/hub/             the hub screens (registry, index, page frame, pages/, debug/)
+lib/hub/             the app's hub pages (domain, API, labs, debug, and kit pages whose demos
+                     use app data); the registry merges them with the kit's pages
 ```
 
-* **Generic** pieces (tokens, atoms, molecules, organisms, templates) never import
-  features, app models, the localisation strings, the network layer or money
-  colours — a future core library ("ppForge") can be extracted from them. They get
-  words and error descriptions from `UiConfig` (`UiStrings`, `UiErrors`); the app
-  fills them once at its root with `AppUiConfig` (`ui/domain/l10n/`).
+* The app uses the kit's names directly (`PpForgeButton`, `PpForgeSpacing` …);
+  there are no `App*` / `Ui*` aliases any more (owner 2026-11-13).
+* **Generic** pieces never know the app: words and error descriptions come from
+  `PpForgeConfig` (`PpForgeStrings`, `PpForgeErrors`), filled once at the app's root
+  by `AppUiConfig`.
 * **Domain** pieces may know the app (money, people, transactions…).
 * Every piece is tagged generic | domain on its hub page.
 
@@ -46,7 +47,10 @@ lib/hub/             the hub screens (registry, index, page frame, pages/, debug
 
 ## Adding or changing a piece
 
-1. Build / change it under `lib/ui/<level>/` (generic or domain), export it from `ui.dart`.
+1. A **domain** piece: build it under `lib/ui/domain/`, export it from `ui.dart`.
+   A **generic** piece: change it in pp-forge-core (with its kit hub page and tests),
+   tag a new version, then bump the tag in the app's `pubspec.yaml`. For quick work,
+   point the app at `path: ../pp-forge-core` meanwhile, but never merge that to main.
 2. Show every variant and state on its hub page (`lib/hub/pages/…`, built from
    `hub_kit.dart`: `HubDemo`, `HubCell`, `HubRow`); add the piece's name to the page's
    `covers` in `lib/hub/hub_registry.dart`.
